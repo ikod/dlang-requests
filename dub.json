@@ -1,0 +1,10 @@
+{
+	"name": "request",
+	"description": "A minimal D application.",
+	"copyright": "Copyright © 2016, igor",
+	"authors": ["igor"],
+    "libs-posix": ["ssl", "crypto"],
+	"dependencies": {
+        "pegged": "0.2.1"
+	}
+}

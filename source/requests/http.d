@@ -14,6 +14,7 @@ import std.string;
 import std.traits;
 import std.experimental.logger;
 import core.thread;
+import core.stdc.errno;
 import pegged.grammar;
 import requests.streams;
 import requests.uri;
@@ -147,6 +148,11 @@ class ConnectError: Exception {
     }
 }
 
+class TimeoutException: Exception {
+    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
+        super(msg, file, line);
+    }
+}
 
 interface Auth {
     string[string] authHeaders(string domain);
@@ -316,11 +322,11 @@ struct Request {
         Auth           __authenticator;
         uint           __keepAlive = 0;
         uint           __maxRedirects = 10;
-        size_t         __maxHeadersLength = 16 * 1024; // 16 KB
+        size_t         __maxHeadersLength = 32 * 1024; // 16 KB
         size_t         __maxContentLength = 5 * 1024 * 1024; // 5MB
         ptrdiff_t      __contentLength;
         SocketStream   __stream;
-        Duration       __timeout = 1.seconds;
+        Duration       __timeout = 30.seconds;
         Response       __response;
         Response[]     __history; // redirects history
         size_t         __bufferSize = 16*1024; // 16k
@@ -561,7 +567,11 @@ struct Request {
         
         while(true) {
             read = __stream.receive(b);
+            tracef("read: %d", read);
             if ( read < 0 ) {
+                if ( errno == EAGAIN ) {
+                    throw new TimeoutException("Timeout receiving headers");
+                }
                 throw new ErrnoException("receiving Headers");
             }
             if ( read == 0 )
@@ -597,6 +607,9 @@ struct Request {
             }
             read = __stream.receive(b);
             if ( read < 0 ) {
+                if ( errno == EAGAIN ) {
+                    throw new TimeoutException("Timeout receiving body");
+                }
                 throw new ErrnoException("receiving body");
             }
             tracef("read: %d", read);
@@ -609,6 +622,8 @@ struct Request {
             __response.__responseBody.put(__bodyDecoder.get());
             tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", receivedBodyLength, __contentLength, __response.__responseBody.length);
         }
+        __bodyDecoder.flush();
+        __response.__responseBody.put(__bodyDecoder.get());
     }
 
     Response exec(string method)(string url, string[string] rqData) if (method=="POST") {
@@ -647,17 +662,17 @@ struct Request {
 
         receiveResponse();
 
-        if ( __response.__code == 302 && followRedirectResponse() ) {
-            goto connect;
-        }
-        
         auto connection = "connection" in __response.__responseHeaders;
         if ( !connection || *connection == "close" ) {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             __stream.close();
         }
-        __bodyDecoder.flush();
-        __response.__responseBody.put(__bodyDecoder.get());
+        if ( canFind([302, 303], __response.__code) && followRedirectResponse() ) {
+            if ( __method != "GET" ) {
+                return this.get();
+            }
+            goto connect;
+        }
         __response.__history = __history;
         return __response;
     }
@@ -731,24 +746,23 @@ struct Request {
         receiveResponse();
 
         ///
-        if ( __response.__code == 302 && followRedirectResponse() ) {
-            goto connect;
-        }
-        
         auto connection = "connection" in __response.__responseHeaders;
         if ( !connection || *connection == "close" ) {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             __stream.close();
         }
-        __bodyDecoder.flush();
-        __response.__responseBody.put(__bodyDecoder.get());
+        if ( canFind([302, 303], __response.__code) && followRedirectResponse() ) {
+            if ( __method != "GET" ) {
+                return this.get();
+            }
+            goto connect;
+        }
         __response.__history = __history;
-        
         ///
         return __response;
     }
 
-    Response exec(string method="POST", R)(string url, R content, string contentType) 
+    Response exec(string method="POST", R)(string url, R content, string contentType="text/html")
         if ( isSomeString!R
             || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front)))) 
             || (rank!R == 2 && (is(Unqual!(typeof(content.front.front)) == ubyte)))
@@ -809,29 +823,30 @@ struct Request {
         receiveResponse();
 
         ///
-        if ( __response.__code == 302 && followRedirectResponse() ) {
-            goto connect;
-        }
-        
         auto connection = "connection" in __response.__responseHeaders;
         if ( !connection || *connection == "close" ) {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             __stream.close();
         }
-        __bodyDecoder.flush();
-        __response.__responseBody.put(__bodyDecoder.get());
-        __response.__history = __history;
+        if ( canFind([302, 303], __response.__code) && followRedirectResponse() ) {
+            if ( __method != "GET" ) {
+                return this.get();
+            }
+            goto connect;
+        }
         ///
+        __response.__history = __history;
         return __response;
     }
     
-    Response exec(string method="GET")(string url = null, string[string] params = null, string file=__FILE__, size_t line=__LINE__) {
+    Response exec(string method="GET")(string url = null, string[string] params = null) if (method != "POST")
+    {
 
         __method = method;
         __response = Response.init;
         __history.length = 0;
 
-        checkURL(url, file, line);
+        checkURL(url);
 
     connect:
 
@@ -855,26 +870,27 @@ struct Request {
         }
 
         receiveResponse();
-        ///
-        if ( __response.__code == 302 && followRedirectResponse() ) {
-            goto connect;
-        }
 
+        ///
         auto connection = "connection" in __response.__responseHeaders;
         if ( !connection || *connection == "close" ) {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             __stream.close();
         }
-        __bodyDecoder.flush();
-        __response.__responseBody.put(__bodyDecoder.get());
-        __response.__history = __history;
+        if ( canFind([302, 303], __response.__code) && followRedirectResponse() ) {
+            if ( __method != "GET" ) {
+                return this.get();
+            }
+            goto connect;
+        }
         ///
+        __response.__history = __history;
         return __response;
     }
 
     Response get(string url = null, string[string] params = null, string file=__FILE__, size_t line=__LINE__) {
         __method = "GET";
-        return exec(url, params, file, line);
+        return exec(url, params);
     }
     
 }
@@ -990,6 +1006,7 @@ unittest {
     rq = Request();
     rq.keepAlive = 5;
     rs = rq.exec!"GET"("http://httpbin.org/relative-redirect/2");
+    writeln(rs.history.length);
     assert(rs.history.length == 2);
     assert(rs.code==200);
 //    rq = Request();
@@ -1000,6 +1017,7 @@ unittest {
 //    rq = Request();
     rq.maxRedirects = 2;
     rs = rq.exec!"GET"("http://httpbin.org/absolute-redirect/3");
+    writeln(rs.history.length);
     assert(rs.history.length == 2);
     assert(rs.code==302);
 
@@ -1024,12 +1042,12 @@ unittest {
     rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
     assert(rs.code==200);
  
-    globalLogLevel(LogLevel.info);
+    globalLogLevel(LogLevel.trace);
     info("Check exception handling");
     rq = Request();
-    assertThrown!ErrnoException(rq.get("http://httpbin.org/delay/3"));
-    assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
     rq.timeout = 1.seconds;
+    assertThrown!TimeoutException(rq.get("http://httpbin.org/delay/3"));
+    assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
     assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
 
     globalLogLevel(LogLevel.info);

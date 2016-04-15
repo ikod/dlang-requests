@@ -10,6 +10,7 @@ import std.range;
 import std.range.primitives;
 import std.string;
 import std.stdio;
+import std.traits;
 import std.zlib;
 
 
@@ -191,7 +192,7 @@ class DecodeChunked : DataPipeIface!ubyte {
                 linebuff ~= data;
                 data.length = 0;
                 auto s = linebuff.findSplit(CRLF);
-                if ( !s ) {
+                if ( !s[1].length ) {
                     if ( linebuff.length >= 80 ) {
                         throw new DecodingExceptioin("Can't find chunk size in the body");
                     }
@@ -233,7 +234,7 @@ class DecodeChunked : DataPipeIface!ubyte {
                 linebuff ~= data;
                 data.length = 0;
                 auto s = linebuff.findSplit(CRLF);
-                if ( s ) {
+                if ( s[1].length ) {
                     data = s[2];
                     chunk_size = 0;
                     linebuff.length = 0;

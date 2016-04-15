@@ -205,7 +205,7 @@ abstract class SocketStream {
     auto connect(string host, short port, Duration timeout = 10.seconds)
     in {assert(isOpen);}
     body {
-        tracef("Create connection to %s:%d", host, port);
+        tracef(format("Create connection to %s:%d", host, port));
         Address[] addresses;
         __isConnected = false;
         try {
@@ -669,7 +669,7 @@ struct Request {
                 each!(h => req.put(h));
         req.put("\r\n");
         req.put(encoded);
-        tracef("req: %s", req);
+        tracef(format("req: %s", req));
         auto rc = __stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);
@@ -739,7 +739,7 @@ struct Request {
             each!(h => req.put(h));
         req.put("\r\n");
         
-        tracef("req: %s", req);
+        tracef(format("req: %s", req));
         auto rc = __stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);
@@ -813,7 +813,7 @@ struct Request {
             each!(h => req.put(h));
         req.put("\r\n");
 
-        tracef("req: %s", req);
+        tracef(format("req: %s", req));
         auto rc = __stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);
@@ -878,7 +878,7 @@ struct Request {
             map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
             each!(h => req.put(h));
         req.put("\r\n");
-        tracef("req: %s", req);
+        tracef(format("req: %s", req));
         auto rc = __stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);

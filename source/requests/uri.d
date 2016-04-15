@@ -71,7 +71,7 @@ struct URI {
                 break;
             case "uri_grammar.Port":
                 tracef("Port '%s'", tree.matches.join);
-                __port = to!ushort(tree.matches.join);
+                __port = std.conv.to!ushort(tree.matches.join);
                 break;
             case "uri_grammar.Path":
                 tracef("Path '%s'", tree.matches.join);

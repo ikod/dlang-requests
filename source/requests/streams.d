@@ -255,6 +255,9 @@ class DecodeChunked : DataPipeIface!ubyte {
         debug tracef("empty=%b", buff.empty);
         return buff.empty;
     }
+    bool done() {
+        return state==States.trailer;
+    }
 }
 
 unittest {
@@ -317,6 +320,9 @@ struct Buffer(T) {
 
     this(this) {
         __repr = new Repr(__repr);
+    }
+   ~this() {
+        __repr = null;
     }
     auto put(U)(U[] data) {
         if ( data.length == 0 ) {

@@ -280,6 +280,10 @@ struct Response {
         Buffer!ubyte   __responseBody;
         Response[]     __history; // redirects history
     }
+   ~this() {
+        __responseHeaders = null;
+        __history.length = 0;
+    }
     mixin(getter("code"));
     mixin(getter("status_line"));
     mixin(getter("responseHeaders"));
@@ -332,6 +336,7 @@ struct Request {
         size_t         __bufferSize = 16*1024; // 16k
 
         DataPipe!ubyte __bodyDecoder;
+        DecodeChunked  __unChunker;
     }
 
     mixin(getter("keepAlive"));
@@ -406,6 +411,7 @@ struct Request {
     auto analyzeHeaders(in string[string] headers) {
 
         __contentLength = -1;
+        __unChunker = null;
         auto contentLength = "content-length" in headers;
         if ( contentLength ) {
             try {
@@ -422,7 +428,8 @@ struct Request {
         if ( transferEncoding ) {
             tracef("transferEncoding: %s", *transferEncoding);
             if ( *transferEncoding == "chunked") {
-                __bodyDecoder.insert(new DecodeChunked());
+                __unChunker = new DecodeChunked();
+                __bodyDecoder.insert(__unChunker);
             }
         }
         auto contentEncoding = "content-encoding" in headers;
@@ -466,7 +473,7 @@ struct Request {
             }
             __response.__responseHeaders[header] = value;
 
-            tracef("Heder %s = %s", header, value);
+            tracef("Header %s = %s", header, value);
             lastHeader = header;
         }
     }
@@ -556,11 +563,17 @@ struct Request {
         scope(exit) {
             __stream.s.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, 0.seconds);
         }
+
         __bodyDecoder = new DataPipe!ubyte();
-        
+        auto b = new ubyte[__bufferSize];
+        scope(exit) {
+            __bodyDecoder = null;
+            __unChunker = null;
+            b = null;
+        }
+
         auto buffer = Buffer!ubyte();
         Buffer!ubyte ResponseHeaders, partialBody;
-        auto b = new ubyte[__bufferSize];
         size_t receivedBodyLength;
         ptrdiff_t read;
         string separator;
@@ -603,6 +616,9 @@ struct Request {
         while( true ) {
             if ( __contentLength >= 0 && receivedBodyLength >= __contentLength ) {
                 trace("Body received.");
+                break;
+            }
+            if ( __unChunker && __unChunker.done ) {
                 break;
             }
             read = __stream.receive(b);
@@ -1006,7 +1022,6 @@ unittest {
     rq = Request();
     rq.keepAlive = 5;
     rs = rq.exec!"GET"("http://httpbin.org/relative-redirect/2");
-    writeln(rs.history.length);
     assert(rs.history.length == 2);
     assert(rs.code==200);
 //    rq = Request();
@@ -1017,7 +1032,6 @@ unittest {
 //    rq = Request();
     rq.maxRedirects = 2;
     rs = rq.exec!"GET"("http://httpbin.org/absolute-redirect/3");
-    writeln(rs.history.length);
     assert(rs.history.length == 2);
     assert(rs.code==302);
 
@@ -1030,6 +1044,7 @@ unittest {
     info("Check chunked content");
     globalLogLevel(LogLevel.info);
     rq = Request();
+    rq.keepAlive = 5;
     rq.bufferSize = 16*1024;
     rs = rq.get("http://httpbin.org/range/1024");
     assert(rs.code==200);

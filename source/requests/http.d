@@ -271,7 +271,12 @@ class TCPSocketStream : SocketStream {
         s = new Socket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
     }
 }
-
+///
+/// Response - this is result of request
+///
+/// Response.code - response code
+/// Response.responseBody - container for received body
+///  
 struct Response {
     private {
         ushort         __code;
@@ -317,7 +322,9 @@ struct PostFile {
     string fieldName;    // name of the field (if empty - send file base name)
     string contentType;  // contentType of the file if not empty
 }
-
+///
+/// Request main structure
+///
 struct Request {
     private {
         string         __method = "GET";
@@ -488,10 +495,6 @@ struct Request {
         return false;
     }
 
-//    bool handleAuthRequest() {
-//        // we received 401, 
-//    }
-
     bool followRedirectResponse() {
         __history ~= __response;
         if ( __history.length >= __maxRedirects ) {
@@ -641,7 +644,20 @@ struct Request {
         __bodyDecoder.flush();
         __response.__responseBody.put(__bodyDecoder.get());
     }
-
+    ///
+    /// execute POST request.
+    /// Send form-urlencoded data
+    /// 
+    /// Parameters:
+    ///     url = url to request
+    ///     rqData = data to send
+    ///  Returns:
+    ///     Response
+    ///  Examples:
+    ///  ------------------------------------------------------------------
+    ///  rs = rq.exec!"POST"("http://httpbin.org/post", ["a":"b", "c":"d"]);
+    ///  ------------------------------------------------------------------
+    ///
     Response exec(string method)(string url, string[string] rqData) if (method=="POST") {
         //
         // application/x-www-form-urlencoded
@@ -692,7 +708,22 @@ struct Request {
         __response.__history = __history;
         return __response;
     }
-
+    ///
+    /// send file(s) using POST
+    /// Parameters:
+    ///     url = url
+    ///     files = array of PostFile structures
+    /// Returns:
+    ///     Response
+    /// Example:
+    /// ---------------------------------------------------------------
+    ///    PostFile[] files = [
+    ///                   {fileName:"tests/abc.txt", fieldName:"abc", contentType:"application/octet-stream"}, 
+    ///                   {fileName:"tests/test.txt"}
+    ///               ];
+    ///    rs = rq.exec!"POST"("http://httpbin.org/post", files);
+    /// ---------------------------------------------------------------
+    /// 
     Response exec(string method="POST")(string url, PostFile[] files) {
         import std.uuid;
         import std.file;
@@ -777,7 +808,27 @@ struct Request {
         ///
         return __response;
     }
-
+    ///
+    /// POST data from some string(with Content-Length), or from range of strings (use Transfer-Encoding: chunked)
+    /// 
+    /// Parameters:
+    ///    url = url
+    ///    content = string or input range
+    ///    contentType = content type
+    ///  Returns:
+    ///     Response
+    ///  Examples:
+    ///      rs = rq.exec!"POST"("http://httpbin.org/post", "привiт, свiт!", "application/octet-stream");
+    ///      
+    ///      auto s = lineSplitter("one,\ntwo,\nthree.");
+    ///      rs = rq.exec!"POST"("http://httpbin.org/post", s, "application/octet-stream");
+    ///      
+    ///      auto s = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    ///      rs = rq.exec!"POST"("http://httpbin.org/post", s.representation.chunks(10), "application/octet-stream");
+    ///
+    ///      auto f = File("tests/test.txt", "rb");
+    ///      rs = rq.exec!"POST"("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
+    ///      
     Response exec(string method="POST", R)(string url, R content, string contentType="text/html")
         if ( isSomeString!R
             || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front)))) 
@@ -854,7 +905,17 @@ struct Request {
         __response.__history = __history;
         return __response;
     }
-    
+    ///
+    /// Send request without data
+    /// Request parameters will be encoded into request string
+    /// Parameters:
+    ///     url = url
+    ///     params = request parameters
+    ///  Returns:
+    ///     Response
+    ///  Examples:
+    ///     rs = Request().exec!"GET"("http://httpbin.org/get", ["c":"d", "a":"b"]);
+    ///     
     Response exec(string method="GET")(string url = null, string[string] params = null) if (method != "POST")
     {
 

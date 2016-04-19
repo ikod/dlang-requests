@@ -341,6 +341,7 @@ struct Request {
         Response       __response;
         Response[]     __history; // redirects history
         size_t         __bufferSize = 16*1024; // 16k
+        uint           __verbosity = 0;  // 0 - no output, 1 - headers, 2 - headers+body info
 
         DataPipe!ubyte __bodyDecoder;
         DecodeChunked  __unChunker;
@@ -361,6 +362,8 @@ struct Request {
     mixin(setter("maxHeadersLength"));
     mixin(getter("bufferSize"));
     mixin(setter("bufferSize"));
+    mixin(getter("verbosity"));
+    mixin(setter("verbosity"));
 
     this(string uri) {
         __uri = URI(uri);
@@ -369,6 +372,10 @@ struct Request {
         if ( __stream && __stream.isConnected) {
             __stream.close();
         }
+        __stream = null;
+        __headers = null;
+        __authenticator = null;
+        __history = null;
     }
 
     void addHeaders(in string[string] headers) {
@@ -457,6 +464,9 @@ struct Request {
             if ( ! __response.status_line.length ) {
                 tracef("statusLine: %s", line);
                 __response.status_line = line;
+                if ( __verbosity >= 1 ) {
+                    writefln("< %s", line);
+                }
                 auto parsed = line.split(" ");
                 if ( parsed.length >= 3 ) {
                     __response.code = parsed[1].to!ushort;
@@ -479,6 +489,9 @@ struct Request {
                 value = stored ~ ", " ~ value;
             }
             __response.__responseHeaders[header] = value;
+            if ( __verbosity >= 1 ) {
+                writefln("< %s: %s", parsed[0], value);
+            }
 
             tracef("Header %s = %s", header, value);
             lastHeader = header;
@@ -611,6 +624,10 @@ struct Request {
         analyzeHeaders(__response.__responseHeaders);
         __bodyDecoder.put(partialBody.data);
 
+        if ( __verbosity >= 2 ) {
+            writefln("< %d bytes of body received", partialBody.length);
+        }
+
         if ( __method == "HEAD" ) {
             // HEAD response have ContentLength, but have no body
             return;
@@ -630,6 +647,9 @@ struct Request {
                     throw new TimeoutException("Timeout receiving body");
                 }
                 throw new ErrnoException("receiving body");
+            }
+            if ( __verbosity >= 2 ) {
+                writefln("< %d bytes of body received", read);
             }
             tracef("read: %d", read);
             if ( read == 0 ) {
@@ -686,6 +706,10 @@ struct Request {
         req.put("\r\n");
         req.put(encoded);
         tracef(format("req: %s", req));
+        if ( __verbosity >= 1 ) {
+            req.data.splitLines.each!(a => writeln("> " ~ a));
+        }
+
         auto rc = __stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);
@@ -771,6 +795,10 @@ struct Request {
         req.put("\r\n");
         
         tracef(format("req: %s", req));
+        if ( __verbosity >= 1 ) {
+            req.data.splitLines.each!(a => writeln("> " ~ a));
+        }
+
         auto rc = __stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);
@@ -865,6 +893,10 @@ struct Request {
         req.put("\r\n");
 
         tracef(format("req: %s", req));
+        if ( __verbosity >= 1 ) {
+            req.data.splitLines.each!(a => writeln("> " ~ a));
+        }
+
         auto rc = __stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);
@@ -940,6 +972,9 @@ struct Request {
             each!(h => req.put(h));
         req.put("\r\n");
         tracef(format("req: %s", req));
+        if ( __verbosity >= 1 ) {
+            req.data.splitLines.each!(a => writeln("> " ~ a));
+        }
         auto rc = __stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);
@@ -1118,7 +1153,7 @@ unittest {
     rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
     assert(rs.code==200);
  
-    globalLogLevel(LogLevel.trace);
+    globalLogLevel(LogLevel.info);
     info("Check exception handling");
     rq = Request();
     rq.timeout = 1.seconds;

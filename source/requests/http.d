@@ -12,6 +12,7 @@ import std.range;
 import std.socket;
 import std.string;
 import std.traits;
+import std.typecons;
 import std.experimental.logger;
 import core.thread;
 import core.stdc.errno;
@@ -284,6 +285,7 @@ struct Response {
         string[string] __responseHeaders;
         Buffer!ubyte   __responseBody;
         Response[]     __history; // redirects history
+        SysTime        __startedAt, __connectedAt, __requestSentAt, __finishedAt;
     }
    ~this() {
         __responseHeaders = null;
@@ -301,6 +303,16 @@ struct Response {
         mixin(setter("status_line"));
         mixin(setter("responseHeaders"));
         mixin(setter("responseBody"));
+    }
+    @property auto getStats() const pure @safe {
+        alias statTuple = Tuple!(Duration, "connectTime",
+                                 Duration, "sendTime",
+                                 Duration, "recvTime");
+        statTuple stat;
+        stat.connectTime = __connectedAt - __startedAt;
+        stat.sendTime = __requestSentAt - __connectedAt;
+        stat.recvTime = __finishedAt - __requestSentAt;
+        return stat;
     }
 }
 
@@ -342,7 +354,6 @@ struct Request {
         Response[]     __history; // redirects history
         size_t         __bufferSize = 16*1024; // 16k
         uint           __verbosity = 0;  // 0 - no output, 1 - headers, 2 - headers+body info
-
         DataPipe!ubyte __bodyDecoder;
         DecodeChunked  __unChunker;
     }
@@ -687,11 +698,13 @@ struct Request {
         __response = Response.init;
         checkURL(url);
     connect:
+        __response.__startedAt = Clock.currTime;
         setupConnection();
         
         if ( !__stream.isConnected() ) {
             return __response;
         }
+        __response.__connectedAt = Clock.currTime;
 
         string encoded = params2query(rqData);
         auto h = headers;
@@ -715,8 +728,11 @@ struct Request {
             errorf("Error sending request: ", lastSocketError);
             return __response;
         }
+        __response.__requestSentAt = Clock.currTime;
 
         receiveResponse();
+
+        __response.__finishedAt = Clock.currTime;
 
         auto connection = "connection" in __response.__responseHeaders;
         if ( !connection || *connection == "close" ) {
@@ -759,12 +775,14 @@ struct Request {
         __response = Response.init;
         checkURL(url);
     connect:
+        __response.__startedAt = Clock.currTime;
         setupConnection();
         
         if ( !__stream.isConnected() ) {
             return __response;
         }
-        
+        __response.__connectedAt = Clock.currTime;
+
         Appender!string req;
         req.put(requestString());
         
@@ -817,9 +835,11 @@ struct Request {
             __stream.send("\r\n");
         }
         __stream.send("--" ~ boundary ~ "--\r\n");
+        __response.__requestSentAt = Clock.currTime;
 
         receiveResponse();
 
+        __response.__finishedAt = Clock.currTime;
         ///
         auto connection = "connection" in __response.__responseHeaders;
         if ( !connection || *connection == "close" ) {
@@ -871,11 +891,13 @@ struct Request {
         __response = Response.init;
         checkURL(url);
     connect:
+        __response.__startedAt = Clock.currTime;
         setupConnection();
         
         if ( !__stream.isConnected() ) {
             return __response;
         }
+        __response.__connectedAt = Clock.currTime;
 
         Appender!string req;
         req.put(requestString());
@@ -918,8 +940,11 @@ struct Request {
             tracef("sent");
             __stream.send("0\r\n\r\n");
         }
+        __response.__requestSentAt = Clock.currTime;
 
         receiveResponse();
+
+        __response.__finishedAt = Clock.currTime;
 
         ///
         auto connection = "connection" in __response.__responseHeaders;
@@ -958,12 +983,13 @@ struct Request {
         checkURL(url);
 
     connect:
-
+        __response.__startedAt = Clock.currTime;
         setupConnection();
 
         if ( !__stream.isConnected() ) {
             return __response;
         }
+        __response.__connectedAt = Clock.currTime;
 
         Appender!string req;
         req.put(requestString(params));
@@ -980,14 +1006,22 @@ struct Request {
             errorf("Error sending request: ", lastSocketError);
             return __response;
         }
+        __response.__requestSentAt = Clock.currTime;
 
         receiveResponse();
+
+        __response.__finishedAt = Clock.currTime;
 
         ///
         auto connection = "connection" in __response.__responseHeaders;
         if ( !connection || *connection == "close" ) {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             __stream.close();
+        }
+        if ( __verbosity >= 1 ) {
+            writeln(">> Connect time: ", __response.__connectedAt - __response.__startedAt);
+            writeln(">> Request send time: ", __response.__requestSentAt - __response.__connectedAt);
+            writeln(">> Response recv time: ", __response.__finishedAt - __response.__requestSentAt);
         }
         if ( canFind([302, 303], __response.__code) && followRedirectResponse() ) {
             if ( __method != "GET" ) {
@@ -1013,13 +1047,16 @@ unittest {
     tracef("http tests - start");
 
     assert(Request.params2query(["c":"d", "a":"b"])=="a=b&c=d");
-    auto rs = Request().get("http://httpbin.org/get", ["c":"d", "a":"b"]);
-    assert(rs.code == 200);
-    rs = Request().get("https://httpbin.org/");
+
+    auto rq = Request();
+    auto rs = rq.get("https://httpbin.org/");
     assert(rs.code==200);
+    assert(rs.responseBody.length > 0);
+    rs = Request().get("http://httpbin.org/get", ["c":"d", "a":"b"]);
+    assert(rs.code == 200);
 
     globalLogLevel(LogLevel.info);
-    auto rq = Request();
+    rq = Request();
     rq.keepAlive = 5;
     // handmade json
     info("Check POST json");

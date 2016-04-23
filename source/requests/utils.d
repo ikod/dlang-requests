@@ -9,7 +9,7 @@ static this() {
 
 auto getter(string name) {
     return `
-        @property auto ` ~ name ~ `() const @safe @nogc {
+        @property final auto ` ~ name ~ `() const @safe @nogc {
             return __` ~ name ~ `;
         }
     `;
@@ -18,8 +18,8 @@ auto setter(string name) {
     string member = "__" ~ name;
     string t = "typeof(this."~member~")";
     return `
-        @property void ` ~ name ~`(` ~ t ~ ` s) {`~ 
-    member ~`=s;
+        @property final void ` ~ name ~`(` ~ t ~ ` s) {`~ 
+             member ~`=s;
         }
     `;
 }

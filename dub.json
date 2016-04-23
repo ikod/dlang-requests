@@ -6,6 +6,5 @@
     "license": "LGPL-3.0",
     "libs-posix": ["ssl", "crypto"],
 	"dependencies": {
-        "pegged": ">=0.2.1"
 	}
 }

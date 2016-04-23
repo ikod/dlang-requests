@@ -16,7 +16,6 @@ import std.typecons;
 import std.experimental.logger;
 import core.thread;
 import core.stdc.errno;
-import pegged.grammar;
 import requests.streams;
 import requests.uri;
 import requests.utils;
@@ -471,7 +470,7 @@ struct Request {
 
     void parseResponseHeaders(ref Buffer!ubyte buffer) {
         string lastHeader;
-        foreach(line; buffer.split("\n").map!(l => l.data!string.stripRight)) {
+        foreach(line; buffer.data!(string).split("\n").map!(l => l.stripRight)) {
             if ( ! __response.status_line.length ) {
                 tracef("statusLine: %s", line);
                 __response.status_line = line;
@@ -633,7 +632,7 @@ struct Request {
         }
         
         analyzeHeaders(__response.__responseHeaders);
-        __bodyDecoder.put(partialBody.data);
+        __bodyDecoder.put(partialBody);
 
         if ( __verbosity >= 2 ) {
             writefln("< %d bytes of body received", partialBody.length);

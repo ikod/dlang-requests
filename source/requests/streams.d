@@ -53,6 +53,22 @@ class DataPipe(E) : DataPipeIface!E {
         }
         t.each!(b => buffer.put(b));
     }
+    void put(Buffer!E buff) {
+        if ( pipe.empty ) {
+            if ( buffer.__repr is null ) {
+                buffer = buff;
+                return;
+            }
+            buffer.__repr.__buffer ~= buff.__repr.__buffer;
+            buffer.__repr.__length += buff.length;
+            return;
+        }
+        auto t = process(pipe.front, buff.__repr.__buffer);
+        foreach(ref p; pipe[1..$]) {
+            t = process(p, t);
+        }
+        t.each!(b => buffer.put(b));
+    }
     E[] get() {
         if ( buffer.empty ) {
             return E[].init;

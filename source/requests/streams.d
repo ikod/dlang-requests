@@ -69,7 +69,7 @@ class DataPipe(E) : DataPipeIface!E {
         }
         t.each!(b => buffer.put(b));
     }
-    E[] get() {
+    E[] get() pure {
         if ( buffer.empty ) {
             return E[].init;
         }
@@ -77,7 +77,7 @@ class DataPipe(E) : DataPipeIface!E {
         buffer = Buffer!E.init;
         return res;
     }
-    bool empty() {
+    bool empty() pure const @safe {
         return buffer.empty;
     }
     void flush() {
@@ -117,7 +117,7 @@ class Decompressor(E) : DataPipeIface!E {
         }
         __buff.put(__zlib.uncompress(data));
     }
-    override E[] get() {
+    override E[] get() pure {
         assert(__buff.length);
         auto r = __buff.__repr.__buffer[0];
         __buff.popFrontN(r.length);
@@ -143,7 +143,7 @@ class Decompressor(E) : DataPipeIface!E {
         debug tracef("empty=%b", __buff.empty);
         return __buff.empty;
     }
-    @property auto ref front() {
+    @property auto ref front() pure const @safe {
         debug tracef("front: buff length=%d", __buff.length);
         return __buff.front;
     }
@@ -338,17 +338,20 @@ struct Buffer(T) {
     this(this) {
         __repr = new Repr(__repr);
     }
+    this(U)(U[] data) pure {
+        put(data);
+    }
    ~this() {
         __repr = null;
     }
-    auto put(U)(U[] data) {
+    auto put(U)(U[] data) pure {
         if ( data.length == 0 ) {
             return this;
         }
         if ( !__repr ) {
             __repr = new Repr;
         }
-        tracef("Append %d bytes", data.length);
+        debug tracef("Append %d bytes", data.length);
         static if (!is(U == T)) {
             auto d = castFrom!(U[]).to!(T[])(data);
             __repr.__length += d.length;

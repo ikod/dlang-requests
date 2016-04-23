@@ -622,9 +622,9 @@ struct Request {
                 throw new RequestException("Headers length > maxHeadersLength (%d > %d)".format(buffer.length, maxHeadersLength));
             }
             if ( headersHaveBeenReceived(data, buffer, separator) ) {
-                auto s = buffer.findSplit(separator);
-                ResponseHeaders = s[0];
-                partialBody = s[2];
+                auto s = buffer.data!(ubyte[]).findSplit(separator);
+                ResponseHeaders = Buffer!ubyte(s[0]);
+                partialBody = Buffer!ubyte(s[2]);
                 receivedBodyLength += partialBody.length;
                 parseResponseHeaders(ResponseHeaders);
                 break;

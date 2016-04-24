@@ -864,7 +864,7 @@ struct Request {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             __stream.close();
         }
-        if ( canFind([302, 303], __response.__code) && followRedirectResponse() ) {
+        if ( canFind([301, 302, 303], __response.__code) && followRedirectResponse() ) {
             if ( __method != "GET" ) {
                 return this.get();
             }

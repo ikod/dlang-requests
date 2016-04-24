@@ -211,8 +211,8 @@ abstract class SocketStream {
         try {
             addresses = getAddress(host, port);
         } catch (Exception e) {
-            errorf("Can't resolve %s - %s", host, e.msg);
-            return this;
+            errorf("Failed to connect: can't resolve %s - %s", host, e.msg);
+            throw new ConnectError("Can't connect to %s:%d: %s".format(host, port, e.msg));
         }
         s.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDTIMEO, timeout);
         foreach(a; addresses) {
@@ -223,7 +223,7 @@ abstract class SocketStream {
                 __isConnected = true;
                 break;
             } catch (SocketException e) {
-                errorf("Failed to connect: %s", e.msg);
+                warningf("Failed to connect: %s", e.msg);
             }
             reopen();
             s.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDTIMEO, timeout);
@@ -1218,6 +1218,7 @@ unittest {
     assertThrown!TimeoutException(rq.get("http://httpbin.org/delay/3"));
     assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
     assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
+    assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
 
     globalLogLevel(LogLevel.info);
     info("Check limits");
@@ -1227,6 +1228,5 @@ unittest {
     rq = Request();
     rq.maxHeadersLength = 1;
     assertThrown!RequestException(rq.get("http://httpbin.org/"));
-    rq = Request();
     tracef("http tests - ok");
 }

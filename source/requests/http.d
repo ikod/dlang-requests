@@ -414,6 +414,10 @@ struct Request {
     }
 
     @property string requestString(string[string] params = null) {
+        if ( __method != "GET" ) {
+            // encode params into url only for GET
+            return "%s %s HTTP/1.1\r\n".format(__method, __uri.path);
+        }
         auto query = __uri.query.dup;
         if ( params ) {
             query ~= params2query(params);
@@ -423,11 +427,25 @@ struct Request {
         }
         return "%s %s%s HTTP/1.1\r\n".format(__method, __uri.path, query);
     }
-
+    static string urlEncoded(string p) pure @safe {
+        string[dchar] translationTable = [
+            ' ':  "%20", '!': "%21", '*': "%2A",
+            '\'': "%27", '(': "%28", ')': "%29",
+            ';':  "%3B", ':': "%3A", '@': "%40",
+            '&':  "%26", '=': "%3D", '+': "%2B",
+            '$':  "%24", ',': "%2C", '/': "%2F",
+            '?':  "%3F", '#': "%23", '[': "%5B",
+            ']':  "%5D", '%': "%25",
+        ];
+        return translate(p, translationTable);
+    }
+    unittest {
+        assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
+    }
     static string params2query(string[string] params) {
         auto m = params.keys.
                         sort().
-                        map!(a=>"%s=%s".format(a, params[a])).
+                        map!(a=>urlEncoded(a) ~ "=" ~ urlEncoded(params[a])).
                         join("&");
         return m;
     }
@@ -717,7 +735,8 @@ struct Request {
                 each!(h => req.put(h));
         req.put("\r\n");
         req.put(encoded);
-        tracef(format("req: %s", req));
+        trace(req);
+
         if ( __verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
@@ -811,7 +830,7 @@ struct Request {
             each!(h => req.put(h));
         req.put("\r\n");
         
-        tracef(format("req: %s", req));
+        trace(req);
         if ( __verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
@@ -913,7 +932,7 @@ struct Request {
             each!(h => req.put(h));
         req.put("\r\n");
 
-        tracef(format("req: %s", req));
+        trace(req);
         if ( __verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
@@ -996,7 +1015,8 @@ struct Request {
             map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
             each!(h => req.put(h));
         req.put("\r\n");
-        tracef(format("req: %s", req));
+        trace(req);
+
         if ( __verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
@@ -1044,25 +1064,27 @@ unittest {
     import std.json;
     globalLogLevel(LogLevel.info);
     tracef("http tests - start");
-
-    assert(Request.params2query(["c":"d", "a":"b"])=="a=b&c=d");
+    assert(Request.params2query(["c ":"d", "a":"b"])=="a=b&c%20=d");
 
     auto rq = Request();
     auto rs = rq.get("https://httpbin.org/");
     assert(rs.code==200);
     assert(rs.responseBody.length > 0);
-    rs = Request().get("http://httpbin.org/get", ["c":"d", "a":"b"]);
+    rs = Request().get("http://httpbin.org/get", ["c":" d", "a":"b"]);
     assert(rs.code == 200);
+    auto json = parseJSON(rs.responseBody.data).object["args"].object;
+    assert(json["c"].str == " d");
+    assert(json["a"].str == "b");
 
     globalLogLevel(LogLevel.info);
     rq = Request();
     rq.keepAlive = 5;
     // handmade json
     info("Check POST json");
-    rs = rq.exec!"POST"("http://httpbin.org/post", `{"a":"b", "c":[1,2,3]}`, "application/json");
+    rs = rq.exec!"POST"("http://httpbin.org/post", `{"a":"☺ ", "c":[1,2,3]}`, "application/json");
     assert(rs.code==200);
-    auto json = parseJSON(rs.responseBody.data).object["json"].object;
-    assert(json["a"].str == "b");
+    json = parseJSON(rs.responseBody.data).object["json"].object;
+    assert(json["a"].str == "☺ ");
     assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
     {
         // files
@@ -1118,10 +1140,10 @@ unittest {
         f.close();
     }
     // associative array
-    rs = rq.exec!"POST"("http://httpbin.org/post", ["a":"b", "c":"d"]);
+    rs = rq.exec!"POST"("http://httpbin.org/post", ["a":"b ", "c":"d"]);
     assert(rs.code==200);
     auto form = parseJSON(rs.responseBody.data).object["form"].object;
-    assert(form["a"].str == "b");
+    assert(form["a"].str == "b ");
     assert(form["c"].str == "d");
     info("Check HEAD");
     rs = rq.exec!"HEAD"("http://httpbin.org/");
@@ -1190,7 +1212,7 @@ unittest {
     assert(rs.code==200);
  
     globalLogLevel(LogLevel.info);
-    info("Check exception handling");
+    info("Check exception handling, error messages are OK");
     rq = Request();
     rq.timeout = 1.seconds;
     assertThrown!TimeoutException(rq.get("http://httpbin.org/delay/3"));

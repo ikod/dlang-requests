@@ -1,6 +1,10 @@
 # dlang-requests
 http requests library
 
+[buildbadge]: https://travis-ci.org/ikod/dlang-request.svg?branch=master
+[buildstatus]: https://travis-ci.org/ikod/dlang-request
+
+
 Usage example:
 ```
  auto rq = Request();

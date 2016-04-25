@@ -1,5 +1,6 @@
 module requests.streams;
 
+private:
 import std.algorithm;
 import std.array;
 import std.conv;
@@ -27,7 +28,7 @@ interface DataPipeIface(E) {
     void flush();
 }
 
-class DataPipe(E) : DataPipeIface!E {
+public class DataPipe(E) : DataPipeIface!E {
 
     DataPipeIface!(E)[]  pipe;
     Buffer!E             buffer;
@@ -93,7 +94,7 @@ class DataPipe(E) : DataPipeIface!E {
 }
 
 
-class Decompressor(E) : DataPipeIface!E {
+public class Decompressor(E) : DataPipeIface!E {
     private {
         Buffer!ubyte __buff;
         UnCompress   __zlib;
@@ -156,7 +157,7 @@ class Decompressor(E) : DataPipeIface!E {
     }
 }
 
-class DecodeChunked : DataPipeIface!ubyte {
+public class DecodeChunked : DataPipeIface!ubyte {
     //    length := 0
     //    read chunk-size, chunk-extension (if any) and CRLF
     //    while (chunk-size > 0) {
@@ -315,7 +316,7 @@ unittest {
     info("Testing DataPipe - done");
 }
 
-struct Buffer(T) {
+public struct Buffer(T) {
     private {
         class Repr {
             size_t         __length;

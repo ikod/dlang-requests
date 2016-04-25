@@ -1,6 +1,6 @@
-
 module requests.http;
 
+private:
 import std.algorithm;
 import std.array;
 import std.conv;
@@ -136,19 +136,19 @@ unittest {
     assert(s.b == false);
 }
 
-class RequestException: Exception {
+public class RequestException: Exception {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
         super(msg, file, line);
     }
 }
 
-class ConnectError: Exception {
+public class ConnectError: Exception {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
         super(msg, file, line);
     }
 }
 
-class TimeoutException: Exception {
+public class TimeoutException: Exception {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
         super(msg, file, line);
     }
@@ -158,7 +158,7 @@ interface Auth {
     string[string] authHeaders(string domain);
 }
 
-class BasicAuthentication: Auth {
+public class BasicAuthentication: Auth {
     private {
         string   _username, _password;
         string[] _domains;
@@ -184,7 +184,7 @@ abstract class SocketStream {
         bool     __isOpen;
         bool     __isConnected;
     }
-    void reopen() {
+    void open(AddressFamily fa) {
     }
     @property bool isOpen() @safe @nogc pure const {
         return s && __isOpen;
@@ -202,9 +202,7 @@ abstract class SocketStream {
         s = null;
     }
 
-    auto connect(string host, short port, Duration timeout = 10.seconds)
-    in {assert(isOpen);}
-    body {
+    auto connect(string host, ushort port, Duration timeout = 10.seconds) {
         tracef(format("Create connection to %s:%d", host, port));
         Address[] addresses;
         __isConnected = false;
@@ -214,19 +212,19 @@ abstract class SocketStream {
             errorf("Failed to connect: can't resolve %s - %s", host, e.msg);
             throw new ConnectError("Can't connect to %s:%d: %s".format(host, port, e.msg));
         }
-        s.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDTIMEO, timeout);
         foreach(a; addresses) {
             tracef("Trying %s", a);
             try {
+                open(a.addressFamily);
+                s.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDTIMEO, timeout);
                 s.connect(a);
                 tracef("Connected to %s", a);
                 __isConnected = true;
                 break;
             } catch (SocketException e) {
-                warningf("Failed to connect: %s", e.msg);
+                warningf("Failed to connect to %s:%d(%s): %s", host, port, a, e.msg);
+                s.close();
             }
-            reopen();
-            s.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDTIMEO, timeout);
         }
         if ( !__isConnected ) {
             throw new ConnectError("Can't connect to %s:%d".format(host, port));
@@ -250,25 +248,23 @@ abstract class SocketStream {
 }
 
 class SSLSocketStream: SocketStream {
-    this() {
-        s = new OpenSslSocket(AddressFamily.INET);
-        assert(s !is null, "Can't create ssl socket");
-        __isOpen = true;
-    }
-    override void reopen() {
-        s.close();
-        s = new OpenSslSocket(AddressFamily.INET);
-    }
-}
-class TCPSocketStream : SocketStream {
-    this() {
-        s = new Socket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+    override void open(AddressFamily fa) {
+        if ( s !is null ) {
+            s.close();
+        }
+        s = new OpenSslSocket(fa);
         assert(s !is null, "Can't create socket");
         __isOpen = true;
     }
-    override void reopen() {
-        s.close();
-        s = new Socket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+}
+class TCPSocketStream : SocketStream {
+    override void open(AddressFamily fa) {
+        if ( s !is null ) {
+            s.close();
+        }
+        s = new Socket(fa, SocketType.STREAM, ProtocolType.TCP);
+        assert(s !is null, "Can't create socket");
+        __isOpen = true;
     }
 }
 ///
@@ -277,7 +273,7 @@ class TCPSocketStream : SocketStream {
 /// Response.code - response code
 /// Response.responseBody - container for received body
 ///  
-struct Response {
+public struct Response {
     private {
         ushort         __code;
         string         __status_line;
@@ -322,13 +318,28 @@ template rank(R) {
         enum size_t rank = 0;
     }
 }
-
 unittest {
     assert(rank!(char) == 0);
     assert(rank!(string) == 1);
+    assert(rank!(ubyte[][]) == 2);
 }
 
-struct PostFile {
+static immutable ushort[] redirectCodes = [301, 302, 303];
+
+static string urlEncoded(string p) pure @safe {
+    immutable string[dchar] translationTable = [
+        ' ':  "%20", '!': "%21", '*': "%2A", '\'': "%27", '(': "%28", ')': "%29",
+        ';':  "%3B", ':': "%3A", '@': "%40", '&':  "%26", '=': "%3D", '+': "%2B",
+        '$':  "%24", ',': "%2C", '/': "%2F", '?':  "%3F", '#': "%23", '[': "%5B",
+        ']':  "%5D", '%': "%25",
+    ];
+    return p.translate(translationTable);
+}
+unittest {
+    assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
+}
+
+public struct PostFile {
     string fileName;     // name of the file to send
     string fieldName;    // name of the field (if empty - send file base name)
     string contentType;  // contentType of the file if not empty
@@ -336,7 +347,7 @@ struct PostFile {
 ///
 /// Request main structure
 ///
-struct Request {
+public struct Request {
     private {
         string         __method = "GET";
         URI            __uri;
@@ -344,7 +355,7 @@ struct Request {
         Auth           __authenticator;
         uint           __keepAlive = 0;
         uint           __maxRedirects = 10;
-        size_t         __maxHeadersLength = 32 * 1024; // 16 KB
+        size_t         __maxHeadersLength = 32 * 1024; // 32 KB
         size_t         __maxContentLength = 5 * 1024 * 1024; // 5MB
         ptrdiff_t      __contentLength;
         SocketStream   __stream;
@@ -426,21 +437,6 @@ struct Request {
             }
         }
         return "%s %s%s HTTP/1.1\r\n".format(__method, __uri.path, query);
-    }
-    static string urlEncoded(string p) pure @safe {
-        string[dchar] translationTable = [
-            ' ':  "%20", '!': "%21", '*': "%2A",
-            '\'': "%27", '(': "%28", ')': "%29",
-            ';':  "%3B", ':': "%3A", '@': "%40",
-            '&':  "%26", '=': "%3D", '+': "%2B",
-            '$':  "%24", ',': "%2C", '/': "%2F",
-            '?':  "%3F", '#': "%23", '[': "%5B",
-            ']':  "%5D", '%': "%25",
-        ];
-        return translate(p, translationTable);
-    }
-    unittest {
-        assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
     }
     static string params2query(string[string] params) {
         auto m = params.keys.
@@ -735,7 +731,7 @@ struct Request {
                 each!(h => req.put(h));
         req.put("\r\n");
         req.put(encoded);
-        trace(req);
+        trace(req.data);
 
         if ( __verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
@@ -757,7 +753,7 @@ struct Request {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             __stream.close();
         }
-        if ( canFind([302, 303], __response.__code) && followRedirectResponse() ) {
+        if ( canFind(redirectCodes, __response.__code) && followRedirectResponse() ) {
             if ( __method != "GET" ) {
                 return this.get();
             }
@@ -830,7 +826,7 @@ struct Request {
             each!(h => req.put(h));
         req.put("\r\n");
         
-        trace(req);
+        trace(req.data);
         if ( __verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
@@ -864,7 +860,7 @@ struct Request {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             __stream.close();
         }
-        if ( canFind([301, 302, 303], __response.__code) && followRedirectResponse() ) {
+        if ( canFind(redirectCodes, __response.__code) && followRedirectResponse() ) {
             if ( __method != "GET" ) {
                 return this.get();
             }
@@ -932,7 +928,7 @@ struct Request {
             each!(h => req.put(h));
         req.put("\r\n");
 
-        trace(req);
+        trace(req.data);
         if ( __verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
@@ -970,7 +966,7 @@ struct Request {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             __stream.close();
         }
-        if ( canFind([302, 303], __response.__code) && followRedirectResponse() ) {
+        if ( canFind(redirectCodes, __response.__code) && followRedirectResponse() ) {
             if ( __method != "GET" ) {
                 return this.get();
             }
@@ -1015,7 +1011,7 @@ struct Request {
             map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
             each!(h => req.put(h));
         req.put("\r\n");
-        trace(req);
+        trace(req.data);
 
         if ( __verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
@@ -1042,7 +1038,7 @@ struct Request {
             writeln(">> Request send time: ", __response.__requestSentAt - __response.__connectedAt);
             writeln(">> Response recv time: ", __response.__finishedAt - __response.__requestSentAt);
         }
-        if ( canFind([302, 303], __response.__code) && followRedirectResponse() ) {
+        if ( canFind(redirectCodes, __response.__code) && followRedirectResponse() ) {
             if ( __method != "GET" ) {
                 return this.get();
             }
@@ -1185,7 +1181,8 @@ unittest {
     assert(rs.code==200);
 //    rq = Request();
     rq.maxRedirects = 2;
-    rs = rq.exec!"GET"("http://httpbin.org/absolute-redirect/3");
+    rq.keepAlive = 0;
+    rs = rq.exec!"GET"("https://httpbin.org/absolute-redirect/3");
     assert(rs.history.length == 2);
     assert(rs.code==302);
 

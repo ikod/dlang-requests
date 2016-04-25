@@ -1,8 +1,8 @@
 # dlang-requests
 http requests library
 
-[buildbadge]: https://travis-ci.org/ikod/dlang-request.svg?branch=master
-[buildstatus]: https://travis-ci.org/ikod/dlang-request
+[buildbadge]: https://travis-ci.org/ikod/dlang-requests.svg?branch=master
+[buildstatus]: https://travis-ci.org/ikod/dlang-requests
 
 
 Usage example:

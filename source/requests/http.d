@@ -1049,9 +1049,11 @@ public struct Request {
         return __response;
     }
 
-    Response get(string url = null, string[string] params = null, string file=__FILE__, size_t line=__LINE__) {
-        __method = "GET";
-        return exec(url, params);
+    Response get(A...)(A args) {
+        return exec!"GET"(args);
+    }
+    Response post(A...)(A args) {
+        return exec!"POST"(args);
     }
     
 }
@@ -1077,7 +1079,7 @@ unittest {
     rq.keepAlive = 5;
     // handmade json
     info("Check POST json");
-    rs = rq.exec!"POST"("http://httpbin.org/post", `{"a":"☺ ", "c":[1,2,3]}`, "application/json");
+    rs = rq.post("http://httpbin.org/post", `{"a":"☺ ", "c":[1,2,3]}`, "application/json");
     assert(rs.code==200);
     json = parseJSON(rs.responseBody.data).object["json"].object;
     assert(json["a"].str == "☺ ");
@@ -1090,13 +1092,13 @@ unittest {
                         {fileName:"tests/abc.txt", fieldName:"abc", contentType:"application/octet-stream"}, 
                         {fileName:"tests/test.txt"}
                     ];
-        rs = rq.exec!"POST"("http://httpbin.org/post", files);
+        rs = rq.post("http://httpbin.org/post", files);
         assert(rs.code==200);
     }
     {
         // string
         info("Check POST utf8 string");
-        rs = rq.exec!"POST"("http://httpbin.org/post", "привiт, свiт!", "application/octet-stream");
+        rs = rq.post("http://httpbin.org/post", "привiт, свiт!", "application/octet-stream");
         assert(rs.code==200);
         auto data = parseJSON(rs.responseBody.data).object["data"].str;
         assert(data=="привiт, свiт!");
@@ -1113,7 +1115,7 @@ unittest {
     {
         info("Check POST chunked from array");
         auto s = ["one,", "two,", "three."];
-        rs = rq.exec!"POST"("http://httpbin.org/post", s, "application/octet-stream");
+        rs = rq.post("http://httpbin.org/post", s, "application/octet-stream");
         assert(rs.code==200);
         auto data = parseJSON(rs.responseBody.data).object["data"].str;
         assert(data=="one,two,three.");
@@ -1121,7 +1123,7 @@ unittest {
     {
         info("Check POST chunked using std.range.chunks()");
         auto s = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        rs = rq.exec!"POST"("http://httpbin.org/post", s.representation.chunks(10), "application/octet-stream");
+        rs = rq.post("http://httpbin.org/post", s.representation.chunks(10), "application/octet-stream");
         assert(rs.code==200);
         auto data = parseJSON(rs.responseBody.data).object["data"].str;
         assert(data==s);
@@ -1129,14 +1131,14 @@ unittest {
     {
         info("Check POST chunked from file.byChunk");
         auto f = File("tests/test.txt", "rb");
-        rs = rq.exec!"POST"("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
+        rs = rq.post("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
         assert(rs.code==200);
         auto data = parseJSON(rs.responseBody.data).object["data"].str;
         assert(data=="abcdefgh\n12345678\n");
         f.close();
     }
     // associative array
-    rs = rq.exec!"POST"("http://httpbin.org/post", ["a":"b ", "c":"d"]);
+    rs = rq.post("http://httpbin.org/post", ["a":"b ", "c":"d"]);
     assert(rs.code==200);
     auto form = parseJSON(rs.responseBody.data).object["form"].object;
     assert(form["a"].str == "b ");
@@ -1171,18 +1173,18 @@ unittest {
     globalLogLevel(LogLevel.info);
     rq = Request();
     rq.keepAlive = 5;
-    rs = rq.exec!"GET"("http://httpbin.org/relative-redirect/2");
+    rs = rq.get("http://httpbin.org/relative-redirect/2");
     assert(rs.history.length == 2);
     assert(rs.code==200);
 //    rq = Request();
     rq.keepAlive = 5;
-    rs = rq.exec!"GET"("http://httpbin.org/absolute-redirect/2");
+    rs = rq.get("http://httpbin.org/absolute-redirect/2");
     assert(rs.history.length == 2);
     assert(rs.code==200);
 //    rq = Request();
     rq.maxRedirects = 2;
     rq.keepAlive = 0;
-    rs = rq.exec!"GET"("https://httpbin.org/absolute-redirect/3");
+    rs = rq.get("https://httpbin.org/absolute-redirect/3");
     assert(rs.history.length == 2);
     assert(rs.code==302);
 

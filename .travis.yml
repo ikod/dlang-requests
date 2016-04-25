@@ -3,4 +3,6 @@ language: d
 d:
     - dmd
     - ldc
-
+os:
+    - linux
+    - osx

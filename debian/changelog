@@ -1,0 +1,5 @@
+dlang-requests (0.0.6-0) unstable; urgency=low
+
+  * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
+
+ -- igor <igor.khasilev@gmail.com>  Tue, 26 Apr 2016 12:11:22 -0400

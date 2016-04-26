@@ -1,0 +1,2 @@
+librequests.a usr/local/lib
+source/requests usr/local/include/d

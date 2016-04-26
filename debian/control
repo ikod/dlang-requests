@@ -1,0 +1,13 @@
+Source: dlang-requests
+Section: devel
+Priority: extra
+Maintainer: vagrant <igor.khasilev@gmail.com>
+Build-Depends: debhelper (>= 7.0.50~)
+Standards-Version: 3.8.4
+Homepage: https://github.com/ikod/dlang-requests
+
+Package: dlang-requests
+Architecture: any
+Depends: libssl0.9.8
+Description: dlang http requests library
+ https://github.com/ikod/dlang-requests

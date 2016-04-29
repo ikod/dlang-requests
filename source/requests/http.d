@@ -366,6 +366,7 @@ public struct Request {
         uint           __verbosity = 0;  // 0 - no output, 1 - headers, 2 - headers+body info
         DataPipe!ubyte __bodyDecoder;
         DecodeChunked  __unChunker;
+        string         __proxy;
     }
 
     mixin(getter("keepAlive"));
@@ -385,6 +386,7 @@ public struct Request {
     mixin(setter("bufferSize"));
     mixin(getter("verbosity"));
     mixin(setter("verbosity"));
+    mixin(setter("proxy"));
 
     this(string uri) {
         __uri = URI(uri);
@@ -425,6 +427,9 @@ public struct Request {
     }
 
     @property string requestString(string[string] params = null) {
+        if ( __proxy ) {
+            return "%s %s HTTP/1.1\r\n".format(__method, __uri.uri);
+        }
         if ( __method != "GET" ) {
             // encode params into url only for GET
             return "%s %s HTTP/1.1\r\n".format(__method, __uri.path);
@@ -584,12 +589,20 @@ public struct Request {
     void setupConnection() {
         if ( !__stream || !__stream.isConnected ) {
             tracef("Set up new connection");
-            final switch (__uri.scheme) {
+            URI   uri;
+            if ( __proxy ) {
+                // use proxy uri to connect
+                uri.uri_parse(__proxy);
+            } else {
+                // use original uri
+                uri = __uri;
+            }
+            final switch (uri.scheme) {
                 case "http":
-                    __stream = new TCPSocketStream().connect(__uri.host, __uri.port, __timeout);
+                    __stream = new TCPSocketStream().connect(uri.host, uri.port, __timeout);
                     break;
                 case "https":
-                    __stream = new SSLSocketStream().connect(__uri.host, __uri.port, __timeout);
+                    __stream = new SSLSocketStream().connect(uri.host, uri.port, __timeout);
                     break;
             }
         } else {
@@ -1178,6 +1191,7 @@ unittest {
     assert(rs.code==200);
 //    rq = Request();
     rq.keepAlive = 5;
+//    rq.proxy = "http://localhost:8888/";
     rs = rq.get("http://httpbin.org/absolute-redirect/2");
     assert(rs.history.length == 2);
     assert(rs.code==200);

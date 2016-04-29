@@ -76,7 +76,9 @@ struct URI {
         if ( path_and_query.length ) {
             i = path_and_query.findSplit("?");
             __path = "/" ~ i[0];
-            __query = "?" ~ i[2];
+            if ( i[2].length) {
+                __query = "?" ~ i[2];
+            }
         }
         //
         return true;

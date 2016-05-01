@@ -3,6 +3,8 @@ http requests library
 
 [![Build Status](https://travis-ci.org/ikod/dlang-requests.svg?branch=master)](https://travis-ci.org/ikod/dlang-requests)
 
+API docs: [Wiki](https://github.com/ikod/dlang-requests/wiki)
+
 Usage example:
 ```
  auto rq = Request();

@@ -1154,7 +1154,7 @@ public unittest {
     assert(rs.responseBody.length > 0);
     rs = Request().get("http://httpbin.org/get", ["c":" d", "a":"b"]);
     assert(rs.code == 200);
-    auto json = parseJSON(rs.responseBody).object["args"].object;
+    auto json = parseJSON(rs.responseBody.data).object["args"].object;
     assert(json["c"].str == " d");
     assert(json["a"].str == "b");
 
@@ -1165,7 +1165,7 @@ public unittest {
     info("Check POST json");
     rs = rq.post("http://httpbin.org/post", `{"a":"☺ ", "c":[1,2,3]}`, "application/json");
     assert(rs.code==200);
-    json = parseJSON(rs.responseBody).object["json"].object;
+    json = parseJSON(rs.responseBody.data).object["json"].object;
     assert(json["a"].str == "☺ ");
     assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
     {
@@ -1184,7 +1184,7 @@ public unittest {
         info("Check POST utf8 string");
         rs = rq.post("http://httpbin.org/post", "привiт, свiт!", "application/octet-stream");
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody).object["data"].str;
+        auto data = parseJSON(rs.responseBody.data).object["data"].str;
         assert(data=="привiт, свiт!");
     }
     // ranges

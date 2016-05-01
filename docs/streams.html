@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>requests.streams</title>
+    <style type="text/css">
+      body {
+        background-color: #6080a0;
+        color: #ffffff;
+      }
+      h1 {
+        text-align: center;
+        font-size: 1.5em;
+        font-weight: bold;
+      }
+      h2 {
+        text-align: center;
+        font-size: 1.4em;
+        font-weight: bold;
+      }
+      p {
+        text-align: justify;
+      }
+      .main {
+        margin-left: auto;
+        margin-right: auto;
+        padding: .5ex 1ex .5ex 1ex;
+        background-color: #e0e0e0;
+        color: #000000;
+        display: table;
+      }
+      .sections {
+        margin-top: 0;
+        padding-left: 2em;
+      }
+      .main > .sections {
+        /* This is the header section for the whole module */
+        margin-left: auto;
+        margin-right: auto;
+        margin-top: 0;
+        padding: 1ex 1em 1ex 1em;
+        background-color: #f0f0f0;
+	color: #000000;
+      }
+      .decl, .desc {
+        padding: .5ex 1ex .5ex 1ex;
+        margin: 1ex 0 1ex 0;
+      }
+      .sections, dt.decl > p {
+	/* We wrap dt.decl in a <p> so that the <dt> is allowed to expand to
+	the width of the <dd>, otherwise the background will be truncated. Yes
+	this is ugly but CSS is a bit crippled. */
+        max-width: 45em;
+      }
+      dt.decl, dt.decl > p {
+        margin-top: 0;
+        margin-bottom: 0;
+        text-align: left;
+        font-size: 1.5em;
+        font-weight: bold;
+      }
+      dd.decl {
+        margin-top: 0;
+      }
+      .sections p:first-child, h4.sec + p {
+        margin-top: 0;
+      }
+      .decl {
+        background-color: #f0f0f0;
+        color: #000000;
+      }
+      .decl .decl {
+        background-color: #f8f8f8;
+	color: #000000;
+      }
+      .decl .decl .decl {
+        background-color: #ffffff;
+        color: #000000;
+      }
+      dd dl {
+        margin-left: 2em;
+      }
+      h3.memb {
+        text-align: left;
+        padding-left: 2em;
+        font-size: 1em;
+        font-weight: bold;
+      }
+      pre.d_code {
+        padding: .5ex 1ex .5ex 1ex;
+        border: 1px dotted black;
+        background-color: #ffffc0;
+	color: #000000;
+      }
+      h4.sec {
+        margin-top: 0;
+        margin-bottom: 0;
+        text-align: left;
+        font-size: 1em;
+        font-weight: bold;
+      }
+      dl.params {
+        margin-top: 0;
+      }
+      .paramname {
+        margin-top: 0;
+        margin-bottom: 0;
+        padding-right: 1em;
+        vertical-align: top;
+        font-size: 1.1em;
+        white-space: nowrap;
+      }
+    </style>
+    
+  </head>
+  <body>
+  
+  <div class="main">
+    
+    <h1>Module: requests.streams</h1>
+    </p><p>
+<div class="modmemb">
+    <h2>Details</h2>
+    <dl><dt class="decl"><p><code><a name="DataPipeIface"></a>interface <u>DataPipeIface</u>(E);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p><u>DataPipeIface</u> can accept some data, process, and return processed data.</p>
+</div>
+<h3 class="memb">Members:</h3>
+  <dl><dt class="decl"><p><code><a name="DataPipeIface.empty"></a>bool <u>empty</u>();
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Is there any processed data ready for reading?</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="DataPipeIface.put"></a>void <u>put</u>(E[]);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Put next data portion for processing</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="DataPipeIface.get"></a>E[] <u>get</u>();
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Get any ready data</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="DataPipeIface.flush"></a>void <u>flush</u>();
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Signal on end of incoming data stream.</p>
+</div>
+</dd>
+</dl>
+</dd>
+<dt class="decl"><p><code><a name="DataPipe"></a>class <u>DataPipe</u>(E): DataPipeIface!E;
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p><u>DataPipe</u> is a pipeline of data processors, each accept some data, process it, and put result to next element in line.
+ This class used to combine different Transfer- and Content- encodings. For example: unchunk chunked transfer-encoding,
+ and uncompress compressed Content-Encoding.</p>
+</div>
+<h3 class="memb">Members:</h3>
+  <dl><dt class="decl"><p><code><a name="DataPipe.insert"></a>void <u>insert</u>(DataPipeIface!E <code><i>p</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Append data processor to pipeline
+</p>
+<h4 class="sec">Parameters:</h4>
+  <table class="params"><tr><td class="paramname"><code>DataPipeIface!E <code><i>p</i></code></code></td>
+<td class="paramdesc"><p>processor</p></td></tr>
+</table>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="DataPipe.put"></a>void <u>put</u>(E[] <code><i>data</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Process next <code><i>data</i></code> portion. Data passed over pipeline and result stored in buffer.
+</p>
+<h4 class="sec">Parameters:</h4>
+  <table class="params"><tr><td class="paramname"><code>E[] <code><i>data</i></code></code></td>
+<td class="paramdesc"><p>input <code><i>data</i></code> array.</p></td></tr>
+</table>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="DataPipe.put.2"></a>void <u>put</u>(Buffer!E <code><i>buff</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Process next data portion. Data passed over pipeline and store result in buffer.
+</p>
+<h4 class="sec">Parameters:</h4>
+  <table class="params"><tr><td class="paramname"><code>Buffer!E <code><i>buff</i></code></code></td>
+<td class="paramdesc"><p>input data buffer.</p></td></tr>
+</table>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="DataPipe.get"></a>pure E[] <u>get</u>();
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Get what was collected in internal buffer and clear it.
+</p>
+<h4 class="sec">Returns:</h4> <p>data collected.</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="DataPipe.empty"></a>const pure @safe bool <u>empty</u>();
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Test if internal buffer is <u>empty</u>
+</p>
+<h4 class="sec">Returns:</h4> <p><b>true</b> if internal buffer is <u>empty</u> (nothing to get())</p>
+</div>
+</dd>
+</dl>
+</dd>
+<dt class="decl"><p><code><a name="Decompressor"></a>class <u>Decompressor</u>(E): DataPipeIface!E;
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Processor for gzipped/compressed content.
+ Also support InputRange interface.</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="DecodeChunked"></a>class <u>DecodeChunked</u>: <u>requests.streams.DataPipeIface!ubyte.DataPipeIface</u>;
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Unchunk chunked http responce body.</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="Buffer"></a>struct <u>Buffer</u>(T);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p><u>Buffer</u> used to collect and process data from network. It remainds Appender, but support
+ also Range interface.
+ <p>To place data in buffer use put() method.</p>
+ <p> To retrieve data from buffer you can use several methods:</p>
+ <ul>  <li>Range methods: front, back, index []</li>
+  <li>data method: return collected data (like Appender.data)</li>
+ </ul></p>
+<h4 class="sec">Examples:</h4> <p><pre class="d_code">
+
+<span style="color:blue">static</span> <span style="color:blue">assert</span>(isInputRange!(<u>Buffer</u>!<span style="color:blue">ubyte</span>));
+<span style="color:blue">static</span> <span style="color:blue">assert</span>(isForwardRange!(<u>Buffer</u>!<span style="color:blue">ubyte</span>));
+<span style="color:blue">static</span> <span style="color:blue">assert</span>(hasLength!(<u>Buffer</u>!<span style="color:blue">ubyte</span>));
+<span style="color:blue">static</span> <span style="color:blue">assert</span>(isBidirectionalRange!(<u>Buffer</u>!<span style="color:blue">ubyte</span>));
+<span style="color:blue">static</span> <span style="color:blue">assert</span>(isRandomAccessRange!(<u>Buffer</u>!<span style="color:blue">ubyte</span>));
+
+<span style="color:blue">auto</span> b = <u>Buffer</u>!<span style="color:blue">ubyte</span>();
+b.put(<span style="color:red">"abc"</span>.representation.dup);
+b.put(<span style="color:red">"def"</span>.representation.dup);
+<span style="color:blue">assert</span>(b.length == 6);
+<span style="color:blue">assert</span>(b.toString == <span style="color:red">"abcdef"</span>);
+<span style="color:blue">assert</span>(b.front == 'a');
+<span style="color:blue">assert</span>(b.back == 'f');
+<span style="color:blue">assert</span>(equal(b[0..$], <span style="color:red">"abcdef"</span>));
+<span style="color:blue">assert</span>(equal(b[$-2..$], <span style="color:red">"ef"</span>));
+b.popFront;
+b.popBack;
+<span style="color:blue">assert</span>(b.front == 'b');
+<span style="color:blue">assert</span>(b.back == 'e');
+<span style="color:blue">assert</span>(b.length == 4);
+<span style="color:blue">assert</span>(retro(b).front == 'e');
+<span style="color:blue">assert</span>(countUntil(b, 'e') == 3);
+<span style="color:blue">assert</span>(equal(splitter(b, 'c').array[1], ['d', 'e'])); <span style="color:green">// split "bcde" on 'c'
+</span><span style="color:blue">assert</span>(equal(b, <span style="color:red">"bcde"</span>));
+b.popFront; b.popFront;
+<span style="color:blue">assert</span>(b.front == 'd');
+<span style="color:blue">assert</span>(b.front == b[0]);
+<span style="color:blue">assert</span>(b.back == b[$-1]);
+
+<span style="color:blue">auto</span> c = <u>Buffer</u>!<span style="color:blue">ubyte</span>();
+c.put(<span style="color:red">"Header0: value0\n"</span>.representation.dup);
+c.put(<span style="color:red">"Header1: value1\n"</span>.representation.dup);
+c.put(<span style="color:red">"Header2: value2\n\nbody"</span>.representation.dup);
+<span style="color:blue">auto</span> c_length = c.length;
+<span style="color:blue">auto</span> eoh = countUntil(c, <span style="color:red">"\n\n"</span>);
+<span style="color:blue">assert</span>(eoh == 47);
+<span style="color:blue">foreach</span>(header; c[0..eoh].splitter('\n') ) {
+    writeln(castFrom!(<span style="color:blue">ubyte</span>[]).to!(string)(header.data));
+}
+<span style="color:blue">assert</span>(equal(findSplit(c, <span style="color:red">"\n\n"</span>)[2], <span style="color:red">"body"</span>));
+<span style="color:blue">assert</span>(c.length == c_length);
+</pre>
+</p></div>
+</dd>
+</dl>
+  </div>
+
+  </div>
+  
+  </body>
+</html>

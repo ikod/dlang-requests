@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>requests.http</title>
+    <style type="text/css">
+      body {
+        background-color: #6080a0;
+        color: #ffffff;
+      }
+      h1 {
+        text-align: center;
+        font-size: 1.5em;
+        font-weight: bold;
+      }
+      h2 {
+        text-align: center;
+        font-size: 1.4em;
+        font-weight: bold;
+      }
+      p {
+        text-align: justify;
+      }
+      .main {
+        margin-left: auto;
+        margin-right: auto;
+        padding: .5ex 1ex .5ex 1ex;
+        background-color: #e0e0e0;
+        color: #000000;
+        display: table;
+      }
+      .sections {
+        margin-top: 0;
+        padding-left: 2em;
+      }
+      .main > .sections {
+        /* This is the header section for the whole module */
+        margin-left: auto;
+        margin-right: auto;
+        margin-top: 0;
+        padding: 1ex 1em 1ex 1em;
+        background-color: #f0f0f0;
+	color: #000000;
+      }
+      .decl, .desc {
+        padding: .5ex 1ex .5ex 1ex;
+        margin: 1ex 0 1ex 0;
+      }
+      .sections, dt.decl > p {
+	/* We wrap dt.decl in a <p> so that the <dt> is allowed to expand to
+	the width of the <dd>, otherwise the background will be truncated. Yes
+	this is ugly but CSS is a bit crippled. */
+        max-width: 45em;
+      }
+      dt.decl, dt.decl > p {
+        margin-top: 0;
+        margin-bottom: 0;
+        text-align: left;
+        font-size: 1.5em;
+        font-weight: bold;
+      }
+      dd.decl {
+        margin-top: 0;
+      }
+      .sections p:first-child, h4.sec + p {
+        margin-top: 0;
+      }
+      .decl {
+        background-color: #f0f0f0;
+        color: #000000;
+      }
+      .decl .decl {
+        background-color: #f8f8f8;
+	color: #000000;
+      }
+      .decl .decl .decl {
+        background-color: #ffffff;
+        color: #000000;
+      }
+      dd dl {
+        margin-left: 2em;
+      }
+      h3.memb {
+        text-align: left;
+        padding-left: 2em;
+        font-size: 1em;
+        font-weight: bold;
+      }
+      pre.d_code {
+        padding: .5ex 1ex .5ex 1ex;
+        border: 1px dotted black;
+        background-color: #ffffc0;
+	color: #000000;
+      }
+      h4.sec {
+        margin-top: 0;
+        margin-bottom: 0;
+        text-align: left;
+        font-size: 1em;
+        font-weight: bold;
+      }
+      dl.params {
+        margin-top: 0;
+      }
+      .paramname {
+        margin-top: 0;
+        margin-bottom: 0;
+        padding-right: 1em;
+        vertical-align: top;
+        font-size: 1.1em;
+        white-space: nowrap;
+      }
+    </style>
+    
+  </head>
+  <body>
+  
+  <div class="main">
+    
+    <h1>Module: requests.http</h1>
+    </p><p>
+<div class="modmemb">
+    <h2>Details</h2>
+    <dl><dt class="decl"><p><code><a name="BasicAuthentication"></a>class <u>BasicAuthentication</u>: <u>requests.http.Auth</u>;
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Basic authentication.
+ Adds <b>Authorization: Basic</b> header to request.</p>
+</div>
+<h3 class="memb">Members:</h3>
+  <dl><dt class="decl"><p><code><a name="BasicAuthentication.this"></a>this(string <code><i>username</i></code>, string <code><i>password</i></code>, string[] <code><i>domains</i></code> = []);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Constructor.
+</p>
+<h4 class="sec">Parameters:</h4>
+  <table class="params"><tr><td class="paramname"><code>string <code><i>username</i></code></code></td>
+<td class="paramdesc"><p><code><i>username</i></code></p></td></tr>
+<tr><td class="paramname"><code>string <code><i>password</i></code></code></td>
+<td class="paramdesc"><p><code><i>password</i></code></p></td></tr>
+<tr><td class="paramname"><code>string[] <code><i>domains</i></code></code></td>
+<td class="paramdesc"><p>not used now</p></td></tr>
+</table>
+</div>
+</dd>
+</dl>
+</dd>
+<dt class="decl"><p><code><a name="Response"></a>struct <u>Response</u>;
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p><u>Response</u> - result of request execution.
+</p>
+<p><u>Response</u>.code - response code
+</p><p>
+
+<u>Response</u>.status_line - received status line
+</p><p>
+
+<u>Response</u>.responseBody - container for received body
+</p><p>
+
+<u>Response</u>.history - for redirected responses contain all history</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="PostFile"></a>struct <u>PostFile</u>;
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Struct to send multiple files in POST request.</p>
+</div>
+<h3 class="memb">Members:</h3>
+  <dl><dt class="decl"><p><code><a name="PostFile.fileName"></a>string <u>fileName</u>;
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Path to the file to send.</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="PostFile.fieldName"></a>string <u>fieldName</u>;
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Name of the field (if empty - send file base name)</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="PostFile.contentType"></a>string <u>contentType</u>;
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p><u>contentType</u> of the file if not empty</p>
+</div>
+</dd>
+</dl>
+</dd>
+<dt class="decl"><p><code><a name="Request"></a>struct <u>Request</u>;
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p><u>Request</u>.
+</p>
+<p>Configurable parameters:
+</p><p>
+
+<b>headers</b> - add any additional headers you'd like to send.
+</p><p>
+
+<b>authenticator</b> - class to send auth headers.
+</p><p>
+
+<b>keepAlive</b> - set <b>true</b> for keepAlive requests. default <b>false</b>.
+</p><p>
+
+<b>maxRedirects</b> - maximum number of redirects. default 10.
+</p><p>
+
+<b>maxHeadersLength</b> - maximum length of server response headers. default = 32KB.
+</p><p>
+
+<b>maxContentLength</b> - maximun content length. delault = 5MB.
+</p><p>
+
+<b>bufferSize</b> - send and receive buffer size. default = 16KB.
+</p><p>
+
+<b>verbosity</b> - level of verbosity(0 - nothing, 1 - headers, 2 - headers and body progress). default = 0.
+</p><p>
+
+<b>proxy</b> - set proxy url if needed. default - <b>null</b>.</p>
+<h4 class="sec">Examples:</h4> <p><pre class="d_code">
+<span style="color:blue">import</span> std.json;
+globalLogLevel(LogLevel.info);
+tracef(<span style="color:red">"http tests - start"</span>);
+
+<span style="color:blue">auto</span> rq = <u>Request</u>();
+<span style="color:blue">auto</span> rs = rq.get(<span style="color:red">"https://httpbin.org/"</span>);
+<span style="color:blue">assert</span>(rs.code==200);
+<span style="color:blue">assert</span>(rs.responseBody.length &gt; 0);
+rs = <u>Request</u>().get(<span style="color:red">"http://httpbin.org/get"</span>, [<span style="color:red">"c"</span>:<span style="color:red">" d"</span>, <span style="color:red">"a"</span>:<span style="color:red">"b"</span>]);
+<span style="color:blue">assert</span>(rs.code == 200);
+<span style="color:blue">auto</span> json = parseJSON(rs.responseBody.data).object[<span style="color:red">"args"</span>].object;
+<span style="color:blue">assert</span>(json[<span style="color:red">"c"</span>].str == <span style="color:red">" d"</span>);
+<span style="color:blue">assert</span>(json[<span style="color:red">"a"</span>].str == <span style="color:red">"b"</span>);
+
+globalLogLevel(LogLevel.info);
+rq = <u>Request</u>();
+rq.keepAlive = <span style="color:blue">true</span>;
+<span style="color:green">// handmade json
+</span>info(<span style="color:red">"Check POST json"</span>);
+rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, <span style="color:red">`{"a":"☺ ", "c":[1,2,3]}`</span>, <span style="color:red">"application/json"</span>);
+<span style="color:blue">assert</span>(rs.code==200);
+json = parseJSON(rs.responseBody.data).object[<span style="color:red">"json"</span>].object;
+<span style="color:blue">assert</span>(json[<span style="color:red">"a"</span>].str == <span style="color:red">"☺ "</span>);
+<span style="color:blue">assert</span>(json[<span style="color:red">"c"</span>].array.map!(a=&gt;a.integer).array == [1,2,3]);
+{
+    <span style="color:green">// files
+</span>    globalLogLevel(LogLevel.info);
+    info(<span style="color:red">"Check POST files"</span>);
+    PostFile[] files = [
+                    {fileName:<span style="color:red">"tests/abc.txt"</span>, fieldName:<span style="color:red">"abc"</span>, contentType:<span style="color:red">"application/octet-stream"</span>}, 
+                    {fileName:<span style="color:red">"tests/test.txt"</span>}
+                ];
+    rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, files);
+    <span style="color:blue">assert</span>(rs.code==200);
+}
+{
+    <span style="color:green">// string
+</span>    info(<span style="color:red">"Check POST utf8 string"</span>);
+    rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, <span style="color:red">"привiт, свiт!"</span>, <span style="color:red">"application/octet-stream"</span>);
+    <span style="color:blue">assert</span>(rs.code==200);
+    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.data).object[<span style="color:red">"data"</span>].str;
+    <span style="color:blue">assert</span>(data==<span style="color:red">"привiт, свiт!"</span>);
+}
+<span style="color:green">// ranges
+</span>{
+    info(<span style="color:red">"Check POST chunked from lineSplitter"</span>);
+    <span style="color:blue">auto</span> s = lineSplitter(<span style="color:red">"one,\ntwo,\nthree."</span>);
+    rs = rq.exec!<span style="color:red">"POST"</span>(<span style="color:red">"http://httpbin.org/post"</span>, s, <span style="color:red">"application/octet-stream"</span>);
+    <span style="color:blue">assert</span>(rs.code==200);
+    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.data).object[<span style="color:red">"data"</span>].str;
+    <span style="color:blue">assert</span>(data==<span style="color:red">"one,two,three."</span>);
+}
+{
+    info(<span style="color:red">"Check POST chunked from array"</span>);
+    <span style="color:blue">auto</span> s = [<span style="color:red">"one,"</span>, <span style="color:red">"two,"</span>, <span style="color:red">"three."</span>];
+    rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, s, <span style="color:red">"application/octet-stream"</span>);
+    <span style="color:blue">assert</span>(rs.code==200);
+    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.data).object[<span style="color:red">"data"</span>].str;
+    <span style="color:blue">assert</span>(data==<span style="color:red">"one,two,three."</span>);
+}
+{
+    info(<span style="color:red">"Check POST chunked using std.range.chunks()"</span>);
+    <span style="color:blue">auto</span> s = <span style="color:red">"ABCDEFGHIJKLMNOPQRSTUVWXYZ"</span>;
+    rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, s.representation.chunks(10), <span style="color:red">"application/octet-stream"</span>);
+    <span style="color:blue">assert</span>(rs.code==200);
+    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.data).object[<span style="color:red">"data"</span>].str;
+    <span style="color:blue">assert</span>(data==s);
+}
+{
+    info(<span style="color:red">"Check POST chunked from file.byChunk"</span>);
+    <span style="color:blue">auto</span> f = File(<span style="color:red">"tests/test.txt"</span>, <span style="color:red">"rb"</span>);
+    rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, f.byChunk(3), <span style="color:red">"application/octet-stream"</span>);
+    <span style="color:blue">assert</span>(rs.code==200);
+    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.data).object[<span style="color:red">"data"</span>].str;
+    <span style="color:blue">assert</span>(data==<span style="color:red">"abcdefgh\n12345678\n"</span>);
+    f.close();
+}
+<span style="color:green">// associative array
+</span>rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, [<span style="color:red">"a"</span>:<span style="color:red">"b "</span>, <span style="color:red">"c"</span>:<span style="color:red">"d"</span>]);
+<span style="color:blue">assert</span>(rs.code==200);
+<span style="color:blue">auto</span> form = parseJSON(rs.responseBody.data).object[<span style="color:red">"form"</span>].object;
+<span style="color:blue">assert</span>(form[<span style="color:red">"a"</span>].str == <span style="color:red">"b "</span>);
+<span style="color:blue">assert</span>(form[<span style="color:red">"c"</span>].str == <span style="color:red">"d"</span>);
+info(<span style="color:red">"Check HEAD"</span>);
+rs = rq.exec!<span style="color:red">"HEAD"</span>(<span style="color:red">"http://httpbin.org/"</span>);
+<span style="color:blue">assert</span>(rs.code==200);
+info(<span style="color:red">"Check DELETE"</span>);
+rs = rq.exec!<span style="color:red">"DELETE"</span>(<span style="color:red">"http://httpbin.org/delete"</span>);
+<span style="color:blue">assert</span>(rs.code==200);
+info(<span style="color:red">"Check PUT"</span>);
+rs = rq.exec!<span style="color:red">"PUT"</span>(<span style="color:red">"http://httpbin.org/put"</span>,  <span style="color:red">`{"a":"b", "c":[1,2,3]}`</span>, <span style="color:red">"application/json"</span>);
+<span style="color:blue">assert</span>(rs.code==200);
+info(<span style="color:red">"Check PATCH"</span>);
+rs = rq.exec!<span style="color:red">"PATCH"</span>(<span style="color:red">"http://httpbin.org/patch"</span>, <span style="color:red">"привiт, свiт!"</span>, <span style="color:red">"application/octet-stream"</span>);
+<span style="color:blue">assert</span>(rs.code==200);
+
+info(<span style="color:red">"Check compressed content"</span>);
+globalLogLevel(LogLevel.info);
+rq = <u>Request</u>();
+rq.keepAlive = <span style="color:blue">true</span>;
+rq.addHeaders([<span style="color:red">"Accept-Encoding"</span>:<span style="color:red">"gzip"</span>]);
+rs = rq.get(<span style="color:red">"http://httpbin.org/gzip"</span>);
+<span style="color:blue">assert</span>(rs.code==200);
+info(<span style="color:red">"gzip - ok"</span>);
+rq.addHeaders([<span style="color:red">"Accept-Encoding"</span>:<span style="color:red">"deflate"</span>]);
+rs = rq.get(<span style="color:red">"http://httpbin.org/deflate"</span>);
+<span style="color:blue">assert</span>(rs.code==200);
+info(<span style="color:red">"deflate - ok"</span>);
+
+info(<span style="color:red">"Check redirects"</span>);
+globalLogLevel(LogLevel.info);
+rq = <u>Request</u>();
+rq.keepAlive = <span style="color:blue">true</span>;
+rs = rq.get(<span style="color:red">"http://httpbin.org/relative-redirect/2"</span>);
+<span style="color:blue">assert</span>(rs.history.length == 2);
+<span style="color:blue">assert</span>(rs.code==200);
+<span style="color:green">//    rq = Request();
+</span><span style="color:green">//    rq.keepAlive = true;
+</span><span style="color:green">//    rq.proxy = "http://localhost:8888/";
+</span>rs = rq.get(<span style="color:red">"http://httpbin.org/absolute-redirect/2"</span>);
+<span style="color:blue">assert</span>(rs.history.length == 2);
+<span style="color:blue">assert</span>(rs.code==200);
+<span style="color:green">//    rq = Request();
+</span>rq.maxRedirects = 2;
+rq.keepAlive = <span style="color:blue">false</span>;
+rs = rq.get(<span style="color:red">"https://httpbin.org/absolute-redirect/3"</span>);
+<span style="color:blue">assert</span>(rs.history.length == 2);
+<span style="color:blue">assert</span>(rs.code==302);
+
+info(<span style="color:red">"Check utf8 content"</span>);
+globalLogLevel(LogLevel.info);
+rq = <u>Request</u>();
+rs = rq.get(<span style="color:red">"http://httpbin.org/encoding/utf8"</span>);
+<span style="color:blue">assert</span>(rs.code==200);
+
+info(<span style="color:red">"Check chunked content"</span>);
+globalLogLevel(LogLevel.info);
+rq = <u>Request</u>();
+rq.keepAlive = <span style="color:blue">true</span>;
+rq.bufferSize = 16*1024;
+rs = rq.get(<span style="color:red">"http://httpbin.org/range/1024"</span>);
+<span style="color:blue">assert</span>(rs.code==200);
+<span style="color:blue">assert</span>(rs.responseBody.length==1024);
+
+info(<span style="color:red">"Check basic auth"</span>);
+globalLogLevel(LogLevel.info);
+rq = <u>Request</u>();
+rq.authenticator = <span style="color:blue">new</span> BasicAuthentication(<span style="color:red">"user"</span>, <span style="color:red">"passwd"</span>);
+rs = rq.get(<span style="color:red">"http://httpbin.org/basic-auth/user/passwd"</span>);
+<span style="color:blue">assert</span>(rs.code==200);
+
+globalLogLevel(LogLevel.info);
+info(<span style="color:red">"Check exception handling, error messages are OK"</span>);
+rq = <u>Request</u>();
+rq.timeout = 1.seconds;
+assertThrown!TimeoutException(rq.get(<span style="color:red">"http://httpbin.org/delay/3"</span>));
+assertThrown!ConnectError(rq.get(<span style="color:red">"http://0.0.0.0:65000/"</span>));
+assertThrown!ConnectError(rq.get(<span style="color:red">"http://1.1.1.1/"</span>));
+assertThrown!ConnectError(rq.get(<span style="color:red">"http://gkhgkhgkjhgjhgfjhgfjhgf/"</span>));
+
+globalLogLevel(LogLevel.info);
+info(<span style="color:red">"Check limits"</span>);
+rq = <u>Request</u>();
+rq.maxContentLength = 1;
+assertThrown!RequestException(rq.get(<span style="color:red">"http://httpbin.org/"</span>));
+rq = <u>Request</u>();
+rq.maxHeadersLength = 1;
+assertThrown!RequestException(rq.get(<span style="color:red">"http://httpbin.org/"</span>));
+tracef(<span style="color:red">"http tests - ok"</span>);
+</pre>
+</p></div>
+<h3 class="memb">Members:</h3>
+  <dl><dt class="decl"><p><code><a name="Request.addHeaders"></a>void <u>addHeaders</u>(in string[string] <code><i>headers</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Add <code><i>headers</i></code> to request
+</p>
+<h4 class="sec">Parameters:</h4>
+  <table class="params"><tr><td class="paramname"><code>string[string] <code><i>headers</i></code></code></td>
+<td class="paramdesc"><p><code><i>headers</i></code> to send.</p></td></tr>
+</table>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="Request.exec"></a>Response <u>exec</u>(string method)(string <code><i>url</i></code>, string[string] <code><i>rqData</i></code>) if (method == "POST");
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>execute POST request.
+</p>
+<p>Send form-urlencoded data
+</p><p>
+
+</p><p>
+
+
+</p>
+<p><h4 class="sec">Parameters:</h4>
+<code><i>url</i></code> = <code><i>url</i></code> to request
+</p><p>
+
+<code><i>rqData</i></code> = data to send
+
+</p>
+<h4 class="sec">Returns:</h4> <p>Response
+
+</p>
+<h4 class="sec">Examples:</h4> <p><pre class="d_code">
+rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red">"http://httpbin.org/post"</span>, [<span style="color:red">"a"</span>:<span style="color:red">"b"</span>, <span style="color:red">"c"</span>:<span style="color:red">"d"</span>]);
+
+</pre>
+</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="Request.exec.2"></a>Response <u>exec</u>(string method = "POST")(string <code><i>url</i></code>, PostFile[] <code><i>files</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>send file(s) using POST
+</p>
+<p><h4 class="sec">Parameters:</h4>
+<code><i>url</i></code> = <code><i>url</i></code>
+</p><p>
+
+<code><i>files</i></code> = array of PostFile structures
+
+</p>
+<h4 class="sec">Returns:</h4> <p>Response
+
+</p>
+<p><h4 class="sec">Example:</h4>
+<pre class="d_code">
+PostFile[] <i>files</i> = [
+
+{fileName:<span style="color:red">"tests/abc.txt"</span>, fieldName:<span style="color:red">"abc"</span>, contentType:<span style="color:red">"application/octet-stream"</span>},
+
+{fileName:<span style="color:red">"tests/test.txt"</span>}
+
+];
+
+rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red">"http://httpbin.org/post"</span>, <i>files</i>);
+
+</pre>
+</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="Request.exec.3"></a>Response <u>exec</u>(string method = "POST", R)(string <code><i>url</i></code>, R <code><i>content</i></code>, string <code><i>contentType</i></code> = "text/html") if (isSomeString!R || rank!R == 2 &amp;&amp; isSomeChar!(Unqual!(typeof(<code><i>content</i></code>.front.front))) || rank!R == 2 &amp;&amp; is(Unqual!(typeof(<code><i>content</i></code>.front.front)) == ubyte));
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>POST data from some string(with Content-Length), or from range of strings (use Transfer-Encoding: chunked)
+</p>
+<p><h4 class="sec">Parameters:</h4>
+<code><i>url</i></code> = <code><i>url</i></code>
+</p><p>
+
+<code><i>content</i></code> = string or input range
+</p><p>
+
+<code><i>contentType</i></code> = <code><i>content</i></code> type
+
+</p>
+<h4 class="sec">Returns:</h4> <p>Response
+
+</p>
+<h4 class="sec">Examples:</h4> <p><pre class="d_code">
+rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red">"http://httpbin.org/post"</span>, <span style="color:red">"привiт, свiт!"</span>, <span style="color:red">"application/octet-stream"</span>);
+
+
+
+<span style="color:blue">auto</span> s = lineSplitter(<span style="color:red">"one,\ntwo,\nthree."</span>);
+
+rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red">"http://httpbin.org/post"</span>, s, <span style="color:red">"application/octet-stream"</span>);
+
+
+
+<span style="color:blue">auto</span> s = <span style="color:red">"ABCDEFGHIJKLMNOPQRSTUVWXYZ"</span>;
+
+rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red">"http://httpbin.org/post"</span>, s.representation.chunks(10), <span style="color:red">"application/octet-stream"</span>);
+
+
+
+<span style="color:blue">auto</span> f = File(<span style="color:red">"tests/test.txt"</span>, <span style="color:red">"rb"</span>);
+
+rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red">"http://httpbin.org/post"</span>, f.byChunk(3), <span style="color:red">"application/octet-stream"</span>);
+
+</pre>
+</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="Request.exec.4"></a>Response <u>exec</u>(string method = "GET")(string <code><i>url</i></code> = null, string[string] <code><i>params</i></code> = null) if (method != "POST");
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Send request without data
+</p>
+<p>Request parameters will be encoded into request string
+
+</p>
+<p><h4 class="sec">Parameters:</h4>
+<code><i>url</i></code> = <code><i>url</i></code>
+</p><p>
+
+<code><i>params</i></code> = request parameters
+
+</p>
+<h4 class="sec">Returns:</h4> <p>Response
+
+</p>
+<h4 class="sec">Examples:</h4> <p><pre class="d_code">
+rs = Request().<u>exec</u>!<span style="color:red">"GET"</span>(<span style="color:red">"http://httpbin.org/get"</span>, [<span style="color:red">"c"</span>:<span style="color:red">"d"</span>, <span style="color:red">"a"</span>:<span style="color:red">"b"</span>]);
+
+</pre>
+</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="Request.get"></a>Response <u>get</u>(A...)(A <code><i>args</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>GET request. Simple wrapper over exec!"GET"
+</p>
+<h4 class="sec">Parameters:</h4>
+  <table class="params"><tr><td class="paramname"><code>A <code><i>args</i></code></code></td>
+<td class="paramdesc"><p>request parameters. see exec docs.</p></td></tr>
+</table>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="Request.post"></a>Response <u>post</u>(A...)(A <code><i>args</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>POST request. Simple wrapper over exec!"POST"
+</p>
+<h4 class="sec">Parameters:</h4>
+  <table class="params"><tr><td class="paramname"><code>A <code><i>args</i></code></code></td>
+<td class="paramdesc"><p>request parameters. see exec docs.</p></td></tr>
+</table>
+</div>
+</dd>
+</dl>
+</dd>
+</dl>
+  </div>
+
+  </div>
+  
+  </body>
+</html>

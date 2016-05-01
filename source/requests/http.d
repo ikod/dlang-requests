@@ -1,5 +1,9 @@
 module requests.http;
 
+/*
+ * 
+ */
+
 private:
 import std.algorithm;
 import std.array;
@@ -157,12 +161,21 @@ public class TimeoutException: Exception {
 interface Auth {
     string[string] authHeaders(string domain);
 }
-
+/**
+ * Basic authentication.
+ * Adds $(B Authorization: Basic) header to request.
+ */
 public class BasicAuthentication: Auth {
     private {
         string   _username, _password;
         string[] _domains;
     }
+    /// Constructor.
+    /// Params:
+    /// username = username
+    /// password = password
+    /// domains = not used now
+    /// 
     this(string username, string password, string[] domains = []) {
         _username = username;
         _password = password;
@@ -268,11 +281,13 @@ class TCPSocketStream : SocketStream {
     }
 }
 ///
-/// Response - this is result of request
+/// Response - result of request execution.
 ///
 /// Response.code - response code
+/// Response.status_line - received status line
 /// Response.responseBody - container for received body
-///  
+/// Response.history - for redirected responses contain all history
+/// 
 public struct Response {
     private {
         ushort         __code;
@@ -289,7 +304,7 @@ public struct Response {
     mixin(getter("code"));
     mixin(getter("status_line"));
     mixin(getter("responseHeaders"));
-    @property auto responseBody() pure const @safe {
+    @property auto responseBody() pure @safe {
         return __responseBody;
     }
     mixin(getter("history"));
@@ -338,22 +353,37 @@ static string urlEncoded(string p) pure @safe {
 unittest {
     assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
 }
-
+/**
+ * Struct to send multiple files in POST request.
+ */
 public struct PostFile {
-    string fileName;     // name of the file to send
-    string fieldName;    // name of the field (if empty - send file base name)
-    string contentType;  // contentType of the file if not empty
+    /// Path to the file to send.
+    string fileName;
+    /// Name of the field (if empty - send file base name)
+    string fieldName;
+    /// contentType of the file if not empty
+    string contentType;
 }
 ///
-/// Request main structure
-///
+/// Request.
+/// Configurable parameters:
+/// $(B headers) - add any additional headers you'd like to send.
+/// $(B authenticator) - class to send auth headers.
+/// $(B keepAlive) - set true for keepAlive requests. default false.
+/// $(B maxRedirects) - maximum number of redirects. default 10.
+/// $(B maxHeadersLength) - maximum length of server response headers. default = 32KB.
+/// $(B maxContentLength) - maximun content length. delault = 5MB.
+/// $(B bufferSize) - send and receive buffer size. default = 16KB.
+/// $(B verbosity) - level of verbosity(0 - nothing, 1 - headers, 2 - headers and body progress). default = 0.
+/// $(B proxy) - set proxy url if needed. default - null.
+/// 
 public struct Request {
     private {
         string         __method = "GET";
         URI            __uri;
         string[string] __headers;
         Auth           __authenticator;
-        uint           __keepAlive = 0;
+        bool           __keepAlive;
         uint           __maxRedirects = 10;
         size_t         __maxHeadersLength = 32 * 1024; // 32 KB
         size_t         __maxContentLength = 5 * 1024 * 1024; // 5MB
@@ -400,14 +430,18 @@ public struct Request {
         __authenticator = null;
         __history = null;
     }
-
+    /// Add headers to request
+    /// Params:
+    /// headers = headers to send.
     void addHeaders(in string[string] headers) {
         foreach(pair; headers.byKeyValue) {
             __headers[pair.key] = pair.value;
         }
     }
-
-    @property string[string] headers() {
+    ///
+    /// compose headers to send
+    /// 
+    private @property string[string] headers() {
         string[string] generatedHeaders;
         if ( __authenticator ) {
             foreach(pair; __authenticator.authHeaders(__uri.host).byKeyValue) {
@@ -425,8 +459,11 @@ public struct Request {
         }
         return generatedHeaders;
     }
-
-    @property string requestString(string[string] params = null) {
+    ///
+    /// Build request string.
+    /// Handle proxy and query parameters.
+    /// 
+    private @property string requestString(string[string] params = null) {
         if ( __proxy ) {
             return "%s %s HTTP/1.1\r\n".format(__method, __uri.uri);
         }
@@ -443,15 +480,24 @@ public struct Request {
         }
         return "%s %s%s HTTP/1.1\r\n".format(__method, __uri.path, query);
     }
-    static string params2query(string[string] params) {
+    ///
+    /// encode parameters and build query part of the url
+    /// 
+    private static string params2query(string[string] params) {
         auto m = params.keys.
                         sort().
                         map!(a=>urlEncoded(a) ~ "=" ~ urlEncoded(params[a])).
                         join("&");
         return m;
     }
-
-    auto analyzeHeaders(in string[string] headers) {
+    unittest {
+        assert(Request.params2query(["c ":"d", "a":"b"])=="a=b&c%20=d");
+    }
+    ///
+    /// Analyze received headers, take appropriate actions:
+    /// check content length, attach unchunk and uncompress
+    /// 
+    private void analyzeHeaders(in string[string] headers) {
 
         __contentLength = -1;
         __unChunker = null;
@@ -476,18 +522,22 @@ public struct Request {
             }
         }
         auto contentEncoding = "content-encoding" in headers;
-        if ( contentEncoding ) {
-            tracef("decode from: %s", *contentEncoding);
-            if ( *contentEncoding == "gzip" ) {
+        if ( contentEncoding ) switch (*contentEncoding) {
+            default:
+                throw new RequestException("Unknown content-encoding " ~ *contentEncoding);
+            case "gzip":
+            case "deflate":
                 __bodyDecoder.insert(new Decompressor!ubyte);
-            }
-            if ( *contentEncoding == "deflate" ) {
-                __bodyDecoder.insert(new Decompressor!ubyte);
-            }
         }
     }
-
-    void parseResponseHeaders(ref Buffer!ubyte buffer) {
+    ///
+    /// Called when we know that all headers already received in buffer
+    /// 1. Split headers on lines
+    /// 2. store status line, store response code
+    /// 3. unfold headers if needed
+    /// 4. store headers
+    /// 
+    private void parseResponseHeaders(ref Buffer!ubyte buffer) {
         string lastHeader;
         foreach(line; buffer.data!(string).split("\n").map!(l => l.stripRight)) {
             if ( ! __response.status_line.length ) {
@@ -527,7 +577,10 @@ public struct Request {
         }
     }
 
-    bool headersHaveBeenReceived(in ubyte[] data, ref Buffer!ubyte buffer, out string separator) {
+    ///
+    /// Do we received \r\n\r\n?
+    /// 
+    private bool headersHaveBeenReceived(in ubyte[] data, ref Buffer!ubyte buffer, out string separator) pure const @safe {
         foreach(s; ["\r\n\r\n", "\n\n"]) {
             if ( data.canFind(s) || buffer.canFind(s) ) {
                 separator = s;
@@ -537,7 +590,7 @@ public struct Request {
         return false;
     }
 
-    bool followRedirectResponse() {
+    private bool followRedirectResponse() {
         __history ~= __response;
         if ( __history.length >= __maxRedirects ) {
             return false;
@@ -565,8 +618,10 @@ public struct Request {
         __response = Response.init;
         return true;
     }
-
-    void handleURLChange(in URI from, in URI to) {
+    ///
+    /// If uri changed so that we have to change host or port, then we have to close socket stream
+    /// 
+    private void handleURLChange(in URI from, in URI to) {
         if ( __stream !is null && __stream.isConnected && 
             ( from.scheme != to.scheme || from.host != to.host || from.port != to.port) ) {
             tracef("Have to reopen stream");
@@ -574,7 +629,7 @@ public struct Request {
         }
     }
     
-    void checkURL(string url, string file=__FILE__, size_t line=__LINE__) {
+    private void checkURL(string url, string file=__FILE__, size_t line=__LINE__) {
         if (url is null && __uri.uri == "" ) {
             throw new RequestException("No url configured", file, line);
         }
@@ -585,8 +640,10 @@ public struct Request {
             __uri = newURI;
         }
     }
-
-    void setupConnection() {
+    ///
+    /// Setup connection. Handle proxy and https case
+    /// 
+    private void setupConnection() {
         if ( !__stream || !__stream.isConnected ) {
             tracef("Set up new connection");
             URI   uri;
@@ -609,8 +666,11 @@ public struct Request {
             tracef("Use old connection");
         }
     }
-
-    void receiveResponse() {
+    ///
+    /// Receive response after request we sent.
+    /// Find headers, split on headers and body, continue to receive body
+    /// 
+    private void receiveResponse() {
 
         __stream.s.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
         scope(exit) {
@@ -893,6 +953,7 @@ public struct Request {
     ///  Returns:
     ///     Response
     ///  Examples:
+    ///  ---------------------------------------------------------------------------------------------------------
     ///      rs = rq.exec!"POST"("http://httpbin.org/post", "привiт, свiт!", "application/octet-stream");
     ///      
     ///      auto s = lineSplitter("one,\ntwo,\nthree.");
@@ -903,7 +964,7 @@ public struct Request {
     ///
     ///      auto f = File("tests/test.txt", "rb");
     ///      rs = rq.exec!"POST"("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
-    ///      
+    ///  --------------------------------------------------------------------------------------------------------
     Response exec(string method="POST", R)(string url, R content, string contentType="text/html")
         if ( isSomeString!R
             || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front)))) 
@@ -998,7 +1059,9 @@ public struct Request {
     ///  Returns:
     ///     Response
     ///  Examples:
+    ///  ---------------------------------------------------------------------------------
     ///     rs = Request().exec!"GET"("http://httpbin.org/get", ["c":"d", "a":"b"]);
+    ///  ---------------------------------------------------------------------------------
     ///     
     Response exec(string method="GET")(string url = null, string[string] params = null) if (method != "POST")
     {
@@ -1061,21 +1124,29 @@ public struct Request {
         __response.__history = __history;
         return __response;
     }
-
+    ///
+    /// GET request. Simple wrapper over exec!"GET"
+    /// Params:
+    /// args = request parameters. see exec docs.
+    ///
     Response get(A...)(A args) {
         return exec!"GET"(args);
     }
+    ///
+    /// POST request. Simple wrapper over exec!"POST"
+    /// Params:
+    /// args = request parameters. see exec docs.
+    ///
     Response post(A...)(A args) {
         return exec!"POST"(args);
     }
     
 }
-
-unittest {
+///
+public unittest {
     import std.json;
     globalLogLevel(LogLevel.info);
     tracef("http tests - start");
-    assert(Request.params2query(["c ":"d", "a":"b"])=="a=b&c%20=d");
 
     auto rq = Request();
     auto rs = rq.get("https://httpbin.org/");
@@ -1083,18 +1154,18 @@ unittest {
     assert(rs.responseBody.length > 0);
     rs = Request().get("http://httpbin.org/get", ["c":" d", "a":"b"]);
     assert(rs.code == 200);
-    auto json = parseJSON(rs.responseBody.data).object["args"].object;
+    auto json = parseJSON(rs.responseBody).object["args"].object;
     assert(json["c"].str == " d");
     assert(json["a"].str == "b");
 
     globalLogLevel(LogLevel.info);
     rq = Request();
-    rq.keepAlive = 5;
+    rq.keepAlive = true;
     // handmade json
     info("Check POST json");
     rs = rq.post("http://httpbin.org/post", `{"a":"☺ ", "c":[1,2,3]}`, "application/json");
     assert(rs.code==200);
-    json = parseJSON(rs.responseBody.data).object["json"].object;
+    json = parseJSON(rs.responseBody).object["json"].object;
     assert(json["a"].str == "☺ ");
     assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
     {
@@ -1113,7 +1184,7 @@ unittest {
         info("Check POST utf8 string");
         rs = rq.post("http://httpbin.org/post", "привiт, свiт!", "application/octet-stream");
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["data"].str;
+        auto data = parseJSON(rs.responseBody).object["data"].str;
         assert(data=="привiт, свiт!");
     }
     // ranges
@@ -1122,7 +1193,7 @@ unittest {
         auto s = lineSplitter("one,\ntwo,\nthree.");
         rs = rq.exec!"POST"("http://httpbin.org/post", s, "application/octet-stream");
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["data"].str;
+        auto data = parseJSON(rs.responseBody.toString).object["data"].str;
         assert(data=="one,two,three.");
     }
     {
@@ -1172,7 +1243,7 @@ unittest {
     info("Check compressed content");
     globalLogLevel(LogLevel.info);
     rq = Request();
-    rq.keepAlive = 5;
+    rq.keepAlive = true;
     rq.addHeaders(["Accept-Encoding":"gzip"]);
     rs = rq.get("http://httpbin.org/gzip");
     assert(rs.code==200);
@@ -1185,19 +1256,19 @@ unittest {
     info("Check redirects");
     globalLogLevel(LogLevel.info);
     rq = Request();
-    rq.keepAlive = 5;
+    rq.keepAlive = true;
     rs = rq.get("http://httpbin.org/relative-redirect/2");
     assert(rs.history.length == 2);
     assert(rs.code==200);
 //    rq = Request();
-    rq.keepAlive = 5;
+//    rq.keepAlive = true;
 //    rq.proxy = "http://localhost:8888/";
     rs = rq.get("http://httpbin.org/absolute-redirect/2");
     assert(rs.history.length == 2);
     assert(rs.code==200);
 //    rq = Request();
     rq.maxRedirects = 2;
-    rq.keepAlive = 0;
+    rq.keepAlive = false;
     rs = rq.get("https://httpbin.org/absolute-redirect/3");
     assert(rs.history.length == 2);
     assert(rs.code==302);
@@ -1211,7 +1282,7 @@ unittest {
     info("Check chunked content");
     globalLogLevel(LogLevel.info);
     rq = Request();
-    rq.keepAlive = 5;
+    rq.keepAlive = true;
     rq.bufferSize = 16*1024;
     rs = rq.get("http://httpbin.org/range/1024");
     assert(rs.code==200);

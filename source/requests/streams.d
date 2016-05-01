@@ -20,29 +20,43 @@ class DecodingExceptioin: Exception {
         super(msg, file, line);
     }
 }
-
-interface DataPipeIface(E) {
+/**
+ * DataPipeIface can accept some data, process, and return processed data.
+ */
+public interface DataPipeIface(E) {
+    /// Is there any processed data ready for reading?
     bool empty();
+    /// Put next data portion for processing
     void put(E[]);
+    /// Get any ready data
     E[] get();
+    /// Signal on end of incoming data stream.
     void flush();
 }
-
+/**
+ * DataPipe is a pipeline of data processors, each accept some data, process it, and put result to next element in line.
+ * This class used to combine different Transfer- and Content- encodings. For example: unchunk chunked transfer-encoding,
+ * and uncompress compressed Content-Encoding.
+ */
 public class DataPipe(E) : DataPipeIface!E {
 
     DataPipeIface!(E)[]  pipe;
     Buffer!E             buffer;
-
+    /// Append data processor to pipeline
+    /// Params:
+    /// p = processor
     void insert(DataPipeIface!E p) {
         pipe ~= p;
     }
-
     E[][] process(DataPipeIface!E p, E[][] data) {
         E[][] result;
         data.each!(e => p.put(e));
         while(!p.empty()) result ~= p.get();
         return result;
     }
+    /// Process next data portion. Data passed over pipeline and result stored in buffer.
+    /// Params:
+    /// data = input data array.
     void put(E[] data) {
         if ( pipe.empty ) {
             buffer.put(data);
@@ -54,6 +68,9 @@ public class DataPipe(E) : DataPipeIface!E {
         }
         t.each!(b => buffer.put(b));
     }
+    /// Process next data portion. Data passed over pipeline and store result in buffer.
+    /// Params:
+    /// buff = input data buffer.
     void put(Buffer!E buff) {
         if ( pipe.empty ) {
             if ( buffer.__repr is null ) {
@@ -70,6 +87,9 @@ public class DataPipe(E) : DataPipeIface!E {
         }
         t.each!(b => buffer.put(b));
     }
+    /// Get what was collected in internal buffer and clear it. 
+    /// Returns:
+    /// data collected.
     E[] get() pure {
         if ( buffer.empty ) {
             return E[].init;
@@ -78,6 +98,9 @@ public class DataPipe(E) : DataPipeIface!E {
         buffer = Buffer!E.init;
         return res;
     }
+    /// Test if internal buffer is empty
+    /// Returns:
+    /// true if internal buffer is empty (nothing to get())
     bool empty() pure const @safe {
         return buffer.empty;
     }
@@ -93,7 +116,10 @@ public class DataPipe(E) : DataPipeIface!E {
     }
 }
 
-
+/**
+ * Processor for gzipped/compressed content.
+ * Also support InputRange interface.
+ */
 public class Decompressor(E) : DataPipeIface!E {
     private {
         Buffer!ubyte __buff;
@@ -130,16 +156,6 @@ public class Decompressor(E) : DataPipeIface!E {
         }
         __buff.put(__zlib.flush());
     }
-//    override @property bool empty() {
-//        return length==0;
-//    }
-//    @property auto opDollar() const pure @safe {
-//        return __buff.length;
-//    }
-//    @property auto length() const pure @safe {
-//        debug tracef("length buff l=%d", __buff.length);
-//        return __buff.length;
-//    }
     override @property bool empty() const pure @safe {
         debug tracef("empty=%b", __buff.empty);
         return __buff.empty;
@@ -157,6 +173,9 @@ public class Decompressor(E) : DataPipeIface!E {
     }
 }
 
+/**
+ * Unchunk chunked http responce body.
+ */
 public class DecodeChunked : DataPipeIface!ubyte {
     //    length := 0
     //    read chunk-size, chunk-extension (if any) and CRLF
@@ -315,7 +334,16 @@ unittest {
     assert(equal(dpu.get(), "abcdefgh"));
     info("Testing DataPipe - done");
 }
-
+/**
+ * Buffer used to collect and process data from network. It remainds Appender, but support
+ * also Range interface.
+ * $(P To place data in buffer use put() method.)
+ * $(P  To retrieve data from buffer you can use several methods:)
+ * $(UL
+ *  $(LI Range methods: front, back, index [])
+ *  $(LI data method: return collected data (like Appender.data))
+ * )
+ */
 public struct Buffer(T) {
     private {
         class Repr {
@@ -485,8 +513,8 @@ public struct Buffer(T) {
         }
     }
 }
-
-unittest {
+///
+public unittest {
 
     static assert(isInputRange!(Buffer!ubyte));
     static assert(isForwardRange!(Buffer!ubyte));

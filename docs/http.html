@@ -143,6 +143,30 @@
 </dd>
 </dl>
 </dd>
+<dt class="decl"><p><code><a name="getContent"></a>auto <u>getContent</u>(A...)(A <code><i>args</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Call GET, and return response content.
+ This is the simplest case, when all you need is the response body.
+</p>
+<h4 class="sec">Returns:</h4> <p>Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.</p>
+<h4 class="sec">Examples:</h4> <p><pre class="d_code">
+globalLogLevel(LogLevel.info);
+<span style="color:blue">auto</span> r = <u>getContent</u>(<span style="color:red">"https://httpbin.org/stream/20"</span>);
+<span style="color:blue">assert</span>(r.data.split(<span style="color:red">"\n"</span>).filter!(<span style="color:red">"a.length&gt;0"</span>).count == 20);
+</pre>
+</p></div>
+</dd>
+<dt class="decl"><p><code><a name="postContent"></a>auto <u>postContent</u>(A...)(A <code><i>args</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Call post and return response content.</p>
+<h4 class="sec">Examples:</h4> <p><pre class="d_code">
+<span style="color:blue">import</span> std.json;
+globalLogLevel(LogLevel.info);
+<span style="color:blue">auto</span> r = <u>postContent</u>(<span style="color:red">"http://httpbin.org/post"</span>, <span style="color:red">`{"a":"b", "c":1}`</span>, <span style="color:red">"application/json"</span>);
+<span style="color:blue">assert</span>(parseJSON(r.data).object[<span style="color:red">"json"</span>].object[<span style="color:red">"c"</span>].integer == 1);
+</pre>
+</p></div>
+</dd>
 <dt class="decl"><p><code><a name="Response"></a>struct <u>Response</u>;
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p><u>Response</u> - result of request execution.
@@ -263,7 +287,7 @@ json = parseJSON(rs.responseBody.data).object[<span style="color:red">"json"</sp
     <span style="color:blue">auto</span> s = lineSplitter(<span style="color:red">"one,\ntwo,\nthree."</span>);
     rs = rq.exec!<span style="color:red">"POST"</span>(<span style="color:red">"http://httpbin.org/post"</span>, s, <span style="color:red">"application/octet-stream"</span>);
     <span style="color:blue">assert</span>(rs.code==200);
-    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.data).object[<span style="color:red">"data"</span>].str;
+    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.toString).object[<span style="color:red">"data"</span>].str;
     <span style="color:blue">assert</span>(data==<span style="color:red">"one,two,three."</span>);
 }
 {

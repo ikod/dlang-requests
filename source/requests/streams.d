@@ -512,6 +512,12 @@ public struct Buffer(T) {
             return castFrom!(T[]).to!U(a.data);
         }
     }
+    string opCast(string)() {
+        return this.toString;
+    }
+    bool opEquals(U)(U x) {
+        return cast(U)this == x;
+    }
 }
 ///
 public unittest {
@@ -531,6 +537,7 @@ public unittest {
     assert(b.back == 'f');
     assert(equal(b[0..$], "abcdef"));
     assert(equal(b[$-2..$], "ef"));
+    assert(b == "abcdef");
     b.popFront;
     b.popBack;
     assert(b.front == 'b');

@@ -1,9 +1,5 @@
 module requests.http;
 
-/*
- * 
- */
-
 private:
 import std.algorithm;
 import std.array;
@@ -23,6 +19,10 @@ import core.stdc.errno;
 import requests.streams;
 import requests.uri;
 import requests.utils;
+
+static this() {
+    globalLogLevel(LogLevel.error);
+}
 
 extern(C) {
     int SSL_library_init();
@@ -280,6 +280,43 @@ class TCPSocketStream : SocketStream {
         __isOpen = true;
     }
 }
+
+/**
+ * Call GET, and return response content.
+ * This is the simplest case, when all you need is the response body.
+ * Returns:
+ * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
+ */
+public auto getContent(A...)(A args) {
+    auto rq = Request();
+    rq.addHeaders(["Accept-Encoding":"gzip, deflate"]);
+    auto rs = rq.exec!"GET"(args);
+    return rs.responseBody;
+}
+///
+public unittest {
+    globalLogLevel(LogLevel.info);
+    auto r = getContent("https://httpbin.org/stream/20");
+    assert(r.data.split("\n").filter!("a.length>0").count == 20);
+}
+
+/**
+ * Call post and return response content.
+ */
+public auto postContent(A...)(A args) {
+    auto rq = Request();
+    rq.addHeaders(["Accept-Encoding":"gzip, deflate"]);
+    auto rs = rq.exec!"POST"(args);
+    return rs.responseBody;
+}
+///
+public unittest {
+    import std.json;
+    globalLogLevel(LogLevel.info);
+    auto r = postContent("http://httpbin.org/post", `{"a":"b", "c":1}`, "application/json");
+    assert(parseJSON(r.data).object["json"].object["c"].integer == 1);
+}
+
 ///
 /// Response - result of request execution.
 ///
@@ -304,7 +341,7 @@ public struct Response {
     mixin(getter("code"));
     mixin(getter("status_line"));
     mixin(getter("responseHeaders"));
-    @property auto responseBody() pure @safe {
+    @property auto responseBody() const pure @safe {
         return __responseBody;
     }
     mixin(getter("history"));
@@ -700,8 +737,9 @@ public struct Request {
                 }
                 throw new ErrnoException("receiving Headers");
             }
-            if ( read == 0 )
+            if ( read == 0 ) {
                 break;
+            }
             
             auto data = b[0..read];
             buffer.put(data);
@@ -857,6 +895,8 @@ public struct Request {
         //
         // application/json
         //
+        bool restartedRequest = false;
+        
         __method = method;
         
         __response = Response.init;
@@ -926,6 +966,17 @@ public struct Request {
 
         receiveResponse();
 
+        if ( __response.__responseHeaders.length == 0 
+            && __keepAlive
+            && !restartedRequest
+            && __method == "GET"
+            ) {
+            tracef("Server closed keepalive connection");
+            __stream.close();
+            restartedRequest = true;
+            goto connect;
+        }
+
         __response.__finishedAt = Clock.currTime;
         ///
         auto connection = "connection" in __response.__responseHeaders;
@@ -974,6 +1025,8 @@ public struct Request {
         //
         // application/json
         //
+        bool restartedRequest = false;
+        
         __method = method;
         
         __response = Response.init;
@@ -1032,6 +1085,17 @@ public struct Request {
 
         receiveResponse();
 
+        if ( __response.__responseHeaders.length == 0 
+            && __keepAlive
+            && !restartedRequest
+            && __method == "GET"
+            ) {
+            tracef("Server closed keepalive connection");
+            __stream.close();
+            restartedRequest = true;
+            goto connect;
+        }
+
         __response.__finishedAt = Clock.currTime;
 
         ///
@@ -1069,6 +1133,7 @@ public struct Request {
         __method = method;
         __response = Response.init;
         __history.length = 0;
+        bool restartedRequest = false; // True if this is restarted keepAlive request
 
         checkURL(url);
 
@@ -1101,6 +1166,16 @@ public struct Request {
 
         receiveResponse();
 
+        if ( __response.__responseHeaders.length == 0 
+            && __keepAlive
+            && !restartedRequest
+            && __method == "GET"
+        ) {
+            tracef("Server closed keepalive connection");
+            __stream.close();
+            restartedRequest = true;
+            goto connect;
+        }
         __response.__finishedAt = Clock.currTime;
 
         ///
@@ -1140,8 +1215,8 @@ public struct Request {
     Response post(A...)(A args) {
         return exec!"POST"(args);
     }
-    
 }
+
 ///
 public unittest {
     import std.json;

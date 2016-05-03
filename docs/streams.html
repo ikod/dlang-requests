@@ -238,6 +238,7 @@ b.put(<span style="color:red">"def"</span>.representation.dup);
 <span style="color:blue">assert</span>(b.back == 'f');
 <span style="color:blue">assert</span>(equal(b[0..$], <span style="color:red">"abcdef"</span>));
 <span style="color:blue">assert</span>(equal(b[$-2..$], <span style="color:red">"ef"</span>));
+<span style="color:blue">assert</span>(b == <span style="color:red">"abcdef"</span>);
 b.popFront;
 b.popBack;
 <span style="color:blue">assert</span>(b.front == 'b');

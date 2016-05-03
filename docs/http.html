@@ -152,7 +152,7 @@
 <h4 class="sec">Examples:</h4> <p><pre class="d_code">
 globalLogLevel(LogLevel.info);
 <span style="color:blue">auto</span> r = <u>getContent</u>(<span style="color:red">"https://httpbin.org/stream/20"</span>);
-<span style="color:blue">assert</span>(r.data.split(<span style="color:red">"\n"</span>).filter!(<span style="color:red">"a.length&gt;0"</span>).count == 20);
+<span style="color:blue">assert</span>(r.splitter('\n').filter!(<span style="color:red">"a.length&gt;0"</span>).count == 20);
 </pre>
 </p></div>
 </dd>

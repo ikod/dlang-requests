@@ -525,6 +525,7 @@ public unittest {
     static assert(isInputRange!(Buffer!ubyte));
     static assert(isForwardRange!(Buffer!ubyte));
     static assert(hasLength!(Buffer!ubyte));
+    static assert(hasSlicing!(Buffer!ubyte));
     static assert(isBidirectionalRange!(Buffer!ubyte));
     static assert(isRandomAccessRange!(Buffer!ubyte));
     

@@ -297,7 +297,7 @@ public auto getContent(A...)(A args) {
 public unittest {
     globalLogLevel(LogLevel.info);
     auto r = getContent("https://httpbin.org/stream/20");
-    assert(r.data.split("\n").filter!("a.length>0").count == 20);
+    assert(r.splitter('\n').filter!("a.length>0").count == 20);
 }
 
 /**
@@ -341,7 +341,7 @@ public struct Response {
     mixin(getter("code"));
     mixin(getter("status_line"));
     mixin(getter("responseHeaders"));
-    @property auto responseBody() const pure @safe {
+    @property auto responseBody() inout pure @safe {
         return __responseBody;
     }
     mixin(getter("history"));

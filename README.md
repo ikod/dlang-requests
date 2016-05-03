@@ -22,6 +22,7 @@ For example to authorize with Basic authorization use next code:
 ```
 
 Here is short descrition of some Request options:
+
 | name | type| meaning| default|
 |------|-----|--------|--------|
 | keepAlive|bool| request keepalive connection| false |

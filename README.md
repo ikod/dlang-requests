@@ -1,18 +1,31 @@
 # dlang-requests
-http requests library
 
 [![Build Status](https://travis-ci.org/ikod/dlang-requests.svg?branch=master)](https://travis-ci.org/ikod/dlang-requests)
 
+HTTP requests library with goals:
+
+* small memory footprint
+* performance
+* simple, high level API
+
 API docs: [Wiki](https://github.com/ikod/dlang-requests/wiki)
 
-In simplest scenario you just need to fetch document from remote site. In this case you can just call getContent
+In simplest scenario you just need to fetch document from remote site. In this case you can call getContent
 ```d
     auto r = getContent("https://httpbin.org/stream/20");
     assert(r.splitter('\n').filter!("a.length>0").count == 20);
 ```
 getContent returns Buffer, filled with data. Buffer looks like Appender!ubyte (it have method data()), but also support Range operations.
 
-For anything other than default you can use Request structure, which can be configured for keep-alive, compressed requests, for different io buffer and maximum sizes of response headers and body.
+When you need access to response code, you have to use *Request* struct for interface:
+
+```d
+    auto rq = Request();
+    auto rs = rq.get("https://httpbin.org/");
+    assert(rs.code==200);
+```
+
+For anything other than default you can configure *Request* structure for keep-alive, compressed requests, for different io buffer and maximum sizes of response headers and body.
 
 For example to authorize with Basic authorization use next code:
 ```d
@@ -33,6 +46,7 @@ Here is short descrition of some Request options:
 | bufferSize | size_t | socket io buffer size | 16KB |
 | verbosity | uint | verbosity level (0, 1 or 2) | 0 |
 | proxy | string | url of the http proxy | null |
+| headers | string[string] | additional headers | null
 
 Usage example:
 ```d
@@ -52,4 +66,5 @@ Usage example:
  f.close();
 
 ```
+
 

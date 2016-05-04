@@ -25,7 +25,7 @@ When you need access to response code, you have to use *Request* struct for inte
     assert(rs.code==200);
 ```
 
-For anything other than default you can configure *Request* structure for keep-alive, compressed requests, for different io buffer and maximum sizes of response headers and body.
+For anything other than default, you can configure *Request* structure for keep-alive, compressed requests, for different io buffer and maximum sizes of response headers and body.
 
 For example to authorize with Basic authorization use next code:
 ```d
@@ -36,17 +36,17 @@ For example to authorize with Basic authorization use next code:
 
 Here is short descrition of some Request options:
 
-| name | type| meaning| default|
-|------|-----|--------|--------|
-| keepAlive|bool| request keepalive connection| false |
-| maxRedirects| uint | maximum redirect depth | 10 |
-| maxHeadersLength | size_t | max.acceptable response headers length | 32KB |
-| maxContentLength | size_t | max.acceptable content length | 5MB |
-| timeout | Duration | timeout on connect or data transfer | 30.seconds |
-| bufferSize | size_t | socket io buffer size | 16KB |
-| verbosity | uint | verbosity level (0, 1 or 2) | 0 |
-| proxy | string | url of the http proxy | null |
-| headers | string[string] | additional headers | null
+| name             | type           | meaning                                | default    |
+|------------------|----------------|----------------------------------------|------------|
+| keepAlive        | bool           | request keepalive connection           | false      |
+| maxRedirects     | uint           | maximum redirect depth                 | 10         |
+| maxHeadersLength | size_t         | max.acceptable response headers length | 32KB       |
+| maxContentLength | size_t         | max.acceptable content length          | 5MB        |
+| timeout          | Duration       | timeout on connect or data transfer    | 30.seconds |
+| bufferSize       | size_t         | socket io buffer size                  | 16KB       |
+| verbosity        | uint           | verbosity level (0, 1 or 2)            | 0          |
+| proxy            | string         | url of the http proxy                  | null       |
+| headers          | string[string] | additional headers                     | null       |
 
 Usage example:
 ```d

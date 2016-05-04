@@ -504,10 +504,6 @@ public struct Request {
         if ( __proxy ) {
             return "%s %s HTTP/1.1\r\n".format(__method, __uri.uri);
         }
-        if ( __method != "GET" ) {
-            // encode params into url only for GET
-            return "%s %s HTTP/1.1\r\n".format(__method, __uri.path);
-        }
         auto query = __uri.query.dup;
         if ( params ) {
             query ~= params2query(params);
@@ -1238,9 +1234,11 @@ public unittest {
     rq.keepAlive = true;
     // handmade json
     info("Check POST json");
-    rs = rq.post("http://httpbin.org/post", `{"a":"☺ ", "c":[1,2,3]}`, "application/json");
+    rs = rq.post("http://httpbin.org/post?b=x", `{"a":"☺ ", "c":[1,2,3]}`, "application/json");
     assert(rs.code==200);
-    json = parseJSON(rs.responseBody.data).object["json"].object;
+    json = parseJSON(rs.responseBody).object["args"].object;
+    assert(json["b"].str == "x");
+    json = parseJSON(rs.responseBody).object["json"].object;
     assert(json["a"].str == "☺ ");
     assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
     {

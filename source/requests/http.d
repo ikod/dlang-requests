@@ -1236,9 +1236,9 @@ public unittest {
     info("Check POST json");
     rs = rq.post("http://httpbin.org/post?b=x", `{"a":"☺ ", "c":[1,2,3]}`, "application/json");
     assert(rs.code==200);
-    json = parseJSON(rs.responseBody).object["args"].object;
+    json = parseJSON(rs.responseBody.data).object["args"].object;
     assert(json["b"].str == "x");
-    json = parseJSON(rs.responseBody).object["json"].object;
+    json = parseJSON(rs.responseBody.data).object["json"].object;
     assert(json["a"].str == "☺ ");
     assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
     {

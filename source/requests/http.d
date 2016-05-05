@@ -289,7 +289,6 @@ class TCPSocketStream : SocketStream {
  */
 public auto getContent(A...)(A args) {
     auto rq = Request();
-    rq.addHeaders(["Accept-Encoding":"gzip, deflate"]);
     auto rs = rq.exec!"GET"(args);
     return rs.responseBody;
 }
@@ -305,7 +304,6 @@ public unittest {
  */
 public auto postContent(A...)(A args) {
     auto rq = Request();
-    rq.addHeaders(["Accept-Encoding":"gzip, deflate"]);
     auto rs = rq.exec!"POST"(args);
     return rs.responseBody;
 }
@@ -416,9 +414,14 @@ public struct PostFile {
 /// 
 public struct Request {
     private {
+        enum           __preHeaders = [
+            "Accept-Encoding": "gzip, deflate",
+            "User-Agent":      "dlang-requests"
+        ];
         string         __method = "GET";
         URI            __uri;
         string[string] __headers;
+        string[]       __filteredHeaders;
         Auth           __authenticator;
         bool           __keepAlive;
         uint           __maxRedirects = 10;
@@ -475,11 +478,18 @@ public struct Request {
             __headers[pair.key] = pair.value;
         }
     }
+    /// Remove headers from request
+    /// Params:
+    /// headers = headers to remove.
+    void removeHeaders(in string[] headers) pure {
+        __filteredHeaders ~= headers;
+    }
     ///
     /// compose headers to send
     /// 
     private @property string[string] headers() {
-        string[string] generatedHeaders;
+        string[string] generatedHeaders = __preHeaders;
+
         if ( __authenticator ) {
             foreach(pair; __authenticator.authHeaders(__uri.host).byKeyValue) {
                 generatedHeaders[pair.key] = pair.value;
@@ -494,6 +504,9 @@ public struct Request {
         foreach(pair; __headers.byKeyValue) {
             generatedHeaders[pair.key] = pair.value;
         }
+
+        __filteredHeaders.each!(a=>generatedHeaders.remove(a));
+
         return generatedHeaders;
     }
     ///

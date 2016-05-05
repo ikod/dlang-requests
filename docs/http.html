@@ -257,8 +257,10 @@ rq = <u>Request</u>();
 rq.keepAlive = <span style="color:blue">true</span>;
 <span style="color:green">// handmade json
 </span>info(<span style="color:red">"Check POST json"</span>);
-rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, <span style="color:red">`{"a":"☺ ", "c":[1,2,3]}`</span>, <span style="color:red">"application/json"</span>);
+rs = rq.post(<span style="color:red">"http://httpbin.org/post?b=x"</span>, <span style="color:red">`{"a":"☺ ", "c":[1,2,3]}`</span>, <span style="color:red">"application/json"</span>);
 <span style="color:blue">assert</span>(rs.code==200);
+json = parseJSON(rs.responseBody.data).object[<span style="color:red">"args"</span>].object;
+<span style="color:blue">assert</span>(json[<span style="color:red">"b"</span>].str == <span style="color:red">"x"</span>);
 json = parseJSON(rs.responseBody.data).object[<span style="color:red">"json"</span>].object;
 <span style="color:blue">assert</span>(json[<span style="color:red">"a"</span>].str == <span style="color:red">"☺ "</span>);
 <span style="color:blue">assert</span>(json[<span style="color:red">"c"</span>].array.map!(a=&gt;a.integer).array == [1,2,3]);
@@ -417,6 +419,16 @@ tracef(<span style="color:red">"http tests - ok"</span>);
 <h4 class="sec">Parameters:</h4>
   <table class="params"><tr><td class="paramname"><code>string[string] <code><i>headers</i></code></code></td>
 <td class="paramdesc"><p><code><i>headers</i></code> to send.</p></td></tr>
+</table>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="Request.removeHeaders"></a>pure void <u>removeHeaders</u>(in string[] <code><i>headers</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Remove <code><i>headers</i></code> from request
+</p>
+<h4 class="sec">Parameters:</h4>
+  <table class="params"><tr><td class="paramname"><code>string[] <code><i>headers</i></code></code></td>
+<td class="paramdesc"><p><code><i>headers</i></code> to remove.</p></td></tr>
 </table>
 </div>
 </dd>

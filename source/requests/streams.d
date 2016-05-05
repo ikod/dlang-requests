@@ -234,7 +234,6 @@ public class DecodeChunked : DataPipeIface!ubyte {
                     }
                     continue;
                 }
-                tracef("Got chunk size line %s", s[0]);
                 string x = castFrom!(ubyte[]).to!string(s[0]);
                 formattedRead(x, "%x", &chunk_size);
                 tracef("Got chunk size %s", chunk_size);

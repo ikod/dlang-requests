@@ -69,6 +69,6 @@ Usage example:
 
 
 For Windows users
-=================
+==
 Requests distributed with binary ssl and crypto libraries. These libararies were downloaded from https://slproweb.com/products/Win32OpenSSL.html (full version) and converted using "implib /system" http://ftp.digitalmars.com/bup.zip.
 If you know better way to link windows libraries, please, let me know.

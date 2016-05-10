@@ -1263,15 +1263,29 @@ public unittest {
     assert(json["a"].str == "☺ ");
     assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
     {
+        import std.file;
+        import std.path;
+        auto tmpd = tempDir();
+        auto tmpfname = tmpd ~ dirSeparator ~ "request_test.txt";
+        auto f = File(tmpfname, "wb");
+        f.rawWrite("abcdefgh\n12345678\n");
+        f.close();
         // files
         globalLogLevel(LogLevel.info);
         info("Check POST files");
         PostFile[] files = [
-                        {fileName:"tests/abc.txt", fieldName:"abc", contentType:"application/octet-stream"}, 
-                        {fileName:"tests/test.txt"}
+                        {fileName: tmpfname, fieldName:"abc", contentType:"application/octet-stream"}, 
+                        {fileName: tmpfname}
                     ];
         rs = rq.post("http://httpbin.org/post", files);
         assert(rs.code==200);
+        info("Check POST chunked from file.byChunk");
+        f = File(tmpfname, "rb");
+        rs = rq.post("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
+        assert(rs.code==200);
+        auto data = parseJSON(rs.responseBody.data).object["data"].str;
+        assert(data=="abcdefgh\n12345678\n");
+        f.close();
     }
     {
         // string
@@ -1305,15 +1319,6 @@ public unittest {
         assert(rs.code==200);
         auto data = parseJSON(rs.responseBody.data).object["data"].str;
         assert(data==s);
-    }
-    {
-        info("Check POST chunked from file.byChunk");
-        auto f = File("tests/test.txt", "rb");
-        rs = rq.post("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
-        assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["data"].str;
-        assert(data=="abcdefgh\n12345678\n");
-        f.close();
     }
     // associative array
     rs = rq.post("http://httpbin.org/post", ["a":"b ", "c":"d"]);

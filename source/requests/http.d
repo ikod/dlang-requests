@@ -57,8 +57,8 @@ extern(C) {
     SSL_METHOD* TLSv1_client_method();
 }
 
-pragma(lib, "crypto");
-pragma(lib, "ssl");
+//pragma(lib, "crypto");
+//pragma(lib, "ssl");
 
 shared static this() {
     SSL_library_init();
@@ -491,21 +491,22 @@ public struct Request {
         string[string] generatedHeaders = __preHeaders;
 
         if ( __authenticator ) {
-            foreach(pair; __authenticator.authHeaders(__uri.host).byKeyValue) {
-                generatedHeaders[pair.key] = pair.value;
-            }
+            __authenticator.
+                authHeaders(__uri.host).
+                byKeyValue.
+                each!(pair => generatedHeaders[pair.key] = pair.value);
         }
 
         generatedHeaders["Connection"] = __keepAlive?"Keep-Alive":"Close";
         generatedHeaders["Host"] = __uri.host;
+
         if ( __uri.scheme !in standard_ports || __uri.port != standard_ports[__uri.scheme] ) {
             generatedHeaders["Host"] ~= ":%d".format(__uri.port);
         }
-        foreach(pair; __headers.byKeyValue) {
-            generatedHeaders[pair.key] = pair.value;
-        }
 
-        __filteredHeaders.each!(a=>generatedHeaders.remove(a));
+        __headers.byKey.each!(h => generatedHeaders[h] = __headers[h]);
+
+        __filteredHeaders.each!(h => generatedHeaders.remove(h));
 
         return generatedHeaders;
     }
@@ -741,10 +742,17 @@ public struct Request {
             read = __stream.receive(b);
             tracef("read: %d", read);
             if ( read < 0 ) {
-                if ( errno == EAGAIN ) {
-                    throw new TimeoutException("Timeout receiving headers");
+                version(Windows) {
+                    if ( errno == 0 ) {
+                        throw new TimeoutException("Timeout receiving headers");
+                    }
                 }
-                throw new ErrnoException("receiving Headers");
+                version(Posix) {
+                    if ( errno == EAGAIN ) {
+                        throw new TimeoutException("Timeout receiving headers");
+                    }
+                    throw new ErrnoException("receiving Headers");
+                }
             }
             if ( read == 0 ) {
                 break;

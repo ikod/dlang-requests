@@ -10,25 +10,38 @@ HTTP requests library with goals:
 
 API docs: [Wiki](https://github.com/ikod/dlang-requests/wiki)
 
-In simplest scenario you just need to fetch document from remote site. In this case you can call getContent
-```d
-    auto r = getContent("https://httpbin.org/stream/20");
-    assert(r.splitter('\n').filter!("a.length>0").count == 20);
+In simplest scenario you just need to fetch and process document from remote site. In this case you can call getContent
+```c
+import std.stdio;
+import std.algorithm;
+import requests;
+
+pragma(lib, "ssl");
+pragma(lib, "crypto");
+
+void main() {
+    writeln(
+        getContent("https://httpbin.org/")
+        .splitter('\n')
+        .filter!("a.length>0")
+        .count
+    );
+}
 ```
-getContent returns Buffer, filled with data. Buffer looks like Appender!ubyte (it have method data()), but also support Range operations.
+getContent returns Buffer, filled with data. Buffer looks like Appender!ubyte (it have method data()), but also support many Range operations.
 
-When you need access to response code, you have to use *Request* struct for interface:
+When you need access to response code, you have to use *Request* and *Response* structures:
 
-```d
-    auto rq = Request();
-    auto rs = rq.get("https://httpbin.org/");
-    assert(rs.code==200);
+```c
+Request rq = Request();
+Response rs = rq.get("https://httpbin.org/");
+assert(rs.code==200);
 ```
 
 For anything other than default, you can configure *Request* structure for keep-alive, compressed requests, for different io buffer and maximum sizes of response headers and body.
 
 For example to authorize with Basic authorization use next code:
-```d
+```c
     rq = Request();
     rq.authenticator = new BasicAuthentication("user", "passwd");
     rs = rq.get("http://httpbin.org/basic-auth/user/passwd");

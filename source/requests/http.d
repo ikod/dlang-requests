@@ -1283,7 +1283,7 @@ public unittest {
         f = File(tmpfname, "rb");
         rs = rq.post("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["data"].str;
+        auto data = parseJSON(rs.responseBody).object["data"].str;
         assert(data=="abcdefgh\n12345678\n");
         f.close();
     }

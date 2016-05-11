@@ -265,15 +265,29 @@ json = parseJSON(rs.responseBody.data).object[<span style="color:red">"json"</sp
 <span style="color:blue">assert</span>(json[<span style="color:red">"a"</span>].str == <span style="color:red">"☺ "</span>);
 <span style="color:blue">assert</span>(json[<span style="color:red">"c"</span>].array.map!(a=&gt;a.integer).array == [1,2,3]);
 {
+    <span style="color:blue">import</span> std.file;
+    <span style="color:blue">import</span> std.path;
+    <span style="color:blue">auto</span> tmpd = tempDir();
+    <span style="color:blue">auto</span> tmpfname = tmpd ~ dirSeparator ~ <span style="color:red">"request_test.txt"</span>;
+    <span style="color:blue">auto</span> f = File(tmpfname, <span style="color:red">"wb"</span>);
+    f.rawWrite(<span style="color:red">"abcdefgh\n12345678\n"</span>);
+    f.close();
     <span style="color:green">// files
 </span>    globalLogLevel(LogLevel.info);
     info(<span style="color:red">"Check POST files"</span>);
     PostFile[] files = [
-                    {fileName:<span style="color:red">"tests/abc.txt"</span>, fieldName:<span style="color:red">"abc"</span>, contentType:<span style="color:red">"application/octet-stream"</span>}, 
-                    {fileName:<span style="color:red">"tests/test.txt"</span>}
+                    {fileName: tmpfname, fieldName:<span style="color:red">"abc"</span>, contentType:<span style="color:red">"application/octet-stream"</span>}, 
+                    {fileName: tmpfname}
                 ];
     rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, files);
     <span style="color:blue">assert</span>(rs.code==200);
+    info(<span style="color:red">"Check POST chunked from file.byChunk"</span>);
+    f = File(tmpfname, <span style="color:red">"rb"</span>);
+    rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, f.byChunk(3), <span style="color:red">"application/octet-stream"</span>);
+    <span style="color:blue">assert</span>(rs.code==200);
+    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody).object[<span style="color:red">"data"</span>].str;
+    <span style="color:blue">assert</span>(data==<span style="color:red">"abcdefgh\n12345678\n"</span>);
+    f.close();
 }
 {
     <span style="color:green">// string
@@ -307,15 +321,6 @@ json = parseJSON(rs.responseBody.data).object[<span style="color:red">"json"</sp
     <span style="color:blue">assert</span>(rs.code==200);
     <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.data).object[<span style="color:red">"data"</span>].str;
     <span style="color:blue">assert</span>(data==s);
-}
-{
-    info(<span style="color:red">"Check POST chunked from file.byChunk"</span>);
-    <span style="color:blue">auto</span> f = File(<span style="color:red">"tests/test.txt"</span>, <span style="color:red">"rb"</span>);
-    rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, f.byChunk(3), <span style="color:red">"application/octet-stream"</span>);
-    <span style="color:blue">assert</span>(rs.code==200);
-    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.data).object[<span style="color:red">"data"</span>].str;
-    <span style="color:blue">assert</span>(data==<span style="color:red">"abcdefgh\n12345678\n"</span>);
-    f.close();
 }
 <span style="color:green">// associative array
 </span>rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, [<span style="color:red">"a"</span>:<span style="color:red">"b "</span>, <span style="color:red">"c"</span>:<span style="color:red">"d"</span>]);

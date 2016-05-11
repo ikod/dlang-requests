@@ -11,7 +11,7 @@ HTTP requests library with goals:
 API docs: [Wiki](https://github.com/ikod/dlang-requests/wiki)
 
 In simplest scenario you just need to fetch and process document from remote site. In this case you can call getContent
-```c
+```d
 import std.stdio;
 import std.algorithm;
 import requests;
@@ -32,13 +32,13 @@ getContent returns Buffer, filled with data. Buffer looks like Appender!ubyte (i
 
 When you need access to response code, you have to use *Request* and *Response* structures:
 
-```c
+```d
 Request rq = Request();
 Response rs = rq.get("https://httpbin.org/");
 assert(rs.code==200);
 ```
 
-For anything other than default, you can configure *Request* structure for keep-alive, compressed requests, for different io buffer and maximum sizes of response headers and body.
+For anything other than default, you can configure *Request* structure for keep-alive, redirects, headers, or for different io buffer and maximum sizes of response headers and body.
 
 For example to authorize with Basic authorization use next code:
 ```c

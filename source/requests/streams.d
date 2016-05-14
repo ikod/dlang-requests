@@ -13,7 +13,8 @@ import std.string;
 import std.stdio;
 import std.traits;
 import std.zlib;
-
+import std.datetime;
+import std.socket;
 
 class DecodingExceptioin: Exception {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
@@ -565,3 +566,203 @@ public unittest {
     assert(equal(findSplit(c, "\n\n")[2], "body"));
     assert(c.length == c_length);
 }
+
+public class ConnectError: Exception {
+    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
+        super(msg, file, line);
+    }
+}
+
+extern(C) {
+    int SSL_library_init();
+    void OpenSSL_add_all_ciphers();
+    void OpenSSL_add_all_digests();
+    void SSL_load_error_strings();
+    
+    struct SSL {}
+    struct SSL_CTX {}
+    struct SSL_METHOD {}
+    
+    SSL_CTX* SSL_CTX_new(const SSL_METHOD* method);
+    SSL* SSL_new(SSL_CTX*);
+    int SSL_set_fd(SSL*, int);
+    int SSL_connect(SSL*);
+    int SSL_write(SSL*, const void*, int);
+    int SSL_read(SSL*, void*, int);
+    int SSL_shutdown(SSL*) @trusted @nogc nothrow;
+    void SSL_free(SSL*);
+    void SSL_CTX_free(SSL_CTX*);
+    
+    long    SSL_CTX_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg);
+    
+    long SSL_CTX_set_mode(SSL_CTX *ctx, long mode);
+    long SSL_set_mode(SSL *ssl, long mode);
+    
+    long SSL_CTX_get_mode(SSL_CTX *ctx);
+    long SSL_get_mode(SSL *ssl);
+    
+    SSL_METHOD* SSLv3_client_method();
+    SSL_METHOD* TLSv1_2_client_method();
+    SSL_METHOD* TLSv1_client_method();
+}
+
+//pragma(lib, "crypto");
+//pragma(lib, "ssl");
+
+shared static this() {
+    SSL_library_init();
+    OpenSSL_add_all_ciphers();
+    OpenSSL_add_all_digests();
+    SSL_load_error_strings();
+}
+
+public class OpenSslSocket : Socket {
+    enum SSL_MODE_RELEASE_BUFFERS = 0x00000010L;
+    private SSL* ssl;
+    private SSL_CTX* ctx;
+    private void initSsl() {
+        //ctx = SSL_CTX_new(SSLv3_client_method());
+        ctx = SSL_CTX_new(TLSv1_client_method());
+        assert(ctx !is null);
+        
+        //SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
+        //SSL_CTX_ctrl(ctx, 33, SSL_MODE_RELEASE_BUFFERS, null);
+        ssl = SSL_new(ctx);
+        SSL_set_fd(ssl, this.handle);
+    }
+    
+    @trusted
+    override void connect(Address to) {
+        super.connect(to);
+        if(SSL_connect(ssl) == -1)
+            throw new Exception("ssl connect failed");
+    }
+    
+    @trusted
+    override ptrdiff_t send(const(void)[] buf, SocketFlags flags) {
+        return SSL_write(ssl, buf.ptr, cast(uint) buf.length);
+    }
+    override ptrdiff_t send(const(void)[] buf) {
+        return send(buf, SocketFlags.NONE);
+    }
+    @trusted
+    override ptrdiff_t receive(void[] buf, SocketFlags flags) {
+        return SSL_read(ssl, buf.ptr, cast(int)buf.length);
+    }
+    override ptrdiff_t receive(void[] buf) {
+        return receive(buf, SocketFlags.NONE);
+    }
+    this(AddressFamily af, SocketType type = SocketType.STREAM) {
+        super(af, type);
+        initSsl();
+    }
+    
+    this(socket_t sock, AddressFamily af) {
+        super(sock, af);
+        initSsl();
+    }
+    override void close() {
+        //SSL_shutdown(ssl);
+        super.close();
+    }
+    ~this() {
+        SSL_free(ssl);
+        SSL_CTX_free(ctx);
+    }
+}
+
+public abstract class SocketStream {
+    private {
+        Duration timeout;
+        Socket   s;
+        bool     __isOpen;
+        bool     __isConnected;
+    }
+    void open(AddressFamily fa) {
+    }
+    @property ref Socket so() pure {
+        return s;
+    }
+    @property bool isOpen() @safe @nogc pure const {
+        return s && __isOpen;
+    }
+    @property bool isConnected() @safe @nogc pure const {
+        return s && __isConnected;
+    }
+    void close() {
+        tracef("Close socket");
+        if ( isOpen ) {
+            s.close();
+            __isOpen = false;
+            __isConnected = false;
+        }
+        s = null;
+    }
+    
+    auto connect(string host, ushort port, Duration timeout = 10.seconds) {
+        tracef(format("Create connection to %s:%d", host, port));
+        Address[] addresses;
+        __isConnected = false;
+        try {
+            addresses = getAddress(host, port);
+        } catch (Exception e) {
+            errorf("Failed to connect: can't resolve %s - %s", host, e.msg);
+            throw new ConnectError("Can't connect to %s:%d: %s".format(host, port, e.msg));
+        }
+        foreach(a; addresses) {
+            tracef("Trying %s", a);
+            try {
+                open(a.addressFamily);
+                s.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDTIMEO, timeout);
+                s.connect(a);
+                tracef("Connected to %s", a);
+                __isConnected = true;
+                break;
+            } catch (SocketException e) {
+                warningf("Failed to connect to %s:%d(%s): %s", host, port, a, e.msg);
+                s.close();
+            }
+        }
+        if ( !__isConnected ) {
+            throw new ConnectError("Can't connect to %s:%d".format(host, port));
+        }
+        return this;
+    }
+    
+    ptrdiff_t send(const(void)[] buff)
+    in {assert(isConnected);}
+    body {
+        return s.send(buff);
+    }
+    
+    ptrdiff_t receive(void[] buff) {
+        auto r = s.receive(buff);
+        if ( r > 0 ) {
+            buff.length = r;
+        }
+        return r;
+    }
+}
+
+public class SSLSocketStream: SocketStream {
+    override void open(AddressFamily fa) {
+        if ( s !is null ) {
+            s.close();
+        }
+        s = new OpenSslSocket(fa);
+        assert(s !is null, "Can't create socket");
+        __isOpen = true;
+    }
+}
+
+public class TCPSocketStream : SocketStream {
+    override void open(AddressFamily fa) {
+        if ( s !is null ) {
+            s.close();
+        }
+        s = new Socket(fa, SocketType.STREAM, ProtocolType.TCP);
+        assert(s !is null, "Can't create socket");
+        __isOpen = true;
+    }
+}
+

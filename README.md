@@ -38,7 +38,7 @@ Response rs = rq.get("https://httpbin.org/");
 assert(rs.code==200);
 ```
 
-For anything other than default, you can configure *Request* structure for keep-alive, redirects, headers, or for different io buffer and maximum sizes of response headers and body.
+For anything other than default, you can configure *Request* structure for keep-alive, redirects, headers, or for different io-buffer and maximum sizes of response headers and body.
 
 For example to authorize with Basic authorization use next code:
 ```c

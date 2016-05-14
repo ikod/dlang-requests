@@ -16,6 +16,7 @@ import std.typecons;
 import std.experimental.logger;
 import core.thread;
 import core.stdc.errno;
+
 import requests.streams;
 import requests.uri;
 import requests.utils;
@@ -24,129 +25,22 @@ static this() {
     globalLogLevel(LogLevel.error);
 }
 
-extern(C) {
-    int SSL_library_init();
-    void OpenSSL_add_all_ciphers();
-    void OpenSSL_add_all_digests();
-    void SSL_load_error_strings();
-    
-    struct SSL {}
-    struct SSL_CTX {}
-    struct SSL_METHOD {}
-    
-    SSL_CTX* SSL_CTX_new(const SSL_METHOD* method);
-    SSL* SSL_new(SSL_CTX*);
-    int SSL_set_fd(SSL*, int);
-    int SSL_connect(SSL*);
-    int SSL_write(SSL*, const void*, int);
-    int SSL_read(SSL*, void*, int);
-    int SSL_shutdown(SSL*) @trusted @nogc nothrow;
-    void SSL_free(SSL*);
-    void SSL_CTX_free(SSL_CTX*);
-    
-    long    SSL_CTX_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg);
-    
-    long SSL_CTX_set_mode(SSL_CTX *ctx, long mode);
-    long SSL_set_mode(SSL *ssl, long mode);
-    
-    long SSL_CTX_get_mode(SSL_CTX *ctx);
-    long SSL_get_mode(SSL *ssl);
-    
-    SSL_METHOD* SSLv3_client_method();
-    SSL_METHOD* TLSv1_2_client_method();
-    SSL_METHOD* TLSv1_client_method();
+static immutable ushort[] redirectCodes = [301, 302, 303];
+
+static string urlEncoded(string p) pure @safe {
+    immutable string[dchar] translationTable = [
+        ' ':  "%20", '!': "%21", '*': "%2A", '\'': "%27", '(': "%28", ')': "%29",
+        ';':  "%3B", ':': "%3A", '@': "%40", '&':  "%26", '=': "%3D", '+': "%2B",
+        '$':  "%24", ',': "%2C", '/': "%2F", '?':  "%3F", '#': "%23", '[': "%5B",
+        ']':  "%5D", '%': "%25",
+    ];
+    return p.translate(translationTable);
 }
-
-//pragma(lib, "crypto");
-//pragma(lib, "ssl");
-
-shared static this() {
-    SSL_library_init();
-    OpenSSL_add_all_ciphers();
-    OpenSSL_add_all_digests();
-    SSL_load_error_strings();
-}
-
-class OpenSslSocket : Socket {
-    enum SSL_MODE_RELEASE_BUFFERS = 0x00000010L;
-    private SSL* ssl;
-    private SSL_CTX* ctx;
-    private void initSsl() {
-        //ctx = SSL_CTX_new(SSLv3_client_method());
-        ctx = SSL_CTX_new(TLSv1_client_method());
-        assert(ctx !is null);
-        
-        //SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
-        //SSL_CTX_ctrl(ctx, 33, SSL_MODE_RELEASE_BUFFERS, null);
-        ssl = SSL_new(ctx);
-        SSL_set_fd(ssl, this.handle);
-    }
-    
-    @trusted
-    override void connect(Address to) {
-        super.connect(to);
-        if(SSL_connect(ssl) == -1)
-            throw new Exception("ssl connect failed");
-    }
-    
-    @trusted
-    override ptrdiff_t send(const(void)[] buf, SocketFlags flags) {
-        return SSL_write(ssl, buf.ptr, cast(uint) buf.length);
-    }
-    override ptrdiff_t send(const(void)[] buf) {
-        return send(buf, SocketFlags.NONE);
-    }
-    @trusted
-    override ptrdiff_t receive(void[] buf, SocketFlags flags) {
-        return SSL_read(ssl, buf.ptr, cast(int)buf.length);
-    }
-    override ptrdiff_t receive(void[] buf) {
-        return receive(buf, SocketFlags.NONE);
-    }
-    this(AddressFamily af, SocketType type = SocketType.STREAM) {
-        super(af, type);
-        initSsl();
-    }
-    
-    this(socket_t sock, AddressFamily af) {
-        super(sock, af);
-        initSsl();
-    }
-    override void close() {
-        //SSL_shutdown(ssl);
-        super.close();
-    }
-    ~this() {
-        SSL_free(ssl);
-        SSL_CTX_free(ctx);
-    }
-}
-
 unittest {
-    struct S {
-        private {
-            int    __i;
-            string __s;
-            bool   __b;
-        }
-        mixin(getter("i"));
-        mixin(setter("i"));
-        mixin(getter("b"));
-    }
-    S s;
-    assert(s.i == 0);
-    s.i = 1;
-    assert(s.i == 1);
-    assert(s.b == false);
+    assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
 }
 
 public class RequestException: Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super(msg, file, line);
-    }
-}
-
-public class ConnectError: Exception {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
         super(msg, file, line);
     }
@@ -189,107 +83,15 @@ public class BasicAuthentication: Auth {
     }
 }
 
-
-abstract class SocketStream {
-    private {
-        Duration timeout;
-        Socket   s;
-        bool     __isOpen;
-        bool     __isConnected;
-    }
-    void open(AddressFamily fa) {
-    }
-    @property bool isOpen() @safe @nogc pure const {
-        return s && __isOpen;
-    }
-    @property bool isConnected() @safe @nogc pure const {
-        return s && __isConnected;
-    }
-    void close() {
-        tracef("Close socket");
-        if ( isOpen ) {
-            s.close();
-            __isOpen = false;
-            __isConnected = false;
-        }
-        s = null;
-    }
-
-    auto connect(string host, ushort port, Duration timeout = 10.seconds) {
-        tracef(format("Create connection to %s:%d", host, port));
-        Address[] addresses;
-        __isConnected = false;
-        try {
-            addresses = getAddress(host, port);
-        } catch (Exception e) {
-            errorf("Failed to connect: can't resolve %s - %s", host, e.msg);
-            throw new ConnectError("Can't connect to %s:%d: %s".format(host, port, e.msg));
-        }
-        foreach(a; addresses) {
-            tracef("Trying %s", a);
-            try {
-                open(a.addressFamily);
-                s.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDTIMEO, timeout);
-                s.connect(a);
-                tracef("Connected to %s", a);
-                __isConnected = true;
-                break;
-            } catch (SocketException e) {
-                warningf("Failed to connect to %s:%d(%s): %s", host, port, a, e.msg);
-                s.close();
-            }
-        }
-        if ( !__isConnected ) {
-            throw new ConnectError("Can't connect to %s:%d".format(host, port));
-        }
-        return this;
-    }
-
-    ptrdiff_t send(const(void)[] buff)
-    in {assert(isConnected);}
-    body {
-        return s.send(buff);
-    }
-
-    ptrdiff_t receive(void[] buff) {
-        auto r = s.receive(buff);
-        if ( r > 0 ) {
-            buff.length = r;
-        }
-        return r;
-    }
-}
-
-class SSLSocketStream: SocketStream {
-    override void open(AddressFamily fa) {
-        if ( s !is null ) {
-            s.close();
-        }
-        s = new OpenSslSocket(fa);
-        assert(s !is null, "Can't create socket");
-        __isOpen = true;
-    }
-}
-class TCPSocketStream : SocketStream {
-    override void open(AddressFamily fa) {
-        if ( s !is null ) {
-            s.close();
-        }
-        s = new Socket(fa, SocketType.STREAM, ProtocolType.TCP);
-        assert(s !is null, "Can't create socket");
-        __isOpen = true;
-    }
-}
-
 /**
  * Call GET, and return response content.
  * This is the simplest case, when all you need is the response body.
  * Returns:
  * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
  */
-public auto getContent(A...)(A args) {
-    auto rq = Request();
-    auto rs = rq.exec!"GET"(args);
+public auto getContent(A...)(string url, A args) {
+    auto rq = Request(url);
+    auto rs = rq.exec!"GET"(null, args);
     return rs.responseBody;
 }
 ///
@@ -302,9 +104,9 @@ public unittest {
 /**
  * Call post and return response content.
  */
-public auto postContent(A...)(A args) {
-    auto rq = Request();
-    auto rs = rq.exec!"POST"(args);
+public auto postContent(A...)(string url, A args) {
+    auto rq = Request(url);
+    auto rs = rq.exec!"POST"(null, args);
     return rs.responseBody;
 }
 ///
@@ -359,34 +161,6 @@ public struct Response {
         stat.recvTime = __finishedAt - __requestSentAt;
         return stat;
     }
-}
-
-template rank(R) {
-    static if ( isInputRange!R ) {
-        enum size_t rank = 1 + rank!(ElementType!R);
-    } else {
-        enum size_t rank = 0;
-    }
-}
-unittest {
-    assert(rank!(char) == 0);
-    assert(rank!(string) == 1);
-    assert(rank!(ubyte[][]) == 2);
-}
-
-static immutable ushort[] redirectCodes = [301, 302, 303];
-
-static string urlEncoded(string p) pure @safe {
-    immutable string[dchar] translationTable = [
-        ' ':  "%20", '!': "%21", '*': "%2A", '\'': "%27", '(': "%28", ')': "%29",
-        ';':  "%3B", ':': "%3A", '@': "%40", '&':  "%26", '=': "%3D", '+': "%2B",
-        '$':  "%24", ',': "%2C", '/': "%2F", '?':  "%3F", '#': "%23", '[': "%5B",
-        ']':  "%5D", '%': "%25",
-    ];
-    return p.translate(translationTable);
-}
-unittest {
-    assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
 }
 /**
  * Struct to send multiple files in POST request.
@@ -719,9 +493,9 @@ public struct Request {
     /// 
     private void receiveResponse() {
 
-        __stream.s.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
+        __stream.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
         scope(exit) {
-            __stream.s.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, 0.seconds);
+            __stream.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, 0.seconds);
         }
 
         __bodyDecoder = new DataPipe!ubyte();

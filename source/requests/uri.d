@@ -57,15 +57,11 @@ struct URI {
         } else {
             hp = i[0];
         }
+
         i = hp.findSplit(":");
         __host = i[0];
-        if ( i[2].length ) {
-            __port = to!ushort(i[2]);
-        } else {
-            if ( __scheme == "https" ) {
-                __port = 443;
-            }
-        }
+        __port = i[2].length ? to!ushort(i[2]) : standard_ports[__scheme];
+
         if ( up.length ) {
             i = up.findSplit(":");
             __username = i[0];

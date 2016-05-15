@@ -16,6 +16,12 @@ import std.zlib;
 import std.datetime;
 import std.socket;
 
+public class ConnectError: Exception {
+    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
+        super(msg, file, line);
+    }
+}
+
 class DecodingExceptioin: Exception {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
         super(msg, file, line);
@@ -373,6 +379,9 @@ public struct Buffer(T) {
    ~this() {
         __repr = null;
     }
+    /***************
+     * store data. Data copied
+     */
     auto put(U)(U[] data) pure {
         if ( data.length == 0 ) {
             return this;
@@ -565,12 +574,6 @@ public unittest {
     }
     assert(equal(findSplit(c, "\n\n")[2], "body"));
     assert(c.length == c_length);
-}
-
-public class ConnectError: Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super(msg, file, line);
-    }
 }
 
 extern(C) {

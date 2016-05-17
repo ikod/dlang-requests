@@ -143,7 +143,7 @@
 </dd>
 </dl>
 </dd>
-<dt class="decl"><p><code><a name="getContent"></a>auto <u>getContent</u>(A...)(A <code><i>args</i></code>);
+<dt class="decl"><p><code><a name="getContent"></a>auto <u>getContent</u>(A...)(string <code><i>url</i></code>, A <code><i>args</i></code>);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Call GET, and return response content.
  This is the simplest case, when all you need is the response body.
@@ -156,7 +156,7 @@ globalLogLevel(LogLevel.info);
 </pre>
 </p></div>
 </dd>
-<dt class="decl"><p><code><a name="postContent"></a>auto <u>postContent</u>(A...)(A <code><i>args</i></code>);
+<dt class="decl"><p><code><a name="postContent"></a>auto <u>postContent</u>(A...)(string <code><i>url</i></code>, A <code><i>args</i></code>);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Call post and return response content.</p>
 <h4 class="sec">Examples:</h4> <p><pre class="d_code">
@@ -171,10 +171,13 @@ globalLogLevel(LogLevel.info);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p><u>Response</u> - result of request execution.
 </p>
-<p><u>Response</u>.code - response code
+<p><u>Response</u>.code - response HTTP code.
 </p><p>
 
-<u>Response</u>.status_line - received status line
+<u>Response</u>.status_line - received HTTP status line.
+</p><p>
+
+<u>Response</u>.responseHeaders - received headers.
 </p><p>
 
 <u>Response</u>.responseBody - container for received body
@@ -285,7 +288,7 @@ json = parseJSON(rs.responseBody.data).object[<span style="color:red">"json"</sp
     f = File(tmpfname, <span style="color:red">"rb"</span>);
     rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, f.byChunk(3), <span style="color:red">"application/octet-stream"</span>);
     <span style="color:blue">assert</span>(rs.code==200);
-    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody).object[<span style="color:red">"data"</span>].str;
+    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.data).object[<span style="color:red">"data"</span>].str;
     <span style="color:blue">assert</span>(data==<span style="color:red">"abcdefgh\n12345678\n"</span>);
     f.close();
 }

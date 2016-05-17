@@ -120,8 +120,9 @@ public unittest {
 ///
 /// Response - result of request execution.
 ///
-/// Response.code - response code
-/// Response.status_line - received status line
+/// Response.code - response HTTP code.
+/// Response.status_line - received HTTP status line.
+/// Response.responseHeaders - received headers.
 /// Response.responseBody - container for received body
 /// Response.history - for redirected responses contain all history
 /// 

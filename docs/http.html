@@ -143,47 +143,23 @@
 </dd>
 </dl>
 </dd>
-<dt class="decl"><p><code><a name="getContent"></a>auto <u>getContent</u>(A...)(string <code><i>url</i></code>, A <code><i>args</i></code>);
+<dt class="decl"><p><code><a name="HTTPResponse"></a>class <u>HTTPResponse</u>: <u>requests.base.Response</u>;
 </code></p></dt>
-<dd class="decl desc"><div class="sections"><p>Call GET, and return response content.
- This is the simplest case, when all you need is the response body.
+<dd class="decl desc"><div class="sections"><p>Response - result of request execution.
 </p>
-<h4 class="sec">Returns:</h4> <p>Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.</p>
-<h4 class="sec">Examples:</h4> <p><pre class="d_code">
-globalLogLevel(LogLevel.info);
-<span style="color:blue">auto</span> r = <u>getContent</u>(<span style="color:red">"https://httpbin.org/stream/20"</span>);
-<span style="color:blue">assert</span>(r.splitter('\n').filter!(<span style="color:red">"a.length&gt;0"</span>).count == 20);
-</pre>
-</p></div>
-</dd>
-<dt class="decl"><p><code><a name="postContent"></a>auto <u>postContent</u>(A...)(string <code><i>url</i></code>, A <code><i>args</i></code>);
-</code></p></dt>
-<dd class="decl desc"><div class="sections"><p>Call post and return response content.</p>
-<h4 class="sec">Examples:</h4> <p><pre class="d_code">
-<span style="color:blue">import</span> std.json;
-globalLogLevel(LogLevel.info);
-<span style="color:blue">auto</span> r = <u>postContent</u>(<span style="color:red">"http://httpbin.org/post"</span>, <span style="color:red">`{"a":"b", "c":1}`</span>, <span style="color:red">"application/json"</span>);
-<span style="color:blue">assert</span>(parseJSON(r.data).object[<span style="color:red">"json"</span>].object[<span style="color:red">"c"</span>].integer == 1);
-</pre>
-</p></div>
-</dd>
-<dt class="decl"><p><code><a name="Response"></a>struct <u>Response</u>;
-</code></p></dt>
-<dd class="decl desc"><div class="sections"><p><u>Response</u> - result of request execution.
-</p>
-<p><u>Response</u>.code - response HTTP code.
+<p>Response.code - response HTTP code.
 </p><p>
 
-<u>Response</u>.status_line - received HTTP status line.
+Response.status_line - received HTTP status line.
 </p><p>
 
-<u>Response</u>.responseHeaders - received headers.
+Response.responseHeaders - received headers.
 </p><p>
 
-<u>Response</u>.responseBody - container for received body
+Response.responseBody - container for received body
 </p><p>
 
-<u>Response</u>.history - for redirected responses contain all history</p>
+Response.history - for redirected responses contain all history</p>
 </div>
 </dd>
 <dt class="decl"><p><code><a name="PostFile"></a>struct <u>PostFile</u>;
@@ -208,9 +184,9 @@ globalLogLevel(LogLevel.info);
 </dd>
 </dl>
 </dd>
-<dt class="decl"><p><code><a name="Request"></a>struct <u>Request</u>;
+<dt class="decl"><p><code><a name="HTTPRequest"></a>struct <u>HTTPRequest</u>;
 </code></p></dt>
-<dd class="decl desc"><div class="sections"><p><u>Request</u>.
+<dd class="decl desc"><div class="sections"><p>Request.
 </p>
 <p>Configurable parameters:
 </p><p>
@@ -245,18 +221,18 @@ globalLogLevel(LogLevel.info);
 globalLogLevel(LogLevel.info);
 tracef(<span style="color:red">"http tests - start"</span>);
 
-<span style="color:blue">auto</span> rq = <u>Request</u>();
+<span style="color:blue">auto</span> rq = <u>HTTPRequest</u>();
 <span style="color:blue">auto</span> rs = rq.get(<span style="color:red">"https://httpbin.org/"</span>);
 <span style="color:blue">assert</span>(rs.code==200);
 <span style="color:blue">assert</span>(rs.responseBody.length &gt; 0);
-rs = <u>Request</u>().get(<span style="color:red">"http://httpbin.org/get"</span>, [<span style="color:red">"c"</span>:<span style="color:red">" d"</span>, <span style="color:red">"a"</span>:<span style="color:red">"b"</span>]);
+rs = <u>HTTPRequest</u>().get(<span style="color:red">"http://httpbin.org/get"</span>, [<span style="color:red">"c"</span>:<span style="color:red">" d"</span>, <span style="color:red">"a"</span>:<span style="color:red">"b"</span>]);
 <span style="color:blue">assert</span>(rs.code == 200);
 <span style="color:blue">auto</span> json = parseJSON(rs.responseBody.data).object[<span style="color:red">"args"</span>].object;
 <span style="color:blue">assert</span>(json[<span style="color:red">"c"</span>].str == <span style="color:red">" d"</span>);
 <span style="color:blue">assert</span>(json[<span style="color:red">"a"</span>].str == <span style="color:red">"b"</span>);
 
 globalLogLevel(LogLevel.info);
-rq = <u>Request</u>();
+rq = <u>HTTPRequest</u>();
 rq.keepAlive = <span style="color:blue">true</span>;
 <span style="color:green">// handmade json
 </span>info(<span style="color:red">"Check POST json"</span>);
@@ -346,20 +322,18 @@ rs = rq.exec!<span style="color:red">"PATCH"</span>(<span style="color:red">"htt
 
 info(<span style="color:red">"Check compressed content"</span>);
 globalLogLevel(LogLevel.info);
-rq = <u>Request</u>();
+rq = <u>HTTPRequest</u>();
 rq.keepAlive = <span style="color:blue">true</span>;
-rq.addHeaders([<span style="color:red">"Accept-Encoding"</span>:<span style="color:red">"gzip"</span>]);
 rs = rq.get(<span style="color:red">"http://httpbin.org/gzip"</span>);
 <span style="color:blue">assert</span>(rs.code==200);
 info(<span style="color:red">"gzip - ok"</span>);
-rq.addHeaders([<span style="color:red">"Accept-Encoding"</span>:<span style="color:red">"deflate"</span>]);
 rs = rq.get(<span style="color:red">"http://httpbin.org/deflate"</span>);
 <span style="color:blue">assert</span>(rs.code==200);
 info(<span style="color:red">"deflate - ok"</span>);
 
 info(<span style="color:red">"Check redirects"</span>);
 globalLogLevel(LogLevel.info);
-rq = <u>Request</u>();
+rq = <u>HTTPRequest</u>();
 rq.keepAlive = <span style="color:blue">true</span>;
 rs = rq.get(<span style="color:red">"http://httpbin.org/relative-redirect/2"</span>);
 <span style="color:blue">assert</span>(rs.history.length == 2);
@@ -379,13 +353,13 @@ rs = rq.get(<span style="color:red">"https://httpbin.org/absolute-redirect/3"</s
 
 info(<span style="color:red">"Check utf8 content"</span>);
 globalLogLevel(LogLevel.info);
-rq = <u>Request</u>();
+rq = <u>HTTPRequest</u>();
 rs = rq.get(<span style="color:red">"http://httpbin.org/encoding/utf8"</span>);
 <span style="color:blue">assert</span>(rs.code==200);
 
 info(<span style="color:red">"Check chunked content"</span>);
 globalLogLevel(LogLevel.info);
-rq = <u>Request</u>();
+rq = <u>HTTPRequest</u>();
 rq.keepAlive = <span style="color:blue">true</span>;
 rq.bufferSize = 16*1024;
 rs = rq.get(<span style="color:red">"http://httpbin.org/range/1024"</span>);
@@ -394,14 +368,14 @@ rs = rq.get(<span style="color:red">"http://httpbin.org/range/1024"</span>);
 
 info(<span style="color:red">"Check basic auth"</span>);
 globalLogLevel(LogLevel.info);
-rq = <u>Request</u>();
+rq = <u>HTTPRequest</u>();
 rq.authenticator = <span style="color:blue">new</span> BasicAuthentication(<span style="color:red">"user"</span>, <span style="color:red">"passwd"</span>);
 rs = rq.get(<span style="color:red">"http://httpbin.org/basic-auth/user/passwd"</span>);
 <span style="color:blue">assert</span>(rs.code==200);
 
 globalLogLevel(LogLevel.info);
 info(<span style="color:red">"Check exception handling, error messages are OK"</span>);
-rq = <u>Request</u>();
+rq = <u>HTTPRequest</u>();
 rq.timeout = 1.seconds;
 assertThrown!TimeoutException(rq.get(<span style="color:red">"http://httpbin.org/delay/3"</span>));
 assertThrown!ConnectError(rq.get(<span style="color:red">"http://0.0.0.0:65000/"</span>));
@@ -410,17 +384,17 @@ assertThrown!ConnectError(rq.get(<span style="color:red">"http://gkhgkhgkjhgjhgf
 
 globalLogLevel(LogLevel.info);
 info(<span style="color:red">"Check limits"</span>);
-rq = <u>Request</u>();
+rq = <u>HTTPRequest</u>();
 rq.maxContentLength = 1;
 assertThrown!RequestException(rq.get(<span style="color:red">"http://httpbin.org/"</span>));
-rq = <u>Request</u>();
+rq = <u>HTTPRequest</u>();
 rq.maxHeadersLength = 1;
 assertThrown!RequestException(rq.get(<span style="color:red">"http://httpbin.org/"</span>));
 tracef(<span style="color:red">"http tests - ok"</span>);
 </pre>
 </p></div>
 <h3 class="memb">Members:</h3>
-  <dl><dt class="decl"><p><code><a name="Request.addHeaders"></a>void <u>addHeaders</u>(in string[string] <code><i>headers</i></code>);
+  <dl><dt class="decl"><p><code><a name="HTTPRequest.addHeaders"></a>void <u>addHeaders</u>(in string[string] <code><i>headers</i></code>);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Add <code><i>headers</i></code> to request
 </p>
@@ -430,7 +404,7 @@ tracef(<span style="color:red">"http tests - ok"</span>);
 </table>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="Request.removeHeaders"></a>pure void <u>removeHeaders</u>(in string[] <code><i>headers</i></code>);
+<dt class="decl"><p><code><a name="HTTPRequest.removeHeaders"></a>pure void <u>removeHeaders</u>(in string[] <code><i>headers</i></code>);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Remove <code><i>headers</i></code> from request
 </p>
@@ -440,7 +414,7 @@ tracef(<span style="color:red">"http tests - ok"</span>);
 </table>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="Request.exec"></a>Response <u>exec</u>(string method)(string <code><i>url</i></code>, string[string] <code><i>rqData</i></code>) if (method == "POST");
+<dt class="decl"><p><code><a name="HTTPRequest.exec"></a>HTTPResponse <u>exec</u>(string method)(string <code><i>url</i></code>, string[string] <code><i>rqData</i></code>) if (method == "POST");
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>execute POST request.
 </p>
@@ -468,7 +442,7 @@ rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red
 </p>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="Request.exec.2"></a>Response <u>exec</u>(string method = "POST")(string <code><i>url</i></code>, PostFile[] <code><i>files</i></code>);
+<dt class="decl"><p><code><a name="HTTPRequest.exec.2"></a>HTTPResponse <u>exec</u>(string method = "POST")(string <code><i>url</i></code>, PostFile[] <code><i>files</i></code>);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>send file(s) using POST
 </p>
@@ -498,7 +472,7 @@ rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red
 </p>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="Request.exec.3"></a>Response <u>exec</u>(string method = "POST", R)(string <code><i>url</i></code>, R <code><i>content</i></code>, string <code><i>contentType</i></code> = "text/html") if (isSomeString!R || rank!R == 2 &amp;&amp; isSomeChar!(Unqual!(typeof(<code><i>content</i></code>.front.front))) || rank!R == 2 &amp;&amp; is(Unqual!(typeof(<code><i>content</i></code>.front.front)) == ubyte));
+<dt class="decl"><p><code><a name="HTTPRequest.exec.3"></a>HTTPResponse <u>exec</u>(string method = "POST", R)(string <code><i>url</i></code>, R <code><i>content</i></code>, string <code><i>contentType</i></code> = "text/html") if (rank!R == 1 || rank!R == 2 &amp;&amp; isSomeChar!(Unqual!(typeof(<code><i>content</i></code>.front.front))) || rank!R == 2 &amp;&amp; is(Unqual!(typeof(<code><i>content</i></code>.front.front)) == ubyte));
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>POST data from some string(with Content-Length), or from range of strings (use Transfer-Encoding: chunked)
 </p>
@@ -540,7 +514,7 @@ rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red
 </p>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="Request.exec.4"></a>Response <u>exec</u>(string method = "GET")(string <code><i>url</i></code> = null, string[string] <code><i>params</i></code> = null) if (method != "POST");
+<dt class="decl"><p><code><a name="HTTPRequest.exec.4"></a>HTTPResponse <u>exec</u>(string method = "GET")(string <code><i>url</i></code> = null, string[string] <code><i>params</i></code> = null) if (method != "POST");
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Send request without data
 </p>
@@ -564,7 +538,7 @@ rs = Request().<u>exec</u>!<span style="color:red">"GET"</span>(<span style="col
 </p>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="Request.get"></a>Response <u>get</u>(A...)(A <code><i>args</i></code>);
+<dt class="decl"><p><code><a name="HTTPRequest.get"></a>HTTPResponse <u>get</u>(A...)(A <code><i>args</i></code>);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>GET request. Simple wrapper over exec!"GET"
 </p>
@@ -574,7 +548,7 @@ rs = Request().<u>exec</u>!<span style="color:red">"GET"</span>(<span style="col
 </table>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="Request.post"></a>Response <u>post</u>(A...)(A <code><i>args</i></code>);
+<dt class="decl"><p><code><a name="HTTPRequest.post"></a>HTTPResponse <u>post</u>(A...)(string <code><i>uri</i></code>, A <code><i>args</i></code>);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>POST request. Simple wrapper over exec!"POST"
 </p>

@@ -14,9 +14,12 @@ import std.experimental.logger;
 import std.stdio;
 import std.path;
 
+import core.stdc.errno;
+
 import requests.uri;
 import requests.utils;
 import requests.streams;
+import requests.base;
 
 public class FTPServerResponseError: Exception {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
@@ -24,40 +27,50 @@ public class FTPServerResponseError: Exception {
     }
 }
 
-struct FTPResponse {
-    ushort       __code;
-    Buffer!ubyte __responseBody;
-    mixin(getter("code"));
-    @property auto responseBody() inout pure @safe {
-        return __responseBody;
-    }
+public class FTPResponse : Response {
+//    ushort       __code;
+//    Buffer!ubyte __responseBody;
+//    mixin(getter("code"));
+//    @property auto responseBody() inout pure @safe {
+//        return __responseBody;
+//    }
 }
 
-struct FTPRequest {
-    URI           __uri;
-    Duration      __timeout = 60.seconds;
-    uint          __verbosity = 0;
-    size_t        __bufferSize = 16*1024; // 16k
-    SocketStream  __controlChannel;
-    string[]      __responseHistory;
-    FTPResponse   __response;
-
+public struct FTPRequest {
+    private {
+        URI           __uri;
+        Duration      __timeout = 60.seconds;
+        uint          __verbosity = 0;
+        size_t        __bufferSize = 16*1024; // 16k
+        size_t        __maxContentLength = 5*1024*1024; // 5MB
+        SocketStream  __controlChannel;
+        string[]      __responseHistory;
+        FTPResponse   __response;
+    }
     mixin(setter("timeout"));
     mixin(getter("timeout"));
     mixin(setter("verbosity"));
     mixin(getter("verbosity"));
+    mixin(getter("responseHistory"));
+    mixin(setter("bufferSize"));
+    mixin(getter("bufferSize"));
+    mixin(setter("maxContentLength"));
+    mixin(getter("maxContentLength"));
 
     this(string uri) {
         __uri = URI(uri);
     }
+
     this(in URI uri) {
         __uri = uri;
     }
-   ~this() {
+
+    ~this() {
         if ( __controlChannel ) {
             __controlChannel.close();
         }
     }
+
     ushort sendCmdGetResponse(string cmd) {
         tracef("cmd to server: %s", cmd.strip);
         if ( __verbosity >=1 ) {
@@ -69,7 +82,7 @@ struct FTPRequest {
         return responseToCode(response);
     }
 
-    ushort responseToCode(string response) pure const {
+    ushort responseToCode(string response) pure const @safe {
         return to!ushort(response[0..3]);
     }
 
@@ -87,7 +100,7 @@ struct FTPRequest {
             tracef("Got %d bytes from control socket", rc);
             if ( rc <= 0 ) {
                 error("Failed to read response from server");
-                throw new FTPServerResponseError("Failed to read server responce over control channel");
+                throw new FTPServerResponseError("Failed to read server responce over control channel: rc=%d, errno: %d".format(rc, errno()));
             }
             if ( __verbosity >= 1 ) {
                 (cast(string)b[0..rc]).
@@ -105,14 +118,15 @@ struct FTPRequest {
             }
         }
         throw new FTPServerResponseError("Failed to read server responce over control channel");
+        assert(0);
     }
 
-    auto post(R)(string uri = null, R data = null) {
+    auto post(R, A...)(string uri, R data, A args) {
         enforce( uri || __uri.host, "FTP URL undefined");
         string response;
         ushort code;
 
-        __response = FTPResponse.init;
+        __response = new FTPResponse;
 
         if ( uri ) {
             // if control channel exists and new URL not match old, then close
@@ -124,6 +138,10 @@ struct FTPRequest {
             }
             __uri = __new;
         }
+
+        __response.URI = __uri;
+        __response.finalURI = __uri;
+
         if ( !__controlChannel ) {
             __controlChannel = new TCPSocketStream();
             __controlChannel.connect(__uri.host, __uri.port, __timeout);
@@ -222,12 +240,13 @@ struct FTPRequest {
         __response.__code = code;
         return __response;
     }
+
     auto get(string uri = null) {
         enforce( uri || __uri.host, "FTP URL undefined");
         string response;
         ushort code;
 
-        __response = FTPResponse.init;
+        __response = new FTPResponse;
 
         if ( uri ) {
             // if control channel exists and new URL not match old, then close
@@ -239,6 +258,10 @@ struct FTPRequest {
             }
             __uri = __new;
         }
+
+        __response.URI = __uri;
+        __response.finalURI = __uri;
+
         if ( !__controlChannel ) {
             __controlChannel = new TCPSocketStream();
             __controlChannel.connect(__uri.host, __uri.port, __timeout);
@@ -345,7 +368,10 @@ unittest {
     info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
     auto rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
     assert(rs.code == 226);
-    info("ftp get  ", "ftp://speedtest.tele2.net/1KB.zip", " - same session.");
+    info("ftp get  ", "ftp://speedtest.tele2.net/nonexistent", ", in same session.");
+    rs = rq.get("ftp://speedtest.tele2.net/nonexistent");
+    assert(rs.code != 226);
+    info("ftp get  ", "ftp://speedtest.tele2.net/1KB.zip", ", in same session.");
     rs = rq.get("ftp://speedtest.tele2.net/1KB.zip");
     assert(rs.code == 226);
     assert(rs.responseBody.length == 1024);
@@ -355,5 +381,9 @@ unittest {
     info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
     rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "another test, ignore please\n".representation);
     assert(rs.code == 226);
+    info("ftp get  ", "ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
+    rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
+    assert(rs.code == 226);
+    assert(rs.finalURI.path == "/pub/FreeBSD/README.TXT");
     info("testing ftp - done.");
 }

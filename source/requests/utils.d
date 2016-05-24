@@ -21,7 +21,7 @@ auto setter(string name) {
     string member = "__" ~ name;
     string t = "typeof(this."~member~")";
     return `
-        @property final void ` ~ name ~`(` ~ t ~ ` s) {`~ 
+        @property final void ` ~ name ~`(` ~ t ~ ` s) pure @nogc nothrow {`~ 
              member ~`=s;
         }
     `;

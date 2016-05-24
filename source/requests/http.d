@@ -20,6 +20,7 @@ import core.stdc.errno;
 import requests.streams;
 import requests.uri;
 import requests.utils;
+import requests.base;
 
 static this() {
     globalLogLevel(LogLevel.error);
@@ -52,7 +53,7 @@ public class TimeoutException: Exception {
     }
 }
 
-interface Auth {
+public interface Auth {
     string[string] authHeaders(string domain);
 }
 /**
@@ -83,39 +84,6 @@ public class BasicAuthentication: Auth {
     }
 }
 
-/**
- * Call GET, and return response content.
- * This is the simplest case, when all you need is the response body.
- * Returns:
- * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
- */
-public auto getContent(A...)(string url, A args) {
-    auto rq = Request(url);
-    auto rs = rq.exec!"GET"(null, args);
-    return rs.responseBody;
-}
-///
-public unittest {
-    globalLogLevel(LogLevel.info);
-    auto r = getContent("https://httpbin.org/stream/20");
-    assert(r.splitter('\n').filter!("a.length>0").count == 20);
-}
-
-/**
- * Call post and return response content.
- */
-public auto postContent(A...)(string url, A args) {
-    auto rq = Request(url);
-    auto rs = rq.exec!"POST"(null, args);
-    return rs.responseBody;
-}
-///
-public unittest {
-    import std.json;
-    globalLogLevel(LogLevel.info);
-    auto r = postContent("http://httpbin.org/post", `{"a":"b", "c":1}`, "application/json");
-    assert(parseJSON(r.data).object["json"].object["c"].integer == 1);
-}
 
 ///
 /// Response - result of request execution.
@@ -126,13 +94,13 @@ public unittest {
 /// Response.responseBody - container for received body
 /// Response.history - for redirected responses contain all history
 /// 
-public struct Response {
+    public class HTTPResponse : Response {
     private {
-        ushort         __code;
+//        ushort         __code;
         string         __status_line;
         string[string] __responseHeaders;
-        Buffer!ubyte   __responseBody;
-        Response[]     __history; // redirects history
+//        Buffer!ubyte   __responseBody;
+        HTTPResponse[]     __history; // redirects history
         SysTime        __startedAt, __connectedAt, __requestSentAt, __finishedAt;
     }
    ~this() {
@@ -142,15 +110,14 @@ public struct Response {
     mixin(getter("code"));
     mixin(getter("status_line"));
     mixin(getter("responseHeaders"));
-    @property auto responseBody() inout pure @safe {
-        return __responseBody;
-    }
+//    @property auto responseBody() inout pure @safe nothrow {
+//        return __responseBody;
+//    }
     mixin(getter("history"));
     private {
         mixin(setter("code"));
         mixin(setter("status_line"));
         mixin(setter("responseHeaders"));
-        mixin(setter("responseBody"));
     }
     @property auto getStats() const pure @safe {
         alias statTuple = Tuple!(Duration, "connectTime",
@@ -187,7 +154,7 @@ public struct PostFile {
 /// $(B verbosity) - level of verbosity(0 - nothing, 1 - headers, 2 - headers and body progress). default = 0.
 /// $(B proxy) - set proxy url if needed. default - null.
 /// 
-public struct Request {
+public struct HTTPRequest {
     private {
         enum           __preHeaders = [
             "Accept-Encoding": "gzip, deflate",
@@ -198,15 +165,15 @@ public struct Request {
         string[string] __headers;
         string[]       __filteredHeaders;
         Auth           __authenticator;
-        bool           __keepAlive;
+        bool           __keepAlive = true;
         uint           __maxRedirects = 10;
         size_t         __maxHeadersLength = 32 * 1024; // 32 KB
         size_t         __maxContentLength = 5 * 1024 * 1024; // 5MB
         ptrdiff_t      __contentLength;
         SocketStream   __stream;
         Duration       __timeout = 30.seconds;
-        Response       __response;
-        Response[]     __history; // redirects history
+        HTTPResponse       __response;
+        HTTPResponse[]     __history; // redirects history
         size_t         __bufferSize = 16*1024; // 16k
         uint           __verbosity = 0;  // 0 - no output, 1 - headers, 2 - headers+body info
         DataPipe!ubyte __bodyDecoder;
@@ -244,6 +211,11 @@ public struct Request {
         __headers = null;
         __authenticator = null;
         __history = null;
+    }
+
+    @property void uri(in URI newURI) {
+        handleURLChange(__uri, newURI);
+        __uri = newURI;
     }
     /// Add headers to request
     /// Params:
@@ -313,7 +285,7 @@ public struct Request {
         return m;
     }
     unittest {
-        assert(Request.params2query(["c ":"d", "a":"b"])=="a=b&c%20=d");
+        assert(HTTPRequest.params2query(["c ":"d", "a":"b"])=="a=b&c%20=d");
     }
     ///
     /// Analyze received headers, take appropriate actions:
@@ -413,7 +385,6 @@ public struct Request {
     }
 
     private bool followRedirectResponse() {
-        __history ~= __response;
         if ( __history.length >= __maxRedirects ) {
             return false;
         }
@@ -421,6 +392,7 @@ public struct Request {
         if ( !location ) {
             return false;
         }
+        __history ~= __response;
         auto connection = "connection" in __response.__responseHeaders;
         if ( !connection || *connection == "close" ) {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
@@ -436,8 +408,11 @@ public struct Request {
             newURI.uri = newURI.recalc_uri;
         }
         handleURLChange(oldURI, newURI);
+            oldURI = __response.URI;
         __uri = newURI;
-        __response = Response.init;
+        __response = new HTTPResponse;
+        __response.URI = oldURI;
+        __response.finalURI = newURI;
         return true;
     }
     ///
@@ -446,7 +421,7 @@ public struct Request {
     private void handleURLChange(in URI from, in URI to) {
         if ( __stream !is null && __stream.isConnected && 
             ( from.scheme != to.scheme || from.host != to.host || from.port != to.port) ) {
-            tracef("Have to reopen stream");
+            tracef("Have to reopen stream, because of URI change");
             __stream.close();
         }
     }
@@ -605,14 +580,17 @@ public struct Request {
     ///  rs = rq.exec!"POST"("http://httpbin.org/post", ["a":"b", "c":"d"]);
     ///  ------------------------------------------------------------------
     ///
-    Response exec(string method)(string url, string[string] rqData) if (method=="POST") {
+    HTTPResponse exec(string method)(string url, string[string] rqData) if (method=="POST") {
         //
         // application/x-www-form-urlencoded
         //
         __method = method;
 
-        __response = Response.init;
+        __response = new HTTPResponse;
         checkURL(url);
+        __response.URI = __uri;
+        __response.finalURI = __uri;
+
     connect:
         __response.__startedAt = Clock.currTime;
         setupConnection();
@@ -681,7 +659,7 @@ public struct Request {
     ///    rs = rq.exec!"POST"("http://httpbin.org/post", files);
     /// ---------------------------------------------------------------
     /// 
-    Response exec(string method="POST")(string url, PostFile[] files) {
+    HTTPResponse exec(string method="POST")(string url, PostFile[] files) {
         import std.uuid;
         import std.file;
         //
@@ -691,8 +669,11 @@ public struct Request {
         
         __method = method;
         
-        __response = Response.init;
+        __response = new HTTPResponse;
         checkURL(url);
+        __response.URI = __uri;
+        __response.finalURI = __uri;
+ 
     connect:
         __response.__startedAt = Clock.currTime;
         setupConnection();
@@ -808,8 +789,8 @@ public struct Request {
     ///      auto f = File("tests/test.txt", "rb");
     ///      rs = rq.exec!"POST"("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
     ///  --------------------------------------------------------------------------------------------------------
-    Response exec(string method="POST", R)(string url, R content, string contentType="text/html")
-        if ( isSomeString!R
+    HTTPResponse exec(string method="POST", R)(string url, R content, string contentType="text/html")
+        if ( (rank!R == 1) //isSomeString!R
             || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front)))) 
             || (rank!R == 2 && (is(Unqual!(typeof(content.front.front)) == ubyte)))
             )
@@ -821,8 +802,11 @@ public struct Request {
         
         __method = method;
         
-        __response = Response.init;
+        __response = new HTTPResponse;
         checkURL(url);
+        __response.URI = __uri;
+        __response.finalURI = __uri;
+
     connect:
         __response.__startedAt = Clock.currTime;
         setupConnection();
@@ -837,7 +821,7 @@ public struct Request {
 
         auto h = headers;
         h["Content-Type"] = contentType;
-        static if ( isSomeString!R ) {
+        static if ( rank!R == 1 ) {
             h["Content-Length"] = to!string(content.length);
         } else {
             h["Transfer-Encoding"] = "chunked";
@@ -858,7 +842,7 @@ public struct Request {
             return __response;
         }
 
-        static if ( isSomeString!R ) {
+        static if ( rank!R == 1) {
             __stream.send(content);
         } else {
             while ( !content.empty ) {
@@ -919,16 +903,17 @@ public struct Request {
     ///     rs = Request().exec!"GET"("http://httpbin.org/get", ["c":"d", "a":"b"]);
     ///  ---------------------------------------------------------------------------------
     ///     
-    Response exec(string method="GET")(string url = null, string[string] params = null) if (method != "POST")
+    HTTPResponse exec(string method="GET")(string url = null, string[string] params = null) if (method != "POST")
     {
 
         __method = method;
-        __response = Response.init;
+        __response = new HTTPResponse;
         __history.length = 0;
         bool restartedRequest = false; // True if this is restarted keepAlive request
 
         checkURL(url);
-
+        __response.URI = __uri;
+        __response.finalURI = __uri;
     connect:
         __response.__startedAt = Clock.currTime;
         setupConnection();
@@ -996,7 +981,7 @@ public struct Request {
     /// Params:
     /// args = request parameters. see exec docs.
     ///
-    Response get(A...)(A args) {
+    HTTPResponse get(A...)(A args) {
         return exec!"GET"(args);
     }
     ///
@@ -1004,8 +989,8 @@ public struct Request {
     /// Params:
     /// args = request parameters. see exec docs.
     ///
-    Response post(A...)(A args) {
-        return exec!"POST"(args);
+    HTTPResponse post(A...)(string uri, A args) {
+        return exec!"POST"(uri, args);
     }
 }
 
@@ -1015,18 +1000,18 @@ public unittest {
     globalLogLevel(LogLevel.info);
     tracef("http tests - start");
 
-    auto rq = Request();
+    auto rq = HTTPRequest();
     auto rs = rq.get("https://httpbin.org/");
     assert(rs.code==200);
     assert(rs.responseBody.length > 0);
-    rs = Request().get("http://httpbin.org/get", ["c":" d", "a":"b"]);
+    rs = HTTPRequest().get("http://httpbin.org/get", ["c":" d", "a":"b"]);
     assert(rs.code == 200);
     auto json = parseJSON(rs.responseBody.data).object["args"].object;
     assert(json["c"].str == " d");
     assert(json["a"].str == "b");
 
     globalLogLevel(LogLevel.info);
-    rq = Request();
+    rq = HTTPRequest();
     rq.keepAlive = true;
     // handmade json
     info("Check POST json");
@@ -1116,20 +1101,18 @@ public unittest {
 
     info("Check compressed content");
     globalLogLevel(LogLevel.info);
-    rq = Request();
+    rq = HTTPRequest();
     rq.keepAlive = true;
-    rq.addHeaders(["Accept-Encoding":"gzip"]);
     rs = rq.get("http://httpbin.org/gzip");
     assert(rs.code==200);
     info("gzip - ok");
-    rq.addHeaders(["Accept-Encoding":"deflate"]);
     rs = rq.get("http://httpbin.org/deflate");
     assert(rs.code==200);
     info("deflate - ok");
 
     info("Check redirects");
     globalLogLevel(LogLevel.info);
-    rq = Request();
+    rq = HTTPRequest();
     rq.keepAlive = true;
     rs = rq.get("http://httpbin.org/relative-redirect/2");
     assert(rs.history.length == 2);
@@ -1149,13 +1132,13 @@ public unittest {
 
     info("Check utf8 content");
     globalLogLevel(LogLevel.info);
-    rq = Request();
+    rq = HTTPRequest();
     rs = rq.get("http://httpbin.org/encoding/utf8");
     assert(rs.code==200);
 
     info("Check chunked content");
     globalLogLevel(LogLevel.info);
-    rq = Request();
+    rq = HTTPRequest();
     rq.keepAlive = true;
     rq.bufferSize = 16*1024;
     rs = rq.get("http://httpbin.org/range/1024");
@@ -1164,14 +1147,14 @@ public unittest {
 
     info("Check basic auth");
     globalLogLevel(LogLevel.info);
-    rq = Request();
+    rq = HTTPRequest();
     rq.authenticator = new BasicAuthentication("user", "passwd");
     rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
     assert(rs.code==200);
  
     globalLogLevel(LogLevel.info);
     info("Check exception handling, error messages are OK");
-    rq = Request();
+    rq = HTTPRequest();
     rq.timeout = 1.seconds;
     assertThrown!TimeoutException(rq.get("http://httpbin.org/delay/3"));
     assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
@@ -1180,10 +1163,10 @@ public unittest {
 
     globalLogLevel(LogLevel.info);
     info("Check limits");
-    rq = Request();
+    rq = HTTPRequest();
     rq.maxContentLength = 1;
     assertThrown!RequestException(rq.get("http://httpbin.org/"));
-    rq = Request();
+    rq = HTTPRequest();
     rq.maxHeadersLength = 1;
     assertThrown!RequestException(rq.get("http://httpbin.org/"));
     tracef("http tests - ok");

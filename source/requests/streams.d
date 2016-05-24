@@ -683,7 +683,7 @@ public abstract class SocketStream {
     }
     void open(AddressFamily fa) {
     }
-    @property ref Socket so() pure {
+    @property ref Socket so() @safe pure {
         return s;
     }
     @property bool isOpen() @safe @nogc pure const {
@@ -732,13 +732,13 @@ public abstract class SocketStream {
         return this;
     }
     
-    ptrdiff_t send(const(void)[] buff)
+    ptrdiff_t send(const(void)[] buff) @safe
     in {assert(isConnected);}
     body {
         return s.send(buff);
     }
     
-    ptrdiff_t receive(void[] buff) {
+    ptrdiff_t receive(void[] buff) @safe {
         auto r = s.receive(buff);
         if ( r > 0 ) {
             buff.length = r;

@@ -9,81 +9,112 @@ import std.datetime;
 import std.experimental.logger;
 import requests.uri;
 
+/***********************************
+ * This is simplest interface to both http and ftp protocols.
+ * Request has methods get, post and exec which routed to proper concrete handler (http or ftp, etc).
+ * To enable some protocol-specific featutes you have to use protocol interface directly (see docs for HTTPRequest or FTPRequest)
+ */
 struct Request {
     private {
-        URI         __uri;
-        HTTPRequest __http;  // route all http/https requests here
-        FTPRequest  __ftp;   // route all ftp requests here
+        URI         _uri;
+        HTTPRequest _http;  // route all http/https requests here
+        FTPRequest  _ftp;   // route all ftp requests here
     }
+    /// Set timeout on IO operation.
+    /// $(B v) - timeout value
+    /// 
     @property void timeout(Duration v) pure @nogc nothrow {
-        __http.timeout = v;
-        __ftp.timeout = v;
+        _http.timeout = v;
+        _ftp.timeout = v;
     }
+    /// Set http keepAlive value
+    /// $(B v) - use keepalive requests - $(B true), or not - $(B false)
     @property void keepAlive(bool v) pure @nogc nothrow {
-        __http.keepAlive = v;
+        _http.keepAlive = v;
     }
+    /// Set limit on HTTP redirects
+    /// $(B v) - limit on redirect depth
     @property void maxRedirects(uint v) pure @nogc nothrow {
-        __http.maxRedirects = v;
+        _http.maxRedirects = v;
     }
+    /// Set maximum content lenth both for http and ftp requests
+    /// $(B v) - maximum content length in bytes. When limit reached - throw RequestException
     @property void maxContentLength(size_t v) pure @nogc nothrow {
-        __http.maxContentLength = v;
-        __ftp.maxContentLength = v;
+        _http.maxContentLength = v;
+        _ftp.maxContentLength = v;
     }
+    /// Set maximum length for HTTP headers
+    /// $(B v) - maximum length of the HTTP response. When limit reached - throw RequestException
     @property void maxHeadersLength(size_t v) pure @nogc nothrow {
-        __http.maxHeadersLength = v;
+        _http.maxHeadersLength = v;
     }
+    /// Set IO buffer size for http and ftp requests
+    /// $(B v) - buffer size in bytes.
     @property void bufferSize(size_t v) {
-        __http.bufferSize = v;
-        __ftp.bufferSize = v;
+        _http.bufferSize = v;
+        _ftp.bufferSize = v;
     }
+    /// Set verbosity for HTTP or FTP requests.
+    /// $(B v) - verbosity level (0 - no output, 1 - headers to stdout, 2 - headers and body progress to stdout). default = 0.
     @property void verbosity(uint v) {
-        __http.verbosity = v;
-        __ftp.verbosity = v;
+        _http.verbosity = v;
+        _ftp.verbosity = v;
     }
+    /// Set authenticator for http requests.
+    /// $(B v) - Auth instance.
     @property void authenticator(Auth v) {
-        __http.authenticator = v;
+        _http.authenticator = v;
     }
+    /// Execute GET for http and retrieve file for FTP.
+    /// You have to provide at least $(B uri). All other arguments should conform to HTTPRequest.get or FTPRequest.get depending on the URI scheme.
+    /// When arguments do not conform scheme (for example you try to call get("ftp://somehost.net/pub/README", {"a":"b"}) which doesn't make sense)
+    /// you will receive Exception("Operation not supported for ftp")
+    ///
     Response get(A...)(string uri, A args) {
         if ( uri ) {
-            __uri = URI(uri);
+            _uri = URI(uri);
         }
-        final switch ( __uri.scheme ) {
+        final switch ( _uri.scheme ) {
             case "http", "https":
-                __http.uri = __uri;
-                static if (__traits(compiles, __http.get(null, args))) {
-                    return __http.get(null, args);
+                _http.uri = _uri;
+                static if (__traits(compiles, _http.get(null, args))) {
+                    return _http.get(null, args);
                 } else {
                     throw new Exception("Operation not supported for http");
                 }
             case "ftp":
-                return __ftp.get(uri);
+                return _ftp.get(uri);
         }
     }
+    /// Execute POST for http and STOR file for FTP.
+    /// You have to provide  $(B uri) and data. Data should conform to HTTPRequest.post or FTPRequest.post depending on the URI scheme.
+    /// When arguments do not conform scheme you will receive Exception("Operation not supported for ftp")
+    ///
     Response post(A...)(string uri, A args) {
         if ( uri ) {
-            __uri = URI(uri);
+            _uri = URI(uri);
         }
-        final switch ( __uri.scheme ) {
+        final switch ( _uri.scheme ) {
             case "http", "https":
-                __http.uri = __uri;
-                static if (__traits(compiles, __http.post(null, args))) {
-                    return __http.post(null, args);
+                _http.uri = _uri;
+                static if (__traits(compiles, _http.post(null, args))) {
+                    return _http.post(null, args);
                 } else {
                     throw new Exception("Operation not supported for http");
                 }
             case "ftp":
-                static if (__traits(compiles, __ftp.post(uri, args))) {
-                    return __ftp.post(uri, args);
+                static if (__traits(compiles, _ftp.post(uri, args))) {
+                    return _ftp.post(uri, args);
                 } else {
                     throw new Exception("Operation not supported for ftp");
                 }
         }
     }
     Response exec(string method="GET", A...)(A args) {
-        return __http.exec!(method)(args);
+        return _http.exec!(method)(args);
     }
 }
-
+///
 unittest {
     import std.algorithm;
     import std.range;

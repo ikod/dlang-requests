@@ -97,6 +97,11 @@ public struct FTPRequest {
         while ( buffer.length < bufferLimit ) {
             trace("Wait on control channel");
             auto rc = __controlChannel.receive(b);
+            version(Posix) {
+                if ( rc < 0 && errno == EINTR ) {
+                    continue;
+                }
+            }
             tracef("Got %d bytes from control socket", rc);
             if ( rc <= 0 ) {
                 error("Failed to read response from server");

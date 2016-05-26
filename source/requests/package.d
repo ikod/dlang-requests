@@ -288,7 +288,7 @@ unittest {
     assertThrown!TimeoutException(rq.get("http://httpbin.org/delay/3"));
     assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
     assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
-    assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
+    //assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
     
     globalLogLevel(LogLevel.info);
     info("Check limits");

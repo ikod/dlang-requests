@@ -349,6 +349,10 @@ public struct FTPRequest {
             }
             tracef("got %d bytes from data channel", rc);
             __response.__responseBody.put(b[0..rc]);
+
+            if ( __response.__responseBody.length >= __maxContentLength ) {
+                throw new RequestException("maxContentLength exceeded for ftp data");
+            }
         }
         __dataStream.close();
         response = serverResponse();

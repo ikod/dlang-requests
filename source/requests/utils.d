@@ -10,6 +10,25 @@ static this() {
 }
 
 
+string Getter_Setter(T)(string name) {
+    return `
+        @property final ` ~ T.stringof ~ ` ` ~ name ~ `() const @safe @nogc {
+            return _` ~ name ~ `;
+        }
+        @property final void ` ~ name ~ `(` ~ T.stringof ~ ` s) pure @nogc nothrow { 
+            _` ~ name ~ `=s;
+        }
+    `;
+}
+
+string Getter(T)(string name) {
+    return `
+        @property final ` ~ T.stringof ~ ` ` ~ name ~ `() @safe @nogc {
+            return _` ~ name ~ `;
+        }
+    `;
+}
+
 auto getter(string name) {
     return `
         @property final auto ` ~ name ~ `() const @safe @nogc {

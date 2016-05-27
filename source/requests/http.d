@@ -37,7 +37,7 @@ static string urlEncoded(string p) pure @safe {
     ];
     return p.translate(translationTable);
 }
-unittest {
+package unittest {
     assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
 }
 
@@ -278,7 +278,7 @@ public struct HTTPRequest {
                         join("&");
         return m;
     }
-    unittest {
+    package unittest {
         assert(HTTPRequest.params2query(["c ":"d", "a":"b"])=="a=b&c%20=d");
     }
     ///
@@ -998,7 +998,7 @@ public struct HTTPRequest {
 }
 
 ///
-public unittest {
+package unittest {
     import std.json;
     globalLogLevel(LogLevel.info);
     tracef("http tests - start");

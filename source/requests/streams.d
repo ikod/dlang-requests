@@ -692,7 +692,7 @@ public abstract class SocketStream {
     @property bool isConnected() @safe @nogc pure const {
         return s && __isConnected;
     }
-    void close() {
+    void close() @trusted {
         tracef("Close socket");
         if ( isOpen ) {
             s.close();

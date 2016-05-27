@@ -25,7 +25,7 @@ struct URI {
         string __path="/";
         string __query;
     }
-    this(string uri) {
+    this(string uri) @safe pure {
         __uri = uri;
         auto parsed = uri_parse(uri);
         if ( !parsed ) {
@@ -33,7 +33,7 @@ struct URI {
         }
     }
     
-    bool uri_parse(string uri) {
+    bool uri_parse(string uri) @safe pure {
         auto i = uri.findSplit("://");
         string   rest;
         if ( i[1].length ) {

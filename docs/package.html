@@ -443,6 +443,32 @@ info(<span style="color:red">"Test postContent"</span>);
 <span style="color:blue">assert</span>(parseJSON(r.data).object[<span style="color:red">"json"</span>].object[<span style="color:red">"c"</span>].integer == 1);
 r = <u>postContent</u>(<span style="color:red">"ftp://speedtest.tele2.net/upload/TEST.TXT"</span>, <span style="color:red">"test, ignore please\n"</span>.representation);
 <span style="color:blue">assert</span>(r.length == 0);
+
+info(<span style="color:red">"Test get in parallel"</span>);
+<span style="color:blue">import</span> std.stdio;
+<span style="color:blue">import</span> std.parallelism;
+<span style="color:blue">import</span> std.algorithm;
+<span style="color:blue">import</span> std.string;
+<span style="color:blue">import</span> core.atomic;
+
+<span style="color:blue">immutable</span> <span style="color:blue">auto</span> urls = [
+    <span style="color:red">"http://httpbin.org/stream/10"</span>,
+    <span style="color:red">"https://httpbin.org/stream/20"</span>,
+    <span style="color:red">"http://httpbin.org/stream/30"</span>,
+    <span style="color:red">"https://httpbin.org/stream/40"</span>,
+    <span style="color:red">"http://httpbin.org/stream/50"</span>,
+    <span style="color:red">"https://httpbin.org/stream/60"</span>,
+    <span style="color:red">"http://httpbin.org/stream/70"</span>,
+];
+
+defaultPoolThreads(5);
+
+<span style="color:blue">shared</span> <span style="color:blue">short</span> lines;
+
+<span style="color:blue">foreach</span>(<i>url</i>; parallel(urls)) {
+    atomicOp!<span style="color:red">"+="</span>(lines, getContent(<i>url</i>).splitter(<span style="color:red">"\n"</span>).count);
+}
+<span style="color:blue">assert</span>(lines == 287);
 </pre>
 </p></div>
 </dd>

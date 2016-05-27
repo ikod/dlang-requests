@@ -28,57 +28,47 @@ public class FTPServerResponseError: Exception {
 }
 
 public class FTPResponse : Response {
-//    ushort       __code;
-//    Buffer!ubyte __responseBody;
-//    mixin(getter("code"));
-//    @property auto responseBody() inout pure @safe {
-//        return __responseBody;
-//    }
 }
 
 public struct FTPRequest {
     private {
-        URI           __uri;
-        Duration      __timeout = 60.seconds;
-        uint          __verbosity = 0;
-        size_t        __bufferSize = 16*1024; // 16k
-        size_t        __maxContentLength = 5*1024*1024; // 5MB
-        SocketStream  __controlChannel;
-        string[]      __responseHistory;
-        FTPResponse   __response;
+        URI           _uri;
+        Duration      _timeout = 60.seconds;
+        uint          _verbosity = 0;
+        size_t        _bufferSize = 16*1024; // 16k
+        size_t        _maxContentLength = 5*1024*1024; // 5MB
+        SocketStream  _controlChannel;
+        string[]      _responseHistory;
+        FTPResponse   _response;
     }
-    mixin(setter("timeout"));
-    mixin(getter("timeout"));
-    mixin(setter("verbosity"));
-    mixin(getter("verbosity"));
-    mixin(getter("responseHistory"));
-    mixin(setter("bufferSize"));
-    mixin(getter("bufferSize"));
-    mixin(setter("maxContentLength"));
-    mixin(getter("maxContentLength"));
+    mixin(Getter_Setter!Duration("timeout"));
+    mixin(Getter_Setter!uint("verbosity"));
+    mixin(Getter_Setter!size_t("bufferSize"));
+    mixin(Getter_Setter!size_t("maxContentLength"));
+    mixin(Getter!(string[])("responseHistory"));
 
     this(string uri) {
-        __uri = URI(uri);
+        _uri = URI(uri);
     }
 
     this(in URI uri) {
-        __uri = uri;
+        _uri = uri;
     }
 
     ~this() {
-        if ( __controlChannel ) {
-            __controlChannel.close();
+        if ( _controlChannel ) {
+            _controlChannel.close();
         }
     }
 
     ushort sendCmdGetResponse(string cmd) {
         tracef("cmd to server: %s", cmd.strip);
-        if ( __verbosity >=1 ) {
+        if ( _verbosity >=1 ) {
             writefln("> %s", cmd.strip);
         }
-        __controlChannel.send(cmd);
+        _controlChannel.send(cmd);
         string response = serverResponse();
-        __responseHistory ~= response;
+        _responseHistory ~= response;
         return responseToCode(response);
     }
 
@@ -86,17 +76,28 @@ public struct FTPRequest {
         return to!ushort(response[0..3]);
     }
 
+    void handleChangeURI(in string uri) @safe {
+        // if control channel exists and new URL not match old, then close
+        URI newURI = URI(uri);
+        if ( _controlChannel && 
+            (newURI.host != _uri.host || newURI.port != _uri.port || newURI.username != _uri.username)) {
+            _controlChannel.close();
+            _controlChannel = null;
+        }
+        _uri = newURI;
+    }
+
     string serverResponse() {
         string res, buffer;
         immutable bufferLimit = 16*1024;
-        __controlChannel.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, __timeout);
+        _controlChannel.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, _timeout);
         scope(exit) {
-            __controlChannel.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, 0.seconds);
+            _controlChannel.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, 0.seconds);
         }
-        auto b = new ubyte[__bufferSize];
+        auto b = new ubyte[_bufferSize];
         while ( buffer.length < bufferLimit ) {
             trace("Wait on control channel");
-            auto rc = __controlChannel.receive(b);
+            auto rc = _controlChannel.receive(b);
             version(Posix) {
                 if ( rc < 0 && errno == EINTR ) {
                     continue;
@@ -107,7 +108,7 @@ public struct FTPRequest {
                 error("Failed to read response from server");
                 throw new FTPServerResponseError("Failed to read server responce over control channel: rc=%d, errno: %d".format(rc, errno()));
             }
-            if ( __verbosity >= 1 ) {
+            if ( _verbosity >= 1 ) {
                 (cast(string)b[0..rc]).
                     splitLines.
                     each!(l=>writefln("< %s", l));
@@ -127,73 +128,66 @@ public struct FTPRequest {
     }
 
     auto post(R, A...)(string uri, R data, A args) {
-        enforce( uri || __uri.host, "FTP URL undefined");
+        enforce( uri || _uri.host, "FTP URL undefined");
         string response;
         ushort code;
 
-        __response = new FTPResponse;
+        _response = new FTPResponse;
 
         if ( uri ) {
-            // if control channel exists and new URL not match old, then close
-            URI __new = URI(uri);
-            if ( __controlChannel && 
-                (__new.host != __uri.host || __new.port != __uri.port || __new.username != __uri.username)) {
-                __controlChannel.close();
-                __controlChannel = null;
-            }
-            __uri = __new;
+            handleChangeURI(uri);
         }
 
-        __response.URI = __uri;
-        __response.finalURI = __uri;
+        _response.URI = _uri;
+        _response.finalURI = _uri;
 
-        if ( !__controlChannel ) {
-            __controlChannel = new TCPSocketStream();
-            __controlChannel.connect(__uri.host, __uri.port, __timeout);
+        if ( !_controlChannel ) {
+            _controlChannel = new TCPSocketStream();
+            _controlChannel.connect(_uri.host, _uri.port, _timeout);
             response = serverResponse();
-            __responseHistory ~= response;
+            _responseHistory ~= response;
             
             code = responseToCode(response);
             tracef("Server initial response: %s", response);
             if ( code/100 > 2 ) {
-                __response.__code = code;
-                return __response;
+                _response.__code = code;
+                return _response;
             }
             // Log in
-            string user = __uri.username.length ? __uri.username : "anonymous";
-            string pass = __uri.password.length ? __uri.password : "requests@";
+            string user = _uri.username.length ? _uri.username : "anonymous";
+            string pass = _uri.password.length ? _uri.password : "requests@";
             tracef("Use %s:%s%s as username:password", user, pass[0], replicate("-", pass.length-1));
             
             code = sendCmdGetResponse("USER " ~ user ~ "\r\n");
             if ( code/100 > 3 ) {
-                __response.__code = code;
-                return __response;
+                _response.__code = code;
+                return _response;
             } else if ( code/100 == 3) {
                 
                 code = sendCmdGetResponse("PASS " ~ pass ~ "\r\n");
                 if ( code/100 > 2 ) {
-                    __response.__code = code;
-                    return __response;
+                    _response.__code = code;
+                    return _response;
                 }
             }
             
         }
 
-        code = sendCmdGetResponse("CWD " ~ dirName(__uri.path) ~ "\r\n");
+        code = sendCmdGetResponse("CWD " ~ dirName(_uri.path) ~ "\r\n");
         if ( code/100 > 2 ) {
-            __response.__code = code;
-            return __response;
+            _response.__code = code;
+            return _response;
         }
 
         code = sendCmdGetResponse("PASV\r\n");
         if ( code/100 > 2 ) {
-            __response.__code = code;
-            return __response;
+            _response.__code = code;
+            return _response;
         }
         // something like  "227 Entering Passive Mode (132,180,15,2,210,187)" expected
         // in last response.
         // Cut anything between ( and )
-        auto v = __responseHistory[$-1].findSplitBefore(")")[0].findSplitAfter("(")[1];
+        auto v = _responseHistory[$-1].findSplitBefore(")")[0].findSplitAfter("(")[1];
         string host;
         ushort port;
         try {
@@ -203,32 +197,34 @@ public struct FTPRequest {
             port = (p1<<8) + p2;
         } catch (FormatException e) {
             error("Failed to parse ", v);
-            __response.__code = 500;
-            return __response;
+            _response.__code = 500;
+            return _response;
         }
 
-        auto __dataStream = new TCPSocketStream();
+        auto dataStream = new TCPSocketStream();
         scope (exit ) {
-            __dataStream.close();
+            if ( dataStream !is null ) {
+                dataStream.close();
+            }
         }
 
-        __dataStream.connect(host, port, __timeout);
+        dataStream.connect(host, port, _timeout);
 
         code = sendCmdGetResponse("TYPE I\r\n");
         if ( code/100 > 2 ) {
-            __response.__code = code;
-            return __response;
+            _response.__code = code;
+            return _response;
         }
 
-        code = sendCmdGetResponse("STOR " ~ baseName(__uri.path) ~ "\r\n");
+        code = sendCmdGetResponse("STOR " ~ baseName(_uri.path) ~ "\r\n");
         if ( code/100 > 1 ) {
-            __response.__code = code;
-            return __response;
+            _response.__code = code;
+            return _response;
         }
-        auto b = new ubyte[__bufferSize];
+        auto b = new ubyte[_bufferSize];
         for(size_t pos = 0; pos < data.length;) {
-            auto chunk = data.take(__bufferSize).array;
-            auto rc = __dataStream.send(chunk);
+            auto chunk = data.take(_bufferSize).array;
+            auto rc = dataStream.send(chunk);
             if ( rc <= 0 ) {
                 trace("done");
                 break;
@@ -236,84 +232,78 @@ public struct FTPRequest {
             tracef("sent %d bytes to data channel", rc);
             pos += rc;
         }
-        __dataStream.close();
+        dataStream.close();
+        dataStream = null;
         response = serverResponse();
         code = responseToCode(response);
         if ( code/100 == 2 ) {
-            tracef("Successfully uploaded %d bytes", __response.__responseBody.length);
+            tracef("Successfully uploaded %d bytes", _response.__responseBody.length);
         }
-        __response.__code = code;
-        return __response;
+        _response.__code = code;
+        return _response;
     }
 
     auto get(string uri = null) {
-        enforce( uri || __uri.host, "FTP URL undefined");
+        enforce( uri || _uri.host, "FTP URL undefined");
         string response;
         ushort code;
 
-        __response = new FTPResponse;
+        _response = new FTPResponse;
 
         if ( uri ) {
-            // if control channel exists and new URL not match old, then close
-            URI __new = URI(uri);
-            if ( __controlChannel && 
-                (__new.host != __uri.host || __new.port != __uri.port || __new.username != __uri.username)) {
-                __controlChannel.close();
-                __controlChannel = null;
-            }
-            __uri = __new;
+            handleChangeURI(uri);
         }
 
-        __response.URI = __uri;
-        __response.finalURI = __uri;
+        _response.URI = _uri;
+        _response.finalURI = _uri;
 
-        if ( !__controlChannel ) {
-            __controlChannel = new TCPSocketStream();
-            __controlChannel.connect(__uri.host, __uri.port, __timeout);
+        if ( !_controlChannel ) {
+            _controlChannel = new TCPSocketStream();
+            _controlChannel.connect(_uri.host, _uri.port, _timeout);
             response = serverResponse();
-            __responseHistory ~= response;
+            _responseHistory ~= response;
             
             code = responseToCode(response);
             tracef("Server initial response: %s", response);
             if ( code/100 > 2 ) {
-                __response.__code = code;
-                return __response;
+                _response.__code = code;
+                return _response;
             }
             // Log in
-            string user = __uri.username.length ? __uri.username : "anonymous";
-            string pass = __uri.password.length ? __uri.password : "requests@";
+            string user = _uri.username.length ? _uri.username : "anonymous";
+            string pass = _uri.password.length ? _uri.password : "requests@";
             tracef("Use %s:%s%s as username:password", user, pass[0], replicate("-", pass.length-1));
             
             code = sendCmdGetResponse("USER " ~ user ~ "\r\n");
             if ( code/100 > 3 ) {
-                __response.__code = code;
-                return __response;
+                _response.__code = code;
+                return _response;
             } else if ( code/100 == 3) {
                 
                 code = sendCmdGetResponse("PASS " ~ pass ~ "\r\n");
                 if ( code/100 > 2 ) {
-                    __response.__code = code;
-                    return __response;
+                    _response.__code = code;
+                    return _response;
                 }
             }
 
         }
 
-        code = sendCmdGetResponse("CWD " ~ dirName(__uri.path) ~ "\r\n");
+        code = sendCmdGetResponse("CWD " ~ dirName(_uri.path) ~ "\r\n");
         if ( code/100 > 2 ) {
-            __response.__code = code;
-            return __response;
+            _response.__code = code;
+            return _response;
         }
         
         code = sendCmdGetResponse("PASV\r\n");
         if ( code/100 > 2 ) {
-            __response.__code = code;
-            return __response;
+            _response.__code = code;
+            return _response;
         }
         // something like  "227 Entering Passive Mode (132,180,15,2,210,187)" expected
         // in last response.
         // Cut anything between ( and )
-        auto v = __responseHistory[$-1].findSplitBefore(")")[0].findSplitAfter("(")[1];
+        auto v = _responseHistory[$-1].findSplitBefore(")")[0].findSplitAfter("(")[1];
         string host;
         ushort port;
         try {
@@ -323,54 +313,56 @@ public struct FTPRequest {
             port = (p1<<8) + p2;
         } catch (FormatException e) {
             error("Failed to parse ", v);
-            __response.__code = 500;
-            return __response;
+            _response.__code = 500;
+            return _response;
         }
         
-        auto __dataStream = new TCPSocketStream();
+        auto dataStream = new TCPSocketStream();
         scope (exit ) {
-            __dataStream.close();
+            if ( dataStream !is null ) {
+                dataStream.close();
+            }
         }
         
-        __dataStream.connect(host, port, __timeout);
+        dataStream.connect(host, port, _timeout);
         
         code = sendCmdGetResponse("TYPE I\r\n");
         if ( code/100 > 2 ) {
-            __response.__code = code;
-            return __response;
+            _response.__code = code;
+            return _response;
         }
         
-        code = sendCmdGetResponse("RETR " ~ baseName(__uri.path) ~ "\r\n");
+        code = sendCmdGetResponse("RETR " ~ baseName(_uri.path) ~ "\r\n");
         if ( code/100 > 1 ) {
-            __response.__code = code;
-            return __response;
+            _response.__code = code;
+            return _response;
         }
-        auto b = new ubyte[__bufferSize];
+        auto b = new ubyte[_bufferSize];
         while ( true ) {
-            auto rc = __dataStream.receive(b);
+            auto rc = dataStream.receive(b);
             if ( rc <= 0 ) {
                 trace("done");
                 break;
             }
             tracef("got %d bytes from data channel", rc);
-            __response.__responseBody.put(b[0..rc]);
+            _response.__responseBody.put(b[0..rc]);
 
-            if ( __response.__responseBody.length >= __maxContentLength ) {
+            if ( _response.__responseBody.length >= _maxContentLength ) {
                 throw new RequestException("maxContentLength exceeded for ftp data");
             }
         }
-        __dataStream.close();
+        dataStream.close();
         response = serverResponse();
         code = responseToCode(response);
         if ( code/100 == 2 ) {
-            tracef("Successfully received %d bytes", __response.__responseBody.length);
+            tracef("Successfully received %d bytes", _response.__responseBody.length);
         }
-        __response.__code = code;
-        return __response;
+        _response.__code = code;
+        return _response;
     }
 }
 
-unittest {
+package unittest {
     globalLogLevel(LogLevel.info );
     info("testing ftp");
     auto rq = FTPRequest();

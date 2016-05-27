@@ -47,6 +47,35 @@ For example to authorize with Basic authorization use next code:
     rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
 ```
 
+You can use *requests* in parallel tasks (but yoou can't share single *Request* structure between threads):
+```
+import std.stdio;
+import std.parallelism;
+import std.algorithm;
+import std.string;
+import core.atomic;
+
+immutable auto urls = [
+    "http://httpbin.org/stream/10",
+    "https://httpbin.org/stream/20",
+    "http://httpbin.org/stream/30",
+    "https://httpbin.org/stream/40",
+    "http://httpbin.org/stream/50",
+    "https://httpbin.org/stream/60",
+    "http://httpbin.org/stream/70",
+];
+
+void main() {    
+    defaultPoolThreads(5);
+
+    shared short lines;
+    
+    foreach(url; parallel(urls)) {
+        atomicOp!"+="(lines, getContent(url).splitter("\n").count);
+    }
+    assert(lines == 287);
+}
+```
 Here is short descrition of some Request options:
 
 | name             | type           | meaning                                | default    |

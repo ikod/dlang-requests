@@ -21,6 +21,22 @@ string Getter_Setter(T)(string name) {
     `;
 }
 
+//string Getter(T)(string name) {
+//    return `
+//        @property final ` ~ T.stringof ~ ` ` ~ name ~ `() const @safe @nogc {
+//            return _` ~ name ~ `;
+//        }
+//    `;
+//}
+//
+string Setter(T)(string name) {
+    return `
+        @property final void ` ~ name ~ `(` ~ T.stringof ~ ` s) pure @nogc nothrow { 
+            _` ~ name ~ `=s;
+        }
+    `;
+}
+
 string Getter(T)(string name) {
     return `
         @property final ` ~ T.stringof ~ ` ` ~ name ~ `() @safe @nogc {
@@ -29,33 +45,33 @@ string Getter(T)(string name) {
     `;
 }
 
-auto getter(string name) {
-    return `
-        @property final auto ` ~ name ~ `() const @safe @nogc {
-            return __` ~ name ~ `;
-        }
-    `;
-}
-auto setter(string name) {
-    string member = "__" ~ name;
-    string t = "typeof(this."~member~")";
-    return `
-        @property final void ` ~ name ~`(` ~ t ~ ` s) pure @nogc nothrow {`~ 
-             member ~`=s;
-        }
-    `;
-}
+//auto getter(string name) {
+//    return `
+//        @property final auto ` ~ name ~ `() const @safe @nogc {
+//            return __` ~ name ~ `;
+//        }
+//    `;
+//}
+//auto setter(string name) {
+//    string member = "__" ~ name;
+//    string t = "typeof(this."~member~")";
+//    return `
+//        @property final void ` ~ name ~`(` ~ t ~ ` s) pure @nogc nothrow {`~ 
+//             member ~`=s;
+//        }
+//    `;
+//}
 
 unittest {
     struct S {
         private {
-            int    __i;
-            string __s;
-            bool   __b;
+            int    _i;
+            string _s;
+            bool   _b;
         }
-        mixin(getter("i"));
-        mixin(setter("i"));
-        mixin(getter("b"));
+        mixin(Getter!int("i"));
+        mixin(Setter!int("i"));
+        mixin(Getter!bool("b"));
     }
     S s;
     assert(s.i == 0);

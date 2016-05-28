@@ -12,20 +12,20 @@ public class RequestException: Exception {
 
 public class Response {
     package {
-        ushort         __code;
-        Buffer!ubyte   __responseBody;
+        ushort         _code;
+        Buffer!ubyte   _responseBody;
         /// Initial URI
-        URI            __URI;
+        URI            _uri;
         /// Final URI. Can differ from __URI if request go through redirections.
-        URI            __finalURI;
-        mixin(setter("code"));
-        mixin(setter("URI"));
-        mixin(setter("finalURI"));
+        URI            _finalURI;
+        mixin(Setter!ushort("code"));
+        mixin(Setter!URI("uri"));
+        mixin(Setter!URI("finalURI"));
     }
-    mixin(getter("code"));
-    mixin(getter("URI"));
-    mixin(getter("finalURI"));
+    mixin(Getter!ushort("code"));
+    mixin(Getter!URI("uri"));
+    mixin(Getter!URI("finalURI"));
     @property auto responseBody() pure @safe nothrow {
-        return __responseBody;
+        return _responseBody;
     }
 }

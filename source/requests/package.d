@@ -117,6 +117,7 @@ struct Request {
 }
 ///
 package unittest {
+    globalLogLevel(LogLevel.info);
     info("Test get in parallel");
     import std.stdio;
     import std.parallelism;

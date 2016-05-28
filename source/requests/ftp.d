@@ -138,7 +138,7 @@ public struct FTPRequest {
             handleChangeURI(uri);
         }
 
-        _response.URI = _uri;
+        _response.uri = _uri;
         _response.finalURI = _uri;
 
         if ( !_controlChannel ) {
@@ -150,7 +150,7 @@ public struct FTPRequest {
             code = responseToCode(response);
             tracef("Server initial response: %s", response);
             if ( code/100 > 2 ) {
-                _response.__code = code;
+                _response.code = code;
                 return _response;
             }
             // Log in
@@ -160,13 +160,13 @@ public struct FTPRequest {
             
             code = sendCmdGetResponse("USER " ~ user ~ "\r\n");
             if ( code/100 > 3 ) {
-                _response.__code = code;
+                _response.code = code;
                 return _response;
             } else if ( code/100 == 3) {
                 
                 code = sendCmdGetResponse("PASS " ~ pass ~ "\r\n");
                 if ( code/100 > 2 ) {
-                    _response.__code = code;
+                    _response.code = code;
                     return _response;
                 }
             }
@@ -175,13 +175,13 @@ public struct FTPRequest {
 
         code = sendCmdGetResponse("CWD " ~ dirName(_uri.path) ~ "\r\n");
         if ( code/100 > 2 ) {
-            _response.__code = code;
+            _response.code = code;
             return _response;
         }
 
         code = sendCmdGetResponse("PASV\r\n");
         if ( code/100 > 2 ) {
-            _response.__code = code;
+            _response.code = code;
             return _response;
         }
         // something like  "227 Entering Passive Mode (132,180,15,2,210,187)" expected
@@ -197,7 +197,7 @@ public struct FTPRequest {
             port = (p1<<8) + p2;
         } catch (FormatException e) {
             error("Failed to parse ", v);
-            _response.__code = 500;
+            _response.code = 500;
             return _response;
         }
 
@@ -212,13 +212,13 @@ public struct FTPRequest {
 
         code = sendCmdGetResponse("TYPE I\r\n");
         if ( code/100 > 2 ) {
-            _response.__code = code;
+            _response.code = code;
             return _response;
         }
 
         code = sendCmdGetResponse("STOR " ~ baseName(_uri.path) ~ "\r\n");
         if ( code/100 > 1 ) {
-            _response.__code = code;
+            _response.code = code;
             return _response;
         }
         auto b = new ubyte[_bufferSize];
@@ -237,9 +237,9 @@ public struct FTPRequest {
         response = serverResponse();
         code = responseToCode(response);
         if ( code/100 == 2 ) {
-            tracef("Successfully uploaded %d bytes", _response.__responseBody.length);
+            tracef("Successfully uploaded %d bytes", _response._responseBody.length);
         }
-        _response.__code = code;
+        _response.code = code;
         return _response;
     }
 
@@ -254,7 +254,7 @@ public struct FTPRequest {
             handleChangeURI(uri);
         }
 
-        _response.URI = _uri;
+        _response.uri = _uri;
         _response.finalURI = _uri;
 
         if ( !_controlChannel ) {
@@ -266,7 +266,7 @@ public struct FTPRequest {
             code = responseToCode(response);
             tracef("Server initial response: %s", response);
             if ( code/100 > 2 ) {
-                _response.__code = code;
+                _response.code = code;
                 return _response;
             }
             // Log in
@@ -276,13 +276,13 @@ public struct FTPRequest {
             
             code = sendCmdGetResponse("USER " ~ user ~ "\r\n");
             if ( code/100 > 3 ) {
-                _response.__code = code;
+                _response.code = code;
                 return _response;
             } else if ( code/100 == 3) {
                 
                 code = sendCmdGetResponse("PASS " ~ pass ~ "\r\n");
                 if ( code/100 > 2 ) {
-                    _response.__code = code;
+                    _response.code = code;
                     return _response;
                 }
             }
@@ -291,13 +291,13 @@ public struct FTPRequest {
 
         code = sendCmdGetResponse("CWD " ~ dirName(_uri.path) ~ "\r\n");
         if ( code/100 > 2 ) {
-            _response.__code = code;
+            _response.code = code;
             return _response;
         }
         
         code = sendCmdGetResponse("PASV\r\n");
         if ( code/100 > 2 ) {
-            _response.__code = code;
+            _response.code = code;
             return _response;
         }
         // something like  "227 Entering Passive Mode (132,180,15,2,210,187)" expected
@@ -313,7 +313,7 @@ public struct FTPRequest {
             port = (p1<<8) + p2;
         } catch (FormatException e) {
             error("Failed to parse ", v);
-            _response.__code = 500;
+            _response.code = 500;
             return _response;
         }
         
@@ -328,13 +328,13 @@ public struct FTPRequest {
         
         code = sendCmdGetResponse("TYPE I\r\n");
         if ( code/100 > 2 ) {
-            _response.__code = code;
+            _response.code = code;
             return _response;
         }
         
         code = sendCmdGetResponse("RETR " ~ baseName(_uri.path) ~ "\r\n");
         if ( code/100 > 1 ) {
-            _response.__code = code;
+            _response.code = code;
             return _response;
         }
         auto b = new ubyte[_bufferSize];
@@ -345,9 +345,9 @@ public struct FTPRequest {
                 break;
             }
             tracef("got %d bytes from data channel", rc);
-            _response.__responseBody.put(b[0..rc]);
+            _response._responseBody.put(b[0..rc]);
 
-            if ( _response.__responseBody.length >= _maxContentLength ) {
+            if ( _response._responseBody.length >= _maxContentLength ) {
                 throw new RequestException("maxContentLength exceeded for ftp data");
             }
         }
@@ -355,9 +355,9 @@ public struct FTPRequest {
         response = serverResponse();
         code = responseToCode(response);
         if ( code/100 == 2 ) {
-            tracef("Successfully received %d bytes", _response.__responseBody.length);
+            tracef("Successfully received %d bytes", _response._responseBody.length);
         }
-        _response.__code = code;
+        _response.code = code;
         return _response;
     }
 }

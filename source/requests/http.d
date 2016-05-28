@@ -90,37 +90,33 @@ public class BasicAuthentication: Auth {
 /// 
     public class HTTPResponse : Response {
     private {
-//        ushort         __code;
-        string         __status_line;
-        string[string] __responseHeaders;
-//        Buffer!ubyte   __responseBody;
-        HTTPResponse[]     __history; // redirects history
-        SysTime        __startedAt, __connectedAt, __requestSentAt, __finishedAt;
+        string         _status_line;
+        string[string] _responseHeaders;
+        HTTPResponse[] _history; // redirects history
+        SysTime        _startedAt, _connectedAt, _requestSentAt, _finishedAt;
     }
-   ~this() {
-        __responseHeaders = null;
-        __history.length = 0;
+
+    ~this() {
+        _responseHeaders = null;
+        _history.length = 0;
     }
-    mixin(getter("code"));
-    mixin(getter("status_line"));
-    mixin(getter("responseHeaders"));
-//    @property auto responseBody() inout pure @safe nothrow {
-//        return __responseBody;
-//    }
-    mixin(getter("history"));
+
+    mixin(Getter!string("status_line"));
+    mixin(Getter!(string[string])("responseHeaders"));
+    mixin(Getter!(HTTPResponse[])("history"));
     private {
-        mixin(setter("code"));
-        mixin(setter("status_line"));
-        mixin(setter("responseHeaders"));
+        mixin(Setter!string("status_line"));
+        mixin(Setter!(string[string])("responseHeaders"));
     }
+
     @property auto getStats() const pure @safe {
         alias statTuple = Tuple!(Duration, "connectTime",
                                  Duration, "sendTime",
                                  Duration, "recvTime");
         statTuple stat;
-        stat.connectTime = __connectedAt - __startedAt;
-        stat.sendTime = __requestSentAt - __connectedAt;
-        stat.recvTime = __finishedAt - __requestSentAt;
+        stat.connectTime = _connectedAt - _startedAt;
+        stat.sendTime = _requestSentAt - _connectedAt;
+        stat.recvTime = _finishedAt - _requestSentAt;
         return stat;
     }
 }
@@ -150,104 +146,96 @@ public struct PostFile {
 /// 
 public struct HTTPRequest {
     private {
-        enum           __preHeaders = [
-            "Accept-Encoding": "gzip, deflate",
-            "User-Agent":      "dlang-requests"
-        ];
-        string         __method = "GET";
-        URI            __uri;
-        string[string] __headers;
-        string[]       __filteredHeaders;
-        Auth           __authenticator;
-        bool           __keepAlive = true;
-        uint           __maxRedirects = 10;
-        size_t         __maxHeadersLength = 32 * 1024; // 32 KB
-        size_t         __maxContentLength = 5 * 1024 * 1024; // 5MB
-        ptrdiff_t      __contentLength;
-        SocketStream   __stream;
-        Duration       __timeout = 30.seconds;
-        HTTPResponse       __response;
-        HTTPResponse[]     __history; // redirects history
-        size_t         __bufferSize = 16*1024; // 16k
-        uint           __verbosity = 0;  // 0 - no output, 1 - headers, 2 - headers+body info
-        DataPipe!ubyte __bodyDecoder;
-        DecodeChunked  __unChunker;
-        string         __proxy;
+        enum           _preHeaders = [
+                            "Accept-Encoding": "gzip, deflate",
+                            "User-Agent":      "dlang-requests"
+                        ];
+        string         _method = "GET";
+        URI            _uri;
+        string[string] _headers;
+        string[]       _filteredHeaders;
+        Auth           _authenticator;
+        bool           _keepAlive = true;
+        uint           _maxRedirects = 10;
+        size_t         _maxHeadersLength = 32 * 1024; // 32 KB
+        size_t         _maxContentLength = 5 * 1024 * 1024; // 5MB
+        ptrdiff_t      _contentLength;
+        SocketStream   _stream;
+        Duration       _timeout = 30.seconds;
+        HTTPResponse   _response;
+        HTTPResponse[] _history; // redirects history
+        size_t         _bufferSize = 16*1024; // 16k
+        uint           _verbosity = 0;  // 0 - no output, 1 - headers, 2 - headers+body info
+        DataPipe!ubyte _bodyDecoder;
+        DecodeChunked  _unChunker;
+        string         _proxy;
     }
+    mixin(Getter_Setter!string   ("method"));
+    mixin(Getter_Setter!bool     ("keepAlive"));
+    mixin(Getter_Setter!size_t   ("maxContentLength"));
+    mixin(Getter_Setter!size_t   ("maxHeadersLength"));
+    mixin(Getter_Setter!size_t   ("bufferSize"));
+    mixin(Getter_Setter!uint     ("maxRedirects"));
+    mixin(Getter_Setter!uint     ("verbosity"));
+    mixin(Getter_Setter!string   ("proxy"));
+    mixin(Getter_Setter!Duration ("timeout"));
 
-    mixin(getter("keepAlive"));
-    mixin(setter("keepAlive"));
-    mixin(getter("method"));
-    mixin(setter("method"));
-    mixin(getter("timeout"));
-    mixin(setter("timeout"));
-    mixin(setter("authenticator"));
-    mixin(getter("maxContentLength"));
-    mixin(setter("maxContentLength"));
-    mixin(getter("maxRedirects"));
-    mixin(setter("maxRedirects"));
-    mixin(getter("maxHeadersLength"));
-    mixin(setter("maxHeadersLength"));
-    mixin(getter("bufferSize"));
-    mixin(setter("bufferSize"));
-    mixin(getter("verbosity"));
-    mixin(setter("verbosity"));
-    mixin(setter("proxy"));
+    mixin(Setter!Auth            ("authenticator"));
 
     this(string uri) {
-        __uri = URI(uri);
+        _uri = URI(uri);
     }
    ~this() {
-        if ( __stream && __stream.isConnected) {
-            __stream.close();
+        if ( _stream && _stream.isConnected) {
+            _stream.close();
         }
-        __stream = null;
-        __headers = null;
-        __authenticator = null;
-        __history = null;
+        _stream = null;
+        _headers = null;
+        _authenticator = null;
+        _history = null;
     }
 
     @property void uri(in URI newURI) {
-        handleURLChange(__uri, newURI);
-        __uri = newURI;
+        handleURLChange(_uri, newURI);
+        _uri = newURI;
     }
     /// Add headers to request
     /// Params:
     /// headers = headers to send.
     void addHeaders(in string[string] headers) {
         foreach(pair; headers.byKeyValue) {
-            __headers[pair.key] = pair.value;
+            _headers[pair.key] = pair.value;
         }
     }
     /// Remove headers from request
     /// Params:
     /// headers = headers to remove.
     void removeHeaders(in string[] headers) pure {
-        __filteredHeaders ~= headers;
+        _filteredHeaders ~= headers;
     }
     ///
     /// compose headers to send
     /// 
     private @property string[string] headers() {
-        string[string] generatedHeaders = __preHeaders;
+        string[string] generatedHeaders = _preHeaders;
 
-        if ( __authenticator ) {
-            __authenticator.
-                authHeaders(__uri.host).
+        if ( _authenticator ) {
+            _authenticator.
+                authHeaders(_uri.host).
                 byKeyValue.
                 each!(pair => generatedHeaders[pair.key] = pair.value);
         }
 
-        generatedHeaders["Connection"] = __keepAlive?"Keep-Alive":"Close";
-        generatedHeaders["Host"] = __uri.host;
+        generatedHeaders["Connection"] = _keepAlive?"Keep-Alive":"Close";
+        generatedHeaders["Host"] = _uri.host;
 
-        if ( __uri.scheme !in standard_ports || __uri.port != standard_ports[__uri.scheme] ) {
-            generatedHeaders["Host"] ~= ":%d".format(__uri.port);
+        if ( _uri.scheme !in standard_ports || _uri.port != standard_ports[_uri.scheme] ) {
+            generatedHeaders["Host"] ~= ":%d".format(_uri.port);
         }
 
-        __headers.byKey.each!(h => generatedHeaders[h] = __headers[h]);
+        _headers.byKey.each!(h => generatedHeaders[h] = _headers[h]);
 
-        __filteredHeaders.each!(h => generatedHeaders.remove(h));
+        _filteredHeaders.each!(h => generatedHeaders.remove(h));
 
         return generatedHeaders;
     }
@@ -256,17 +244,17 @@ public struct HTTPRequest {
     /// Handle proxy and query parameters.
     /// 
     private @property string requestString(string[string] params = null) {
-        if ( __proxy ) {
-            return "%s %s HTTP/1.1\r\n".format(__method, __uri.uri);
+        if ( _proxy ) {
+            return "%s %s HTTP/1.1\r\n".format(_method, _uri.uri);
         }
-        auto query = __uri.query.dup;
+        auto query = _uri.query.dup;
         if ( params ) {
             query ~= params2query(params);
             if ( query[0] != '?' ) {
                 query = "?" ~ query;
             }
         }
-        return "%s %s%s HTTP/1.1\r\n".format(__method, __uri.path, query);
+        return "%s %s%s HTTP/1.1\r\n".format(_method, _uri.path, query);
     }
     ///
     /// encode parameters and build query part of the url
@@ -287,15 +275,15 @@ public struct HTTPRequest {
     /// 
     private void analyzeHeaders(in string[string] headers) {
 
-        __contentLength = -1;
-        __unChunker = null;
+        _contentLength = -1;
+        _unChunker = null;
         auto contentLength = "content-length" in headers;
         if ( contentLength ) {
             try {
-                __contentLength = to!ptrdiff_t(*contentLength);
-                if ( __contentLength > maxContentLength) {
+                _contentLength = to!ptrdiff_t(*contentLength);
+                if ( _contentLength > maxContentLength) {
                     throw new RequestException("ContentLength > maxContentLength (%d>%d)".
-                                format(__contentLength, __maxContentLength));
+                                format(_contentLength, _maxContentLength));
                 }
             } catch (ConvException e) {
                 throw new RequestException("Can't convert Content-Length from %s".format(*contentLength));
@@ -305,8 +293,8 @@ public struct HTTPRequest {
         if ( transferEncoding ) {
             tracef("transferEncoding: %s", *transferEncoding);
             if ( *transferEncoding == "chunked") {
-                __unChunker = new DecodeChunked();
-                __bodyDecoder.insert(__unChunker);
+                _unChunker = new DecodeChunked();
+                _bodyDecoder.insert(_unChunker);
             }
         }
         auto contentEncoding = "content-encoding" in headers;
@@ -315,7 +303,7 @@ public struct HTTPRequest {
                 throw new RequestException("Unknown content-encoding " ~ *contentEncoding);
             case "gzip":
             case "deflate":
-                __bodyDecoder.insert(new Decompressor!ubyte);
+                _bodyDecoder.insert(new Decompressor!ubyte);
         }
     }
     ///
@@ -328,21 +316,21 @@ public struct HTTPRequest {
     private void parseResponseHeaders(ref Buffer!ubyte buffer) {
         string lastHeader;
         foreach(line; buffer.data!(string).split("\n").map!(l => l.stripRight)) {
-            if ( ! __response.status_line.length ) {
+            if ( ! _response.status_line.length ) {
                 tracef("statusLine: %s", line);
-                __response.status_line = line;
-                if ( __verbosity >= 1 ) {
+                _response.status_line = line;
+                if ( _verbosity >= 1 ) {
                     writefln("< %s", line);
                 }
                 auto parsed = line.split(" ");
                 if ( parsed.length >= 3 ) {
-                    __response.code = parsed[1].to!ushort;
+                    _response.code = parsed[1].to!ushort;
                 }
                 continue;
             }
             if ( line[0] == ' ' || line[0] == '\t' ) {
                 // unfolding https://tools.ietf.org/html/rfc822#section-3.1
-                auto stored = lastHeader in __response.__responseHeaders;
+                auto stored = lastHeader in _response._responseHeaders;
                 if ( stored ) {
                     *stored ~= line;
                 }
@@ -351,12 +339,12 @@ public struct HTTPRequest {
             auto parsed = line.findSplit(":");
             auto header = parsed[0].toLower;
             auto value = parsed[2].strip;
-            auto stored = __response.responseHeaders.get(header, null);
+            auto stored = _response.responseHeaders.get(header, null);
             if ( stored ) {
                 value = stored ~ ", " ~ value;
             }
-            __response.__responseHeaders[header] = value;
-            if ( __verbosity >= 1 ) {
+            _response._responseHeaders[header] = value;
+            if ( _verbosity >= 1 ) {
                 writefln("< %s: %s", parsed[0], value);
             }
 
@@ -379,20 +367,20 @@ public struct HTTPRequest {
     }
 
     private bool followRedirectResponse() {
-        if ( __history.length >= __maxRedirects ) {
+        if ( _history.length >= _maxRedirects ) {
             return false;
         }
-        auto location = "location" in __response.responseHeaders;
+        auto location = "location" in _response.responseHeaders;
         if ( !location ) {
             return false;
         }
-        __history ~= __response;
-        auto connection = "connection" in __response.__responseHeaders;
+        _history ~= _response;
+        auto connection = "connection" in _response._responseHeaders;
         if ( !connection || *connection == "close" ) {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
-            __stream.close();
+            _stream.close();
         }
-        URI oldURI = __uri;
+        URI oldURI = _uri;
         URI newURI = oldURI;
         try {
             newURI = URI(*location);
@@ -402,55 +390,55 @@ public struct HTTPRequest {
             newURI.uri = newURI.recalc_uri;
         }
         handleURLChange(oldURI, newURI);
-            oldURI = __response.URI;
-        __uri = newURI;
-        __response = new HTTPResponse;
-        __response.URI = oldURI;
-        __response.finalURI = newURI;
+            oldURI = _response.uri;
+        _uri = newURI;
+        _response = new HTTPResponse;
+        _response.uri = oldURI;
+        _response.finalURI = newURI;
         return true;
     }
     ///
     /// If uri changed so that we have to change host or port, then we have to close socket stream
     /// 
     private void handleURLChange(in URI from, in URI to) {
-        if ( __stream !is null && __stream.isConnected && 
+        if ( _stream !is null && _stream.isConnected && 
             ( from.scheme != to.scheme || from.host != to.host || from.port != to.port) ) {
             tracef("Have to reopen stream, because of URI change");
-            __stream.close();
+            _stream.close();
         }
     }
     
     private void checkURL(string url, string file=__FILE__, size_t line=__LINE__) {
-        if (url is null && __uri.uri == "" ) {
+        if (url is null && _uri.uri == "" ) {
             throw new RequestException("No url configured", file, line);
         }
         
         if ( url !is null ) {
             URI newURI = URI(url);
-            handleURLChange(__uri, newURI);
-            __uri = newURI;
+            handleURLChange(_uri, newURI);
+            _uri = newURI;
         }
     }
     ///
     /// Setup connection. Handle proxy and https case
     /// 
     private void setupConnection() {
-        if ( !__stream || !__stream.isConnected ) {
+        if ( !_stream || !_stream.isConnected ) {
             tracef("Set up new connection");
             URI   uri;
-            if ( __proxy ) {
+            if ( _proxy ) {
                 // use proxy uri to connect
-                uri.uri_parse(__proxy);
+                uri.uri_parse(_proxy);
             } else {
                 // use original uri
-                uri = __uri;
+                uri = _uri;
             }
             final switch (uri.scheme) {
                 case "http":
-                    __stream = new TCPSocketStream().connect(uri.host, uri.port, __timeout);
+                    _stream = new TCPSocketStream().connect(uri.host, uri.port, _timeout);
                     break;
                 case "https":
-                    __stream = new SSLSocketStream().connect(uri.host, uri.port, __timeout);
+                    _stream = new SSLSocketStream().connect(uri.host, uri.port, _timeout);
                     break;
             }
         } else {
@@ -463,16 +451,16 @@ public struct HTTPRequest {
     /// 
     private void receiveResponse() {
 
-        __stream.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
+        _stream.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
         scope(exit) {
-            __stream.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, 0.seconds);
+            _stream.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, 0.seconds);
         }
 
-        __bodyDecoder = new DataPipe!ubyte();
-        auto b = new ubyte[__bufferSize];
+        _bodyDecoder = new DataPipe!ubyte();
+        auto b = new ubyte[_bufferSize];
         scope(exit) {
-            __bodyDecoder = null;
-            __unChunker = null;
+            _bodyDecoder = null;
+            _unChunker = null;
             b = null;
         }
 
@@ -484,7 +472,7 @@ public struct HTTPRequest {
         
         while(true) {
 
-            read = __stream.receive(b);
+            read = _stream.receive(b);
             tracef("read: %d", read);
             if ( read < 0 ) {
                 version(Windows) {
@@ -521,27 +509,27 @@ public struct HTTPRequest {
             }
         }
         
-        analyzeHeaders(__response.__responseHeaders);
-        __bodyDecoder.put(partialBody);
+        analyzeHeaders(_response._responseHeaders);
+        _bodyDecoder.put(partialBody);
 
-        if ( __verbosity >= 2 ) {
+        if ( _verbosity >= 2 ) {
             writefln("< %d bytes of body received", partialBody.length);
         }
 
-        if ( __method == "HEAD" ) {
+        if ( _method == "HEAD" ) {
             // HEAD response have ContentLength, but have no body
             return;
         }
 
         while( true ) {
-            if ( __contentLength >= 0 && receivedBodyLength >= __contentLength ) {
+            if ( _contentLength >= 0 && receivedBodyLength >= _contentLength ) {
                 trace("Body received.");
                 break;
             }
-            if ( __unChunker && __unChunker.done ) {
+            if ( _unChunker && _unChunker.done ) {
                 break;
             }
-            read = __stream.receive(b);
+            read = _stream.receive(b);
             if ( read < 0 ) {
                 version(Posix) {
                     if ( errno == EINTR ) {
@@ -553,7 +541,7 @@ public struct HTTPRequest {
                 }
                 throw new ErrnoException("receiving body");
             }
-            if ( __verbosity >= 2 ) {
+            if ( _verbosity >= 2 ) {
                 writefln("< %d bytes of body received", read);
             }
             tracef("read: %d", read);
@@ -562,12 +550,12 @@ public struct HTTPRequest {
                 break;
             }
             receivedBodyLength += read;
-            __bodyDecoder.put(b[0..read].dup);
-            __response.__responseBody.put(__bodyDecoder.get());
-            tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", receivedBodyLength, __contentLength, __response.__responseBody.length);
+            _bodyDecoder.put(b[0..read].dup);
+            _response._responseBody.put(_bodyDecoder.get());
+            tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", receivedBodyLength, _contentLength, _response._responseBody.length);
         }
-        __bodyDecoder.flush();
-        __response.__responseBody.put(__bodyDecoder.get());
+        _bodyDecoder.flush();
+        _response._responseBody.put(_bodyDecoder.get());
     }
     ///
     /// execute POST request.
@@ -587,21 +575,21 @@ public struct HTTPRequest {
         //
         // application/x-www-form-urlencoded
         //
-        __method = method;
+        _method = method;
 
-        __response = new HTTPResponse;
+        _response = new HTTPResponse;
         checkURL(url);
-        __response.URI = __uri;
-        __response.finalURI = __uri;
+        _response.uri = _uri;
+        _response.finalURI = _uri;
 
     connect:
-        __response.__startedAt = Clock.currTime;
+        _response._startedAt = Clock.currTime;
         setupConnection();
         
-        if ( !__stream.isConnected() ) {
-            return __response;
+        if ( !_stream.isConnected() ) {
+            return _response;
         }
-        __response.__connectedAt = Clock.currTime;
+        _response._connectedAt = Clock.currTime;
 
         string encoded = params2query(rqData);
         auto h = headers;
@@ -617,34 +605,34 @@ public struct HTTPRequest {
         req.put(encoded);
         trace(req.data);
 
-        if ( __verbosity >= 1 ) {
+        if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
 
-        auto rc = __stream.send(req.data());
+        auto rc = _stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);
-            return __response;
+            return _response;
         }
-        __response.__requestSentAt = Clock.currTime;
+        _response._requestSentAt = Clock.currTime;
 
         receiveResponse();
 
-        __response.__finishedAt = Clock.currTime;
+        _response._finishedAt = Clock.currTime;
 
-        auto connection = "connection" in __response.__responseHeaders;
+        auto connection = "connection" in _response._responseHeaders;
         if ( !connection || *connection == "close" ) {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
-            __stream.close();
+            _stream.close();
         }
-        if ( canFind(redirectCodes, __response.__code) && followRedirectResponse() ) {
-            if ( __method != "GET" ) {
+        if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
+            if ( _method != "GET" ) {
                 return this.get();
             }
             goto connect;
         }
-        __response.__history = __history;
-        return __response;
+        _response._history = _history;
+        return _response;
     }
     ///
     /// send file(s) using POST
@@ -670,21 +658,21 @@ public struct HTTPRequest {
         //
         bool restartedRequest = false;
         
-        __method = method;
+        _method = method;
         
-        __response = new HTTPResponse;
+        _response = new HTTPResponse;
         checkURL(url);
-        __response.URI = __uri;
-        __response.finalURI = __uri;
+        _response.uri = _uri;
+        _response.finalURI = _uri;
  
     connect:
-        __response.__startedAt = Clock.currTime;
+        _response._startedAt = Clock.currTime;
         setupConnection();
         
-        if ( !__stream.isConnected() ) {
-            return __response;
+        if ( !_stream.isConnected() ) {
+            return _response;
         }
-        __response.__connectedAt = Clock.currTime;
+        _response._connectedAt = Clock.currTime;
 
         Appender!string req;
         req.put(requestString());
@@ -716,59 +704,59 @@ public struct HTTPRequest {
         req.put("\r\n");
         
         trace(req.data);
-        if ( __verbosity >= 1 ) {
+        if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
 
-        auto rc = __stream.send(req.data());
+        auto rc = _stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);
-            return __response;
+            return _response;
         }
         foreach(hdr, f; zip(partHeaders, files)) {
             tracef("sending part headers <%s>", hdr);
-            __stream.send(hdr);
+            _stream.send(hdr);
             auto file = File(f.fileName, "rb");
             scope(exit) {
                 file.close();
             }
             foreach(chunk; file.byChunk(16*1024)) {
-                __stream.send(chunk);
+                _stream.send(chunk);
             }
-            __stream.send("\r\n");
+            _stream.send("\r\n");
         }
-        __stream.send("--" ~ boundary ~ "--\r\n");
-        __response.__requestSentAt = Clock.currTime;
+        _stream.send("--" ~ boundary ~ "--\r\n");
+        _response._requestSentAt = Clock.currTime;
 
         receiveResponse();
 
-        if ( __response.__responseHeaders.length == 0 
-            && __keepAlive
+        if ( _response._responseHeaders.length == 0 
+            && _keepAlive
             && !restartedRequest
-            && __method == "GET"
+            && _method == "GET"
             ) {
             tracef("Server closed keepalive connection");
-            __stream.close();
+            _stream.close();
             restartedRequest = true;
             goto connect;
         }
 
-        __response.__finishedAt = Clock.currTime;
+        _response._finishedAt = Clock.currTime;
         ///
-        auto connection = "connection" in __response.__responseHeaders;
+        auto connection = "connection" in _response._responseHeaders;
         if ( !connection || *connection == "close" ) {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
-            __stream.close();
+            _stream.close();
         }
-        if ( canFind(redirectCodes, __response.__code) && followRedirectResponse() ) {
-            if ( __method != "GET" ) {
+        if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
+            if ( _method != "GET" ) {
                 return this.get();
             }
             goto connect;
         }
-        __response.__history = __history;
+        _response._history = _history;
         ///
-        return __response;
+        return _response;
     }
     ///
     /// POST data from some string(with Content-Length), or from range of strings (use Transfer-Encoding: chunked)
@@ -803,21 +791,21 @@ public struct HTTPRequest {
         //
         bool restartedRequest = false;
         
-        __method = method;
+        _method = method;
         
-        __response = new HTTPResponse;
+        _response = new HTTPResponse;
         checkURL(url);
-        __response.URI = __uri;
-        __response.finalURI = __uri;
+        _response.uri = _uri;
+        _response.finalURI = _uri;
 
     connect:
-        __response.__startedAt = Clock.currTime;
+        _response._startedAt = Clock.currTime;
         setupConnection();
         
-        if ( !__stream.isConnected() ) {
-            return __response;
+        if ( !_stream.isConnected() ) {
+            return _response;
         }
-        __response.__connectedAt = Clock.currTime;
+        _response._connectedAt = Clock.currTime;
 
         Appender!string req;
         req.put(requestString());
@@ -835,63 +823,63 @@ public struct HTTPRequest {
         req.put("\r\n");
 
         trace(req.data);
-        if ( __verbosity >= 1 ) {
+        if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
 
-        auto rc = __stream.send(req.data());
+        auto rc = _stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);
-            return __response;
+            return _response;
         }
 
         static if ( rank!R == 1) {
-            __stream.send(content);
+            _stream.send(content);
         } else {
             while ( !content.empty ) {
                 auto chunk = content.front;
                 auto chunkHeader = "%x\r\n".format(chunk.length);
                 tracef("sending %s%s", chunkHeader, chunk);
-                __stream.send(chunkHeader);
-                __stream.send(chunk);
-                __stream.send("\r\n");
+                _stream.send(chunkHeader);
+                _stream.send(chunk);
+                _stream.send("\r\n");
                 content.popFront;
             }
             tracef("sent");
-            __stream.send("0\r\n\r\n");
+            _stream.send("0\r\n\r\n");
         }
-        __response.__requestSentAt = Clock.currTime;
+        _response._requestSentAt = Clock.currTime;
 
         receiveResponse();
 
-        if ( __response.__responseHeaders.length == 0 
-            && __keepAlive
+        if ( _response._responseHeaders.length == 0 
+            && _keepAlive
             && !restartedRequest
-            && __method == "GET"
+            && _method == "GET"
             ) {
             tracef("Server closed keepalive connection");
-            __stream.close();
+            _stream.close();
             restartedRequest = true;
             goto connect;
         }
 
-        __response.__finishedAt = Clock.currTime;
+        _response._finishedAt = Clock.currTime;
 
         ///
-        auto connection = "connection" in __response.__responseHeaders;
+        auto connection = "connection" in _response._responseHeaders;
         if ( !connection || *connection == "close" ) {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
-            __stream.close();
+            _stream.close();
         }
-        if ( canFind(redirectCodes, __response.__code) && followRedirectResponse() ) {
-            if ( __method != "GET" ) {
+        if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
+            if ( _method != "GET" ) {
                 return this.get();
             }
             goto connect;
         }
         ///
-        __response.__history = __history;
-        return __response;
+        _response._history = _history;
+        return _response;
     }
     ///
     /// Send request without data
@@ -909,22 +897,22 @@ public struct HTTPRequest {
     HTTPResponse exec(string method="GET")(string url = null, string[string] params = null) if (method != "POST")
     {
 
-        __method = method;
-        __response = new HTTPResponse;
-        __history.length = 0;
+        _method = method;
+        _response = new HTTPResponse;
+        _history.length = 0;
         bool restartedRequest = false; // True if this is restarted keepAlive request
 
         checkURL(url);
-        __response.URI = __uri;
-        __response.finalURI = __uri;
+        _response.uri = _uri;
+        _response.finalURI = _uri;
     connect:
-        __response.__startedAt = Clock.currTime;
+        _response._startedAt = Clock.currTime;
         setupConnection();
 
-        if ( !__stream.isConnected() ) {
-            return __response;
+        if ( !_stream.isConnected() ) {
+            return _response;
         }
-        __response.__connectedAt = Clock.currTime;
+        _response._connectedAt = Clock.currTime;
 
         Appender!string req;
         req.put(requestString(params));
@@ -934,50 +922,50 @@ public struct HTTPRequest {
         req.put("\r\n");
         trace(req.data);
 
-        if ( __verbosity >= 1 ) {
+        if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
-        auto rc = __stream.send(req.data());
+        auto rc = _stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);
-            return __response;
+            return _response;
         }
-        __response.__requestSentAt = Clock.currTime;
+        _response._requestSentAt = Clock.currTime;
 
         receiveResponse();
 
-        if ( __response.__responseHeaders.length == 0 
-            && __keepAlive
+        if ( _response._responseHeaders.length == 0 
+            && _keepAlive
             && !restartedRequest
-            && __method == "GET"
+            && _method == "GET"
         ) {
             tracef("Server closed keepalive connection");
-            __stream.close();
+            _stream.close();
             restartedRequest = true;
             goto connect;
         }
-        __response.__finishedAt = Clock.currTime;
+        _response._finishedAt = Clock.currTime;
 
         ///
-        auto connection = "connection" in __response.__responseHeaders;
+        auto connection = "connection" in _response._responseHeaders;
         if ( !connection || *connection == "close" ) {
             tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
-            __stream.close();
+            _stream.close();
         }
-        if ( __verbosity >= 1 ) {
-            writeln(">> Connect time: ", __response.__connectedAt - __response.__startedAt);
-            writeln(">> Request send time: ", __response.__requestSentAt - __response.__connectedAt);
-            writeln(">> Response recv time: ", __response.__finishedAt - __response.__requestSentAt);
+        if ( _verbosity >= 1 ) {
+            writeln(">> Connect time: ", _response._connectedAt - _response._startedAt);
+            writeln(">> Request send time: ", _response._requestSentAt - _response._connectedAt);
+            writeln(">> Response recv time: ", _response._finishedAt - _response._requestSentAt);
         }
-        if ( canFind(redirectCodes, __response.__code) && followRedirectResponse() ) {
-            if ( __method != "GET" ) {
+        if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
+            if ( _method != "GET" ) {
                 return this.get();
             }
             goto connect;
         }
         ///
-        __response.__history = __history;
-        return __response;
+        _response._history = _history;
+        return _response;
     }
     ///
     /// GET request. Simple wrapper over exec!"GET"

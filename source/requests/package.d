@@ -117,6 +117,34 @@ struct Request {
 }
 ///
 package unittest {
+    info("Test get in parallel");
+    import std.stdio;
+    import std.parallelism;
+    import std.algorithm;
+    import std.string;
+    import core.atomic;
+    
+    immutable auto urls = [
+        "http://httpbin.org/stream/10",
+        "https://httpbin.org/stream/20",
+        "http://httpbin.org/stream/30",
+        "https://httpbin.org/stream/40",
+        "http://httpbin.org/stream/50",
+        "https://httpbin.org/stream/60",
+        "http://httpbin.org/stream/70",
+    ];
+    
+    defaultPoolThreads(5);
+    
+    shared short lines;
+    
+    foreach(url; parallel(urls)) {
+        atomicOp!"+="(lines, getContent(url).splitter("\n").count);
+    }
+    assert(lines == 287);
+}
+///
+package unittest {
     import std.algorithm;
     import std.range;
     import std.array;
@@ -352,6 +380,7 @@ public auto postContent(A...)(string url, A args) {
     auto rs = rq.post(url, args);
     return rs.responseBody;
 }
+
 ///
 package unittest {
     import std.json;
@@ -362,30 +391,5 @@ package unittest {
     assert(parseJSON(r.data).object["json"].object["c"].integer == 1);
     r = postContent("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
     assert(r.length == 0);
-
-    info("Test get in parallel");
-    import std.stdio;
-    import std.parallelism;
-    import std.algorithm;
-    import std.string;
-    import core.atomic;
-
-    immutable auto urls = [
-        "http://httpbin.org/stream/10",
-        "https://httpbin.org/stream/20",
-        "http://httpbin.org/stream/30",
-        "https://httpbin.org/stream/40",
-        "http://httpbin.org/stream/50",
-        "https://httpbin.org/stream/60",
-        "http://httpbin.org/stream/70",
-    ];
-    
-    defaultPoolThreads(5);
-
-    shared short lines;
-    
-    foreach(url; parallel(urls)) {
-        atomicOp!"+="(lines, getContent(url).splitter("\n").count);
-    }
-    assert(lines == 287);
 }
+

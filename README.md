@@ -47,7 +47,7 @@ For example to authorize with Basic authorization use next code:
     rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
 ```
 
-You can use *requests* in parallel tasks (but yoou can't share single *Request* structure between threads):
+You can use *requests* in parallel tasks (but you can't share single *Request* structure between threads):
 ```
 import std.stdio;
 import std.parallelism;

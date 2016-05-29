@@ -294,8 +294,6 @@ json = parseJSON(rs.responseBody.data).object[<span style="color:red">"cookies"<
 <span style="color:blue">assert</span>(json[<span style="color:red">"A"</span>].str == <span style="color:red">"abcd"</span>);
 <span style="color:blue">assert</span>(json[<span style="color:red">"b"</span>].str == <span style="color:red">"cdef"</span>);
 <span style="color:blue">auto</span> cookie = rq.cookie();
-<span style="color:blue">assert</span>(isPermutation([<span style="color:red">"A"</span>, <span style="color:red">"b"</span>], rq.cookie.map!<span style="color:red">"a.attr"</span>));
-<span style="color:blue">assert</span>(isPermutation([<span style="color:red">"abcd"</span>, <span style="color:red">"cdef"</span>], rq.cookie.map!<span style="color:red">"a.value"</span>));
 <span style="color:blue">foreach</span>(c; rq.cookie) {
     <span style="color:blue">final</span> <span style="color:blue">switch</span>(c.attr) {
         <span style="color:blue">case</span> <span style="color:red">"A"</span>:

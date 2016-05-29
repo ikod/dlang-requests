@@ -151,8 +151,8 @@
 <dt class="decl"><p><code><a name="DataPipe"></a>class <u>DataPipe</u>(E): DataPipeIface!E;
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p><u>DataPipe</u> is a pipeline of data processors, each accept some data, process it, and put result to next element in line.
- This class used to combine different Transfer- and Content- encodings. For example: unchunk chunked transfer-encoding,
- and uncompress compressed Content-Encoding.</p>
+ This class used to combine different Transfer- and Content- encodings. For example: unchunk transfer-encoding "chunnked",
+ and uncompress Content-Encoding "gzip".</p>
 </div>
 <h3 class="memb">Members:</h3>
   <dl><dt class="decl"><p><code><a name="DataPipe.insert"></a>void <u>insert</u>(DataPipeIface!E <code><i>p</i></code>);

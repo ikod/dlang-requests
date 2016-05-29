@@ -16,6 +16,8 @@ import std.zlib;
 import std.datetime;
 import std.socket;
 
+alias InDataHandler = DataPipeIface!ubyte;
+
 public class ConnectError: Exception {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
         super(msg, file, line);
@@ -42,8 +44,8 @@ public interface DataPipeIface(E) {
 }
 /**
  * DataPipe is a pipeline of data processors, each accept some data, process it, and put result to next element in line.
- * This class used to combine different Transfer- and Content- encodings. For example: unchunk chunked transfer-encoding,
- * and uncompress compressed Content-Encoding.
+ * This class used to combine different Transfer- and Content- encodings. For example: unchunk transfer-encoding "chunnked",
+ * and uncompress Content-Encoding "gzip".
  */
 public class DataPipe(E) : DataPipeIface!E {
 

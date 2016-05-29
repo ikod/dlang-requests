@@ -12,7 +12,7 @@ static this() {
 
 string Getter_Setter(T)(string name) {
     return `
-        @property final ` ~ T.stringof ~ ` ` ~ name ~ `() const @safe @nogc {
+        @property final ` ~ T.stringof ~ ` ` ~ name ~ `() pure const @safe @nogc nothrow {
             return _` ~ name ~ `;
         }
         @property final void ` ~ name ~ `(` ~ T.stringof ~ ` s) pure @nogc nothrow { 
@@ -21,14 +21,6 @@ string Getter_Setter(T)(string name) {
     `;
 }
 
-//string Getter(T)(string name) {
-//    return `
-//        @property final ` ~ T.stringof ~ ` ` ~ name ~ `() const @safe @nogc {
-//            return _` ~ name ~ `;
-//        }
-//    `;
-//}
-//
 string Setter(T)(string name) {
     return `
         @property final void ` ~ name ~ `(` ~ T.stringof ~ ` s) pure @nogc nothrow { 
@@ -39,7 +31,7 @@ string Setter(T)(string name) {
 
 string Getter(T)(string name) {
     return `
-        @property final ` ~ T.stringof ~ ` ` ~ name ~ `() @safe @nogc {
+        @property final ` ~ T.stringof ~ ` ` ~ name ~ `() pure const @safe @nogc nothrow {
             return _` ~ name ~ `;
         }
     `;
@@ -92,4 +84,38 @@ unittest {
     assert(rank!(string) == 1);
     assert(rank!(ubyte[][]) == 2);
 }
+// test if p1 is sub-path of p2
+bool pathMatches(string p1, string p2) pure @safe @nogc {
+    import std.algorithm;
+    return p1.startsWith(p2);
+}
 
+package unittest {
+    assert("/abc/def".pathMatches("/"));
+    assert("/abc/def".pathMatches("/abc"));
+    assert("/abc/def".pathMatches("/abc/def"));
+    assert(!"/def".pathMatches("/abc"));
+}
+
+// test if d1 is subbomain of d2
+//    Host names can be specified either as an IP address or a HDN string.
+//    Sometimes we compare one host name with another.  (Such comparisons
+//    SHALL be case-insensitive.)  Host A's name domain-matches host B's if
+//        
+//    *  their host name strings string-compare equal; or
+//    
+//    * A is a HDN string and has the form NB, where N is a non-empty
+//        name string, B has the form .B', and B' is a HDN string.  (So,
+//            x.y.com domain-matches .Y.com but not Y.com.)
+        
+package bool domainMatches(string d1, string d2) pure @safe @nogc {
+    import std.algorithm;
+    return d1==d2 ||
+           (d2[0] == '.' && d1.endsWith(d2));
+}
+
+package unittest {
+    assert("x.example.com".domainMatches(".example.com"));
+    assert(!"x.example.com".domainMatches("example.com"));
+    assert("example.com".domainMatches("example.com"));
+}

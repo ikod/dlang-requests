@@ -197,7 +197,7 @@ Response.history - for redirected responses contain all history</p>
 <b>authenticator</b> - class to send auth headers.
 </p><p>
 
-<b>keepAlive</b> - set <b>true</b> for keepAlive requests. default <b>false</b>.
+<b>keepAlive</b> - set <b>true</b> for keepAlive requests. default <b>true</b>.
 </p><p>
 
 <b>maxRedirects</b> - maximum number of redirects. default 10.
@@ -206,7 +206,7 @@ Response.history - for redirected responses contain all history</p>
 <b>maxHeadersLength</b> - maximum length of server response headers. default = 32KB.
 </p><p>
 
-<b>maxContentLength</b> - maximun content length. delault = 5MB.
+<b>maxContentLength</b> - maximun content length. delault - 0 = unlimited.
 </p><p>
 
 <b>bufferSize</b> - send and receive buffer size. default = 16KB.
@@ -350,12 +350,18 @@ rq.keepAlive = <span style="color:blue">false</span>;
 rs = rq.get(<span style="color:red">"https://httpbin.org/absolute-redirect/3"</span>);
 <span style="color:blue">assert</span>(rs.history.length == 2);
 <span style="color:blue">assert</span>(rs.code==302);
-
 info(<span style="color:red">"Check utf8 content"</span>);
 globalLogLevel(LogLevel.info);
 rq = <u>HTTPRequest</u>();
 rs = rq.get(<span style="color:red">"http://httpbin.org/encoding/utf8"</span>);
 <span style="color:blue">assert</span>(rs.code==200);
+
+info(<span style="color:red">"Check cookie"</span>);
+rs = <u>HTTPRequest</u>().get(<span style="color:red">"http://httpbin.org/cookies/set?A=abcd&amp;b=cdef"</span>);
+<span style="color:blue">assert</span>(rs.code == 200);
+json = parseJSON(rs.responseBody.data).object[<span style="color:red">"cookies"</span>].object;
+<span style="color:blue">assert</span>(json[<span style="color:red">"A"</span>].str == <span style="color:red">"abcd"</span>);
+<span style="color:blue">assert</span>(json[<span style="color:red">"b"</span>].str == <span style="color:red">"cdef"</span>);
 
 info(<span style="color:red">"Check chunked content"</span>);
 globalLogLevel(LogLevel.info);

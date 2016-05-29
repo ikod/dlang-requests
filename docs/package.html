@@ -127,6 +127,7 @@
  <u>Request</u> has methods get, post and exec which routed to proper concrete handler (http or ftp, etc).
  To enable some protocol-specific featutes you have to use protocol interface directly (see docs for HTTPRequest or FTPRequest)</p>
 <h4 class="sec">Examples:</h4> <p><pre class="d_code">
+globalLogLevel(LogLevel.info);
 info(<span style="color:red">"Test get in parallel"</span>);
 <span style="color:blue">import</span> std.stdio;
 <span style="color:blue">import</span> std.parallelism;
@@ -284,6 +285,27 @@ rq.keepAlive = <span style="color:blue">true</span>;
 rs = rq.get(<span style="color:red">"http://httpbin.org/relative-redirect/2"</span>);
 <span style="color:blue">assert</span>((<span style="color:blue">cast</span>(HTTPResponse)rs).history.length == 2);
 <span style="color:blue">assert</span>((<span style="color:blue">cast</span>(HTTPResponse)rs).code==200);
+
+info(<span style="color:red">"Check cookie"</span>);
+rq = <u>Request</u>();
+rs = rq.get(<span style="color:red">"http://httpbin.org/cookies/set?A=abcd&amp;b=cdef"</span>);
+<span style="color:blue">assert</span>(rs.code == 200);
+json = parseJSON(rs.responseBody.data).object[<span style="color:red">"cookies"</span>].object;
+<span style="color:blue">assert</span>(json[<span style="color:red">"A"</span>].str == <span style="color:red">"abcd"</span>);
+<span style="color:blue">assert</span>(json[<span style="color:red">"b"</span>].str == <span style="color:red">"cdef"</span>);
+<span style="color:blue">auto</span> cookie = rq.cookie();
+<span style="color:blue">assert</span>(isPermutation([<span style="color:red">"A"</span>, <span style="color:red">"b"</span>], rq.cookie.map!<span style="color:red">"a.attr"</span>));
+<span style="color:blue">assert</span>(isPermutation([<span style="color:red">"abcd"</span>, <span style="color:red">"cdef"</span>], rq.cookie.map!<span style="color:red">"a.value"</span>));
+<span style="color:blue">foreach</span>(c; rq.cookie) {
+    <span style="color:blue">final</span> <span style="color:blue">switch</span>(c.attr) {
+        <span style="color:blue">case</span> <span style="color:red">"A"</span>:
+            <span style="color:blue">assert</span>(c.value == <span style="color:red">"abcd"</span>);
+            <span style="color:blue">break</span>;
+        <span style="color:blue">case</span> <span style="color:red">"b"</span>:
+            <span style="color:blue">assert</span>(c.value == <span style="color:red">"cdef"</span>);
+            <span style="color:blue">break</span>;
+    }
+}
 <span style="color:green">//    rq = Request();
 </span><span style="color:green">//    rq.keepAlive = true;
 </span><span style="color:green">//    rq.proxy = "http://localhost:8888/";
@@ -414,6 +436,20 @@ info(<span style="color:red">"testing ftp - done."</span>);
 <dd class="decl desc"><div class="sections"><p>Set <u>authenticator</u> for http requests.
 </p>
 <p><b><code><i>v</i></code></b> - Auth instance.</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="Request.cookie"></a>pure nothrow @nogc @property void <u>cookie</u>(Cookie[] <code><i>v</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Set Cookie for http requests.
+</p>
+<p><b><code><i>v</i></code></b> - array of <u>cookie</u>.</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="Request.cookie.2"></a>pure nothrow @nogc @property Cookie[] <u>cookie</u>();
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Get Cookie for http requests.
+</p>
+<p><b>v</b> - array of <u>cookie</u>.</p>
 </div>
 </dd>
 <dt class="decl"><p><code><a name="Request.get"></a>Response <u>get</u>(A...)(string <code><i>uri</i></code>, A <code><i>args</i></code>);

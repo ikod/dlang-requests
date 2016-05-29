@@ -36,7 +36,8 @@ public struct FTPRequest {
         Duration      _timeout = 60.seconds;
         uint          _verbosity = 0;
         size_t        _bufferSize = 16*1024; // 16k
-        size_t        _maxContentLength = 5*1024*1024; // 5MB
+        size_t        _maxContentLength;
+        size_t        _contentLength;
         SocketStream  _controlChannel;
         string[]      _responseHistory;
         FTPResponse   _response;
@@ -45,8 +46,9 @@ public struct FTPRequest {
     mixin(Getter_Setter!uint("verbosity"));
     mixin(Getter_Setter!size_t("bufferSize"));
     mixin(Getter_Setter!size_t("maxContentLength"));
-    mixin(Getter!(string[])("responseHistory"));
-
+    @property final string[] responseHistory() @safe @nogc nothrow {
+        return _responseHistory;
+    }
     this(string uri) {
         _uri = URI(uri);
     }
@@ -294,7 +296,24 @@ public struct FTPRequest {
             _response.code = code;
             return _response;
         }
-        
+        code = sendCmdGetResponse("SIZE " ~ baseName(_uri.path) ~ "\r\n");
+        if ( code/100 == 2 ) {
+            // something like 
+            // 213 229355520
+            auto s = _responseHistory[$-1].findSplitAfter(" ");
+            if ( s.length ) {
+                try {
+                    _contentLength = to!size_t(s[1]);
+                } catch (ConvException) {
+                    trace("Failed to convert string %s to file size".format(s[1]));
+                }
+            }
+        }
+
+        if ( _maxContentLength && _contentLength > _maxContentLength ) {
+            throw new RequestException("maxContentLength exceeded for ftp data");
+        }
+
         code = sendCmdGetResponse("PASV\r\n");
         if ( code/100 > 2 ) {
             _response.code = code;
@@ -347,7 +366,7 @@ public struct FTPRequest {
             tracef("got %d bytes from data channel", rc);
             _response._responseBody.put(b[0..rc]);
 
-            if ( _response._responseBody.length >= _maxContentLength ) {
+            if ( _maxContentLength && _response._responseBody.length >= _maxContentLength ) {
                 throw new RequestException("maxContentLength exceeded for ftp data");
             }
         }

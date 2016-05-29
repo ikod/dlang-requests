@@ -46,6 +46,7 @@ public struct FTPRequest {
     mixin(Getter_Setter!uint("verbosity"));
     mixin(Getter_Setter!size_t("bufferSize"));
     mixin(Getter_Setter!size_t("maxContentLength"));
+
     @property final string[] responseHistory() @safe @nogc nothrow {
         return _responseHistory;
     }

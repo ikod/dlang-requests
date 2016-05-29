@@ -295,8 +295,6 @@ package unittest {
     assert(json["A"].str == "abcd");
     assert(json["b"].str == "cdef");
     auto cookie = rq.cookie();
-    assert(isPermutation(["A", "b"], rq.cookie.map!"a.attr"));
-    assert(isPermutation(["abcd", "cdef"], rq.cookie.map!"a.value"));
     foreach(c; rq.cookie) {
         final switch(c.attr) {
             case "A":

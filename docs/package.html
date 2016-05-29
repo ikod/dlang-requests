@@ -304,10 +304,7 @@ json = parseJSON(rs.responseBody.data).object[<span style="color:red">"cookies"<
             <span style="color:blue">break</span>;
     }
 }
-<span style="color:green">//    rq = Request();
-</span><span style="color:green">//    rq.keepAlive = true;
-</span><span style="color:green">//    rq.proxy = "http://localhost:8888/";
-</span>rs = rq.get(<span style="color:red">"http://httpbin.org/absolute-redirect/2"</span>);
+rs = rq.get(<span style="color:red">"http://httpbin.org/absolute-redirect/2"</span>);
 <span style="color:blue">assert</span>((<span style="color:blue">cast</span>(HTTPResponse)rs).history.length == 2);
 <span style="color:blue">assert</span>((<span style="color:blue">cast</span>(HTTPResponse)rs).code==200);
 <span style="color:green">//    rq = Request();

@@ -141,15 +141,18 @@ public struct PostFile {
 ///
 /// Request.
 /// Configurable parameters:
-/// $(B headers) - add any additional headers you'd like to send.
-/// $(B authenticator) - class to send auth headers.
-/// $(B keepAlive) - set true for keepAlive requests. default true.
-/// $(B maxRedirects) - maximum number of redirects. default 10.
-/// $(B maxHeadersLength) - maximum length of server response headers. default = 32KB.
-/// $(B maxContentLength) - maximun content length. delault - 0 = unlimited.
-/// $(B bufferSize) - send and receive buffer size. default = 16KB.
-/// $(B verbosity) - level of verbosity(0 - nothing, 1 - headers, 2 - headers and body progress). default = 0.
-/// $(B proxy) - set proxy url if needed. default - null.
+/// $(B method) - string, method to use (GET, POST, ...)
+/// $(B headers) - string[string], add any additional headers you'd like to send.
+/// $(B authenticator) - class Auth, class to send auth headers.
+/// $(B keepAlive) - bool, set true for keepAlive requests. default true.
+/// $(B maxRedirects) - uint, maximum number of redirects. default 10.
+/// $(B maxHeadersLength) - size_t, maximum length of server response headers. default = 32KB.
+/// $(B maxContentLength) - size_t, maximun content length. delault - 0 = unlimited.
+/// $(B bufferSize) - size_t, send and receive buffer size. default = 16KB.
+/// $(B verbosity) - uint, level of verbosity(0 - nothing, 1 - headers, 2 - headers and body progress). default = 0.
+/// $(B proxy) - string, set proxy url if needed. default - null.
+/// $(B cookie) - Tuple Cookie, Read/Write cookie You can get cookie setted by server, or set cookies before doing request.
+/// $(B timeout) - Duration, Set timeout value for connect/receive/send.
 /// 
 public struct HTTPRequest {
     private {
@@ -384,8 +387,10 @@ public struct HTTPRequest {
            _cookie ~= processCookie(value);
         }
     }
-
-    Cookie[] processCookie(string value ) pure {
+    ///
+    /// Process Set-Cookie header from server response
+    /// 
+    private Cookie[] processCookie(string value ) pure {
         // cookie processing
         //
         // as we can't join several set-cookie lines in single line
@@ -526,7 +531,7 @@ public struct HTTPRequest {
         }
     }
     ///
-    /// Receive response after request we sent.
+    /// Request sent, now receive response.
     /// Find headers, split on headers and body, continue to receive body
     /// 
     private void receiveResponse() {
@@ -1218,7 +1223,18 @@ package unittest {
     json = parseJSON(rs.responseBody.data).object["cookies"].object;
     assert(json["A"].str == "abcd");
     assert(json["b"].str == "cdef");
-    
+    auto cookie = rq.cookie();
+    foreach(c; rq.cookie) {
+        final switch(c.attr) {
+            case "A":
+                assert(c.value == "abcd");
+                break;
+            case "b":
+                assert(c.value == "cdef");
+                break;
+        }
+    }
+
     info("Check chunked content");
     globalLogLevel(LogLevel.info);
     rq = HTTPRequest();

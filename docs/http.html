@@ -191,31 +191,40 @@ Response.history - for redirected responses contain all history</p>
 <p>Configurable parameters:
 </p><p>
 
-<b>headers</b> - add any additional headers you'd like to send.
+<b>method</b> - string, method to use (GET, POST, ...)
 </p><p>
 
-<b>authenticator</b> - class to send auth headers.
+<b>headers</b> - string[string], add any additional headers you'd like to send.
 </p><p>
 
-<b>keepAlive</b> - set <b>true</b> for keepAlive requests. default <b>true</b>.
+<b>authenticator</b> - class Auth, class to send auth headers.
 </p><p>
 
-<b>maxRedirects</b> - maximum number of redirects. default 10.
+<b>keepAlive</b> - bool, set <b>true</b> for keepAlive requests. default <b>true</b>.
 </p><p>
 
-<b>maxHeadersLength</b> - maximum length of server response headers. default = 32KB.
+<b>maxRedirects</b> - uint, maximum number of redirects. default 10.
 </p><p>
 
-<b>maxContentLength</b> - maximun content length. delault - 0 = unlimited.
+<b>maxHeadersLength</b> - size_t, maximum length of server response headers. default = 32KB.
 </p><p>
 
-<b>bufferSize</b> - send and receive buffer size. default = 16KB.
+<b>maxContentLength</b> - size_t, maximun content length. delault - 0 = unlimited.
 </p><p>
 
-<b>verbosity</b> - level of verbosity(0 - nothing, 1 - headers, 2 - headers and body progress). default = 0.
+<b>bufferSize</b> - size_t, send and receive buffer size. default = 16KB.
 </p><p>
 
-<b>proxy</b> - set proxy url if needed. default - <b>null</b>.</p>
+<b>verbosity</b> - uint, level of verbosity(0 - nothing, 1 - headers, 2 - headers and body progress). default = 0.
+</p><p>
+
+<b>proxy</b> - string, set proxy url if needed. default - <b>null</b>.
+</p><p>
+
+<b>cookie</b> - Tuple Cookie, Read/Write cookie You can get cookie setted by server, or set cookies before doing request.
+</p><p>
+
+<b>timeout</b> - Duration, Set timeout value for connect/receive/send.</p>
 <h4 class="sec">Examples:</h4> <p><pre class="d_code">
 <span style="color:blue">import</span> std.json;
 globalLogLevel(LogLevel.info);

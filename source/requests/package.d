@@ -305,9 +305,6 @@ package unittest {
                 break;
         }
     }
-    //    rq = Request();
-    //    rq.keepAlive = true;
-    //    rq.proxy = "http://localhost:8888/";
     rs = rq.get("http://httpbin.org/absolute-redirect/2");
     assert((cast(HTTPResponse)rs).history.length == 2);
     assert((cast(HTTPResponse)rs).code==200);

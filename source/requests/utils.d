@@ -84,7 +84,7 @@ unittest {
     assert(rank!(string) == 1);
     assert(rank!(ubyte[][]) == 2);
 }
-// test if p1 is sub-path of p2
+// test if p1 is sub-path of p2 (used to find Cookie to send)
 bool pathMatches(string p1, string p2) pure @safe @nogc {
     import std.algorithm;
     return p1.startsWith(p2);
@@ -97,7 +97,7 @@ package unittest {
     assert(!"/def".pathMatches("/abc"));
 }
 
-// test if d1 is subbomain of d2
+// test if d1 is subbomain of d2 (used to find Cookie to send)
 //    Host names can be specified either as an IP address or a HDN string.
 //    Sometimes we compare one host name with another.  (Such comparisons
 //    SHALL be case-insensitive.)  Host A's name domain-matches host B's if

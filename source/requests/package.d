@@ -66,6 +66,16 @@ struct Request {
     @property void authenticator(Auth v) {
         _http.authenticator = v;
     }
+    /// Set Cookie for http requests.
+    /// $(B v) - array of cookie.
+    @property void cookie(Cookie[] v) pure @nogc nothrow {
+        _http.cookie = v;
+    }
+    /// Get Cookie for http requests.
+    /// $(B v) - array of cookie.
+    @property Cookie[] cookie()  pure @nogc nothrow {
+        return _http.cookie;
+    }
     /// Execute GET for http and retrieve file for FTP.
     /// You have to provide at least $(B uri). All other arguments should conform to HTTPRequest.get or FTPRequest.get depending on the URI scheme.
     /// When arguments do not conform scheme (for example you try to call get("ftp://somehost.net/pub/README", {"a":"b"}) which doesn't make sense)
@@ -276,6 +286,27 @@ package unittest {
     rs = rq.get("http://httpbin.org/relative-redirect/2");
     assert((cast(HTTPResponse)rs).history.length == 2);
     assert((cast(HTTPResponse)rs).code==200);
+
+    info("Check cookie");
+    rq = Request();
+    rs = rq.get("http://httpbin.org/cookies/set?A=abcd&b=cdef");
+    assert(rs.code == 200);
+    json = parseJSON(rs.responseBody.data).object["cookies"].object;
+    assert(json["A"].str == "abcd");
+    assert(json["b"].str == "cdef");
+    auto cookie = rq.cookie();
+    assert(isPermutation(["A", "b"], rq.cookie.map!"a.attr"));
+    assert(isPermutation(["abcd", "cdef"], rq.cookie.map!"a.value"));
+    foreach(c; rq.cookie) {
+        final switch(c.attr) {
+            case "A":
+                assert(c.value == "abcd");
+                break;
+            case "b":
+                assert(c.value == "cdef");
+                break;
+        }
+    }
     //    rq = Request();
     //    rq.keepAlive = true;
     //    rq.proxy = "http://localhost:8888/";

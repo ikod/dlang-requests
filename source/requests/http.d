@@ -28,6 +28,8 @@ static this() {
 
 static immutable ushort[] redirectCodes = [301, 302, 303];
 
+public alias Cookie = Tuple!(string, "path", string, "domain", string, "attr", string, "value");
+
 static string urlEncoded(string p) pure @safe {
     immutable string[dchar] translationTable = [
         ' ':  "%20", '!': "%21", '*': "%2A", '\'': "%27", '(': "%28", ')': "%29",
@@ -78,7 +80,6 @@ public class BasicAuthentication: Auth {
     }
 }
 
-
 ///
 /// Response - result of request execution.
 ///
@@ -92,8 +93,14 @@ public class BasicAuthentication: Auth {
     private {
         string         _status_line;
         string[string] _responseHeaders;
+
         HTTPResponse[] _history; // redirects history
         SysTime        _startedAt, _connectedAt, _requestSentAt, _finishedAt;
+
+        mixin(Setter!string("status_line"));
+        @property final void responseHeaders(string[string] s) @safe @nogc nothrow {
+            _responseHeaders = s;
+        }
     }
 
     ~this() {
@@ -102,11 +109,11 @@ public class BasicAuthentication: Auth {
     }
 
     mixin(Getter!string("status_line"));
-    mixin(Getter!(string[string])("responseHeaders"));
-    mixin(Getter!(HTTPResponse[])("history"));
-    private {
-        mixin(Setter!string("status_line"));
-        mixin(Setter!(string[string])("responseHeaders"));
+    @property final string[string] responseHeaders() @safe @nogc nothrow {
+        return _responseHeaders;
+    }
+    @property final HTTPResponse[] history() @safe @nogc nothrow {
+        return _history;
     }
 
     @property auto getStats() const pure @safe {
@@ -136,10 +143,10 @@ public struct PostFile {
 /// Configurable parameters:
 /// $(B headers) - add any additional headers you'd like to send.
 /// $(B authenticator) - class to send auth headers.
-/// $(B keepAlive) - set true for keepAlive requests. default false.
+/// $(B keepAlive) - set true for keepAlive requests. default true.
 /// $(B maxRedirects) - maximum number of redirects. default 10.
 /// $(B maxHeadersLength) - maximum length of server response headers. default = 32KB.
-/// $(B maxContentLength) - maximun content length. delault = 5MB.
+/// $(B maxContentLength) - maximun content length. delault - 0 = unlimited.
 /// $(B bufferSize) - send and receive buffer size. default = 16KB.
 /// $(B verbosity) - level of verbosity(0 - nothing, 1 - headers, 2 - headers and body progress). default = 0.
 /// $(B proxy) - set proxy url if needed. default - null.
@@ -158,17 +165,19 @@ public struct HTTPRequest {
         bool           _keepAlive = true;
         uint           _maxRedirects = 10;
         size_t         _maxHeadersLength = 32 * 1024; // 32 KB
-        size_t         _maxContentLength = 5 * 1024 * 1024; // 5MB
-        ptrdiff_t      _contentLength;
-        SocketStream   _stream;
+        size_t         _maxContentLength; // 0 - Unlimited
+        string         _proxy;
+        uint           _verbosity = 0;  // 0 - no output, 1 - headers, 2 - headers+body info
         Duration       _timeout = 30.seconds;
+        size_t         _bufferSize = 16*1024; // 16k
+
+        SocketStream   _stream;
         HTTPResponse   _response;
         HTTPResponse[] _history; // redirects history
-        size_t         _bufferSize = 16*1024; // 16k
-        uint           _verbosity = 0;  // 0 - no output, 1 - headers, 2 - headers+body info
         DataPipe!ubyte _bodyDecoder;
         DecodeChunked  _unChunker;
-        string         _proxy;
+        ptrdiff_t      _contentLength;
+        Cookie[]       _cookie;
     }
     mixin(Getter_Setter!string   ("method"));
     mixin(Getter_Setter!bool     ("keepAlive"));
@@ -179,8 +188,15 @@ public struct HTTPRequest {
     mixin(Getter_Setter!uint     ("verbosity"));
     mixin(Getter_Setter!string   ("proxy"));
     mixin(Getter_Setter!Duration ("timeout"));
-
     mixin(Setter!Auth            ("authenticator"));
+
+    @property final void cookie(Cookie[] s) pure @safe @nogc nothrow {
+        _cookie = s;
+    }
+    
+    @property final Cookie[] cookie() pure @safe @nogc nothrow {
+        return _cookie;
+    }    
 
     this(string uri) {
         _uri = URI(uri);
@@ -216,7 +232,7 @@ public struct HTTPRequest {
     ///
     /// compose headers to send
     /// 
-    private @property string[string] headers() {
+    private string[string] requestHeaders() {
         string[string] generatedHeaders = _preHeaders;
 
         if ( _authenticator ) {
@@ -234,6 +250,14 @@ public struct HTTPRequest {
         }
 
         _headers.byKey.each!(h => generatedHeaders[h] = _headers[h]);
+
+        if ( _cookie.length ) {
+            auto cs = _cookie.
+                filter!(c => _uri.path.pathMatches(c.path) && _uri.host.domainMatches(c.domain)).
+                map!(c => "%s=%s".format(c.attr, c.value)).
+                joiner(";");
+            generatedHeaders["Cookie"] = "%s".format(cs);
+        }
 
         _filteredHeaders.each!(h => generatedHeaders.remove(h));
 
@@ -281,7 +305,7 @@ public struct HTTPRequest {
         if ( contentLength ) {
             try {
                 _contentLength = to!ptrdiff_t(*contentLength);
-                if ( _contentLength > maxContentLength) {
+                if ( _maxContentLength && _contentLength > _maxContentLength) {
                     throw new RequestException("ContentLength > maxContentLength (%d>%d)".
                                 format(_contentLength, _maxContentLength));
                 }
@@ -305,9 +329,11 @@ public struct HTTPRequest {
             case "deflate":
                 _bodyDecoder.insert(new Decompressor!ubyte);
         }
+
     }
     ///
-    /// Called when we know that all headers already received in buffer
+    /// Called when we know that all headers already received in buffer.
+    /// This routine does not interpret headers content (see analyzeHeaders).
     /// 1. Split headers on lines
     /// 2. store status line, store response code
     /// 3. unfold headers if needed
@@ -339,20 +365,74 @@ public struct HTTPRequest {
             auto parsed = line.findSplit(":");
             auto header = parsed[0].toLower;
             auto value = parsed[2].strip;
-            auto stored = _response.responseHeaders.get(header, null);
-            if ( stored ) {
-                value = stored ~ ", " ~ value;
-            }
-            _response._responseHeaders[header] = value;
+
             if ( _verbosity >= 1 ) {
-                writefln("< %s: %s", parsed[0], value);
+                writefln("< %s: %s", header, value);
             }
 
-            tracef("Header %s = %s", header, value);
             lastHeader = header;
+            tracef("Header %s = %s", header, value);
+
+            if ( header != "set-cookie" ) {
+                auto stored = _response.responseHeaders.get(header, null);
+                if ( stored ) {
+                    value = stored ~ ", " ~ value;
+                }
+                _response._responseHeaders[header] = value;
+                continue;
+            }
+           _cookie ~= processCookie(value);
         }
     }
 
+    Cookie[] processCookie(string value ) pure {
+        // cookie processing
+        //
+        // as we can't join several set-cookie lines in single line
+        // < Set-Cookie: idx=7f2800f63c112a65ef5082957bcca24b; expires=Mon, 29-May-2017 00:31:25 GMT; path=/; domain=example.com
+        // < Set-Cookie: idx=7f2800f63c112a65ef5082957bcca24b; expires=Mon, 29-May-2017 00:31:25 GMT; path=/; domain=example.com, cs=ip764-RgKqc-HvSkxRxdQQAKW8LA; path=/; domain=.example.com; HttpOnly
+        //
+        Cookie[] res;
+        string[string] kv;
+        auto fields = value.split(";").map!strip;
+        while(!fields.empty) {
+            auto s = fields.front.findSplit("=");
+            fields.popFront;
+            if ( s[1] != "=" ) {
+                continue;
+            }
+            auto k = s[0];
+            auto v = s[2];
+            switch(k.toLower()) {
+                case "domain":
+                    k = "domain";
+                    break;
+                case "path":
+                    k = "path";
+                    break;
+                case "expires":
+                    continue;
+                default:
+                    break;
+            }
+            kv[k] = v;
+        }
+        if ( "domain" !in kv ) {
+            kv["domain"] = _uri.host;
+        }
+        if ( "path" !in kv ) {
+            kv["path"] = _uri.path;
+        }
+        auto domain = kv["domain"]; kv.remove("domain");
+        auto path   = kv["path"];   kv.remove("path");
+        foreach(pair; kv.byKeyValue) {
+            auto _attr = pair.key;
+            auto _value = pair.value;
+            auto cookie = Cookie(path, domain, _attr, _value);
+            res ~= cookie;
+        }
+        return res;
+    }
     ///
     /// Do we received \r\n\r\n?
     /// 
@@ -550,9 +630,15 @@ public struct HTTPRequest {
                 break;
             }
             receivedBodyLength += read;
+            if ( _maxContentLength && receivedBodyLength > _maxContentLength ) {
+                throw new RequestException("ContentLength > maxContentLength (%d>%d)".
+                    format(_contentLength, _maxContentLength));
+            }
+
             _bodyDecoder.put(b[0..read].dup);
             _response._responseBody.put(_bodyDecoder.get());
             tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", receivedBodyLength, _contentLength, _response._responseBody.length);
+
         }
         _bodyDecoder.flush();
         _response._responseBody.put(_bodyDecoder.get());
@@ -592,7 +678,7 @@ public struct HTTPRequest {
         _response._connectedAt = Clock.currTime;
 
         string encoded = params2query(rqData);
-        auto h = headers;
+        auto h = requestHeaders();
         h["Content-Type"] = "application/x-www-form-urlencoded";
         h["Content-Length"] = to!string(encoded.length);
 
@@ -695,7 +781,7 @@ public struct HTTPRequest {
         }
         contentLength += "--".length + boundary.length + "--\r\n".length;
 
-        auto h = headers;
+        auto h = requestHeaders();
         h["Content-Type"] = "multipart/form-data; boundary=" ~ boundary;
         h["Content-Length"] = to!string(contentLength);
         h.byKeyValue.
@@ -810,7 +896,7 @@ public struct HTTPRequest {
         Appender!string req;
         req.put(requestString());
 
-        auto h = headers;
+        auto h = requestHeaders;
         h["Content-Type"] = contentType;
         static if ( rank!R == 1 ) {
             h["Content-Length"] = to!string(content.length);
@@ -916,7 +1002,7 @@ public struct HTTPRequest {
 
         Appender!string req;
         req.put(requestString(params));
-        headers.byKeyValue.
+        requestHeaders().byKeyValue.
             map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
             each!(h => req.put(h));
         req.put("\r\n");
@@ -1120,13 +1206,19 @@ package unittest {
     rs = rq.get("https://httpbin.org/absolute-redirect/3");
     assert(rs.history.length == 2);
     assert(rs.code==302);
-
     info("Check utf8 content");
     globalLogLevel(LogLevel.info);
     rq = HTTPRequest();
     rs = rq.get("http://httpbin.org/encoding/utf8");
     assert(rs.code==200);
 
+    info("Check cookie");
+    rs = HTTPRequest().get("http://httpbin.org/cookies/set?A=abcd&b=cdef");
+    assert(rs.code == 200);
+    json = parseJSON(rs.responseBody.data).object["cookies"].object;
+    assert(json["A"].str == "abcd");
+    assert(json["b"].str == "cdef");
+    
     info("Check chunked content");
     globalLogLevel(LogLevel.info);
     rq = HTTPRequest();

@@ -143,6 +143,10 @@
 </dd>
 </dl>
 </dd>
+<dt class="decl"><p><code><a name="queryParams"></a>pure nothrow @safe auto <u>queryParams</u>(T...)(T <code><i>params</i></code>);
+</code></p></dt>
+<dd class="decl desc"></p><p>
+</dd>
 <dt class="decl"><p><code><a name="HTTPResponse"></a>class <u>HTTPResponse</u>: <u>requests.base.Response</u>;
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Response - result of request execution.
@@ -310,6 +314,22 @@ json = parseJSON(rs.responseBody.data).object[<span style="color:red">"json"</sp
     <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.data).object[<span style="color:red">"data"</span>].str;
     <span style="color:blue">assert</span>(data==s);
 }
+{
+    info(<span style="color:red">"Check POST from AA"</span>);
+    rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, [<span style="color:red">"a"</span>:<span style="color:red">"b"</span>, <span style="color:red">"c"</span>:<span style="color:red">"d"</span>]);
+    <span style="color:blue">assert</span>(rs.code==200);
+    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.data).object[<span style="color:red">"form"</span>].object;
+    <span style="color:blue">assert</span>(data[<span style="color:red">"a"</span>].str == <span style="color:red">"b"</span>);
+    <span style="color:blue">assert</span>(data[<span style="color:red">"c"</span>].str == <span style="color:red">"d"</span>);
+}
+{
+    info(<span style="color:red">"Check POST from QueryParams"</span>);
+    rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, queryParams(<span style="color:red">"name[]"</span>, <span style="color:red">"first"</span>, <span style="color:red">"name[]"</span>, 2));
+    <span style="color:blue">assert</span>(rs.code==200);
+    <span style="color:blue">auto</span> data = parseJSON(rs.responseBody.data).object[<span style="color:red">"form"</span>].object;
+    <span style="color:blue">assert</span>((data[<span style="color:red">"name[]"</span>].array[0].str == <span style="color:red">"first"</span>));
+    <span style="color:blue">assert</span>((data[<span style="color:red">"name[]"</span>].array[1].str == <span style="color:red">"2"</span>));
+}
 <span style="color:green">// associative array
 </span>rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, [<span style="color:red">"a"</span>:<span style="color:red">"b "</span>, <span style="color:red">"c"</span>:<span style="color:red">"d"</span>]);
 <span style="color:blue">assert</span>(rs.code==200);
@@ -371,6 +391,17 @@ rs = <u>HTTPRequest</u>().get(<span style="color:red">"http://httpbin.org/cookie
 json = parseJSON(rs.responseBody.data).object[<span style="color:red">"cookies"</span>].object;
 <span style="color:blue">assert</span>(json[<span style="color:red">"A"</span>].str == <span style="color:red">"abcd"</span>);
 <span style="color:blue">assert</span>(json[<span style="color:red">"b"</span>].str == <span style="color:red">"cdef"</span>);
+<span style="color:blue">auto</span> cookie = rq.cookie();
+<span style="color:blue">foreach</span>(c; rq.cookie) {
+    <span style="color:blue">final</span> <span style="color:blue">switch</span>(c.attr) {
+        <span style="color:blue">case</span> <span style="color:red">"A"</span>:
+            <span style="color:blue">assert</span>(c.value == <span style="color:red">"abcd"</span>);
+            <span style="color:blue">break</span>;
+        <span style="color:blue">case</span> <span style="color:red">"b"</span>:
+            <span style="color:blue">assert</span>(c.value == <span style="color:red">"cdef"</span>);
+            <span style="color:blue">break</span>;
+    }
+}
 
 info(<span style="color:red">"Check chunked content"</span>);
 globalLogLevel(LogLevel.info);
@@ -429,35 +460,7 @@ tracef(<span style="color:red">"http tests - ok"</span>);
 </table>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="HTTPRequest.exec"></a>HTTPResponse <u>exec</u>(string method)(string <code><i>url</i></code>, string[string] <code><i>rqData</i></code>) if (method == "POST");
-</code></p></dt>
-<dd class="decl desc"><div class="sections"><p>execute POST request.
-</p>
-<p>Send form-urlencoded data
-</p><p>
-
-</p><p>
-
-
-</p>
-<p><h4 class="sec">Parameters:</h4>
-<code><i>url</i></code> = <code><i>url</i></code> to request
-</p><p>
-
-<code><i>rqData</i></code> = data to send
-
-</p>
-<h4 class="sec">Returns:</h4> <p>Response
-
-</p>
-<h4 class="sec">Examples:</h4> <p><pre class="d_code">
-rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red">"http://httpbin.org/post"</span>, [<span style="color:red">"a"</span>:<span style="color:red">"b"</span>, <span style="color:red">"c"</span>:<span style="color:red">"d"</span>]);
-
-</pre>
-</p>
-</div>
-</dd>
-<dt class="decl"><p><code><a name="HTTPRequest.exec.2"></a>HTTPResponse <u>exec</u>(string method = "POST")(string <code><i>url</i></code>, PostFile[] <code><i>files</i></code>);
+<dt class="decl"><p><code><a name="HTTPRequest.exec"></a>HTTPResponse <u>exec</u>(string method = "POST")(string <code><i>url</i></code>, PostFile[] <code><i>files</i></code>);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>send file(s) using POST
 </p>
@@ -487,7 +490,7 @@ rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red
 </p>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="HTTPRequest.exec.3"></a>HTTPResponse <u>exec</u>(string method = "POST", R)(string <code><i>url</i></code>, R <code><i>content</i></code>, string <code><i>contentType</i></code> = "text/html") if (rank!R == 1 || rank!R == 2 &amp;&amp; isSomeChar!(Unqual!(typeof(<code><i>content</i></code>.front.front))) || rank!R == 2 &amp;&amp; is(Unqual!(typeof(<code><i>content</i></code>.front.front)) == ubyte));
+<dt class="decl"><p><code><a name="HTTPRequest.exec.2"></a>HTTPResponse <u>exec</u>(string method = "POST", R)(string <code><i>url</i></code>, R <code><i>content</i></code>, string <code><i>contentType</i></code> = "text/html") if (rank!R == 1 || rank!R == 2 &amp;&amp; isSomeChar!(Unqual!(typeof(<code><i>content</i></code>.front.front))) || rank!R == 2 &amp;&amp; is(Unqual!(typeof(<code><i>content</i></code>.front.front)) == ubyte));
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>POST data from some string(with Content-Length), or from range of strings (use Transfer-Encoding: chunked)
 </p>
@@ -529,7 +532,7 @@ rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red
 </p>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="HTTPRequest.exec.4"></a>HTTPResponse <u>exec</u>(string method = "GET")(string <code><i>url</i></code> = null, string[string] <code><i>params</i></code> = null) if (method != "POST");
+<dt class="decl"><p><code><a name="HTTPRequest.exec.3"></a>HTTPResponse <u>exec</u>(string method = "GET")(string <code><i>url</i></code> = null, QueryParam[] <code><i>params</i></code> = null);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Send request without data
 </p>

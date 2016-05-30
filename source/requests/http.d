@@ -28,7 +28,8 @@ static this() {
 
 static immutable ushort[] redirectCodes = [301, 302, 303];
 
-public alias Cookie = Tuple!(string, "path", string, "domain", string, "attr", string, "value");
+public alias Cookie     = Tuple!(string, "path", string, "domain", string, "attr", string, "value");
+public alias QueryParam = Tuple!(string, "key", string, "value");
 
 static string urlEncoded(string p) pure @safe {
     immutable string[dchar] translationTable = [
@@ -79,6 +80,28 @@ public class BasicAuthentication: Auth {
         return auth;
     }
 }
+///
+///
+///
+public auto queryParams(T...)(T params) pure nothrow @safe
+{
+    static assert (T.length % 2 == 0, "wrong args count");
+    
+    QueryParam[] output;
+    output.reserve = T.length / 2;
+    
+    void queryParamsHelper(T...)(T params, ref QueryParam[] output)
+    {
+        static if (T.length > 0)
+        {
+            output ~= QueryParam(params[0].to!string, params[1].to!string);
+            queryParamsHelper(params[2..$], output);
+        }
+    }
+    
+    queryParamsHelper(params, output);
+    return output;
+}
 
 ///
 /// Response - result of request execution.
@@ -89,7 +112,7 @@ public class BasicAuthentication: Auth {
 /// Response.responseBody - container for received body
 /// Response.history - for redirected responses contain all history
 /// 
-    public class HTTPResponse : Response {
+public class HTTPResponse : Response {
     private {
         string         _status_line;
         string[string] _responseHeaders;
@@ -270,7 +293,7 @@ public struct HTTPRequest {
     /// Build request string.
     /// Handle proxy and query parameters.
     /// 
-    private @property string requestString(string[string] params = null) {
+    private @property string requestString(QueryParam[] params = null) {
         if ( _proxy ) {
             return "%s %s HTTP/1.1\r\n".format(_method, _uri.uri);
         }
@@ -286,15 +309,14 @@ public struct HTTPRequest {
     ///
     /// encode parameters and build query part of the url
     /// 
-    private static string params2query(string[string] params) {
-        auto m = params.keys.
-                        sort().
-                        map!(a=>urlEncoded(a) ~ "=" ~ urlEncoded(params[a])).
-                        join("&");
-        return m;
+    private static string params2query(in QueryParam[] params) pure @safe {
+        return params.
+                map!(a => "%s=%s".format(a.key.urlEncoded, a.value.urlEncoded)).
+                join("&");
     }
+    //
     package unittest {
-        assert(HTTPRequest.params2query(["c ":"d", "a":"b"])=="a=b&c%20=d");
+        assert(params2query(queryParams("a","b", "c", " d "))=="a=b&c=%20d%20");
     }
     ///
     /// Analyze received headers, take appropriate actions:
@@ -492,7 +514,9 @@ public struct HTTPRequest {
             _stream.close();
         }
     }
-    
+    ///
+    /// if we have new uri, then we need to check if we have to reopen existent connection
+    /// 
     private void checkURL(string url, string file=__FILE__, size_t line=__LINE__) {
         if (url is null && _uri.uri == "" ) {
             throw new RequestException("No url configured", file, line);
@@ -647,83 +671,6 @@ public struct HTTPRequest {
         }
         _bodyDecoder.flush();
         _response._responseBody.put(_bodyDecoder.get());
-    }
-    ///
-    /// execute POST request.
-    /// Send form-urlencoded data
-    /// 
-    /// Parameters:
-    ///     url = url to request
-    ///     rqData = data to send
-    ///  Returns:
-    ///     Response
-    ///  Examples:
-    ///  ------------------------------------------------------------------
-    ///  rs = rq.exec!"POST"("http://httpbin.org/post", ["a":"b", "c":"d"]);
-    ///  ------------------------------------------------------------------
-    ///
-    HTTPResponse exec(string method)(string url, string[string] rqData) if (method=="POST") {
-        //
-        // application/x-www-form-urlencoded
-        //
-        _method = method;
-
-        _response = new HTTPResponse;
-        checkURL(url);
-        _response.uri = _uri;
-        _response.finalURI = _uri;
-
-    connect:
-        _response._startedAt = Clock.currTime;
-        setupConnection();
-        
-        if ( !_stream.isConnected() ) {
-            return _response;
-        }
-        _response._connectedAt = Clock.currTime;
-
-        string encoded = params2query(rqData);
-        auto h = requestHeaders();
-        h["Content-Type"] = "application/x-www-form-urlencoded";
-        h["Content-Length"] = to!string(encoded.length);
-
-        Appender!string req;
-        req.put(requestString());
-        h.byKeyValue.
-            map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
-                each!(h => req.put(h));
-        req.put("\r\n");
-        req.put(encoded);
-        trace(req.data);
-
-        if ( _verbosity >= 1 ) {
-            req.data.splitLines.each!(a => writeln("> " ~ a));
-        }
-
-        auto rc = _stream.send(req.data());
-        if ( rc == -1 ) {
-            errorf("Error sending request: ", lastSocketError);
-            return _response;
-        }
-        _response._requestSentAt = Clock.currTime;
-
-        receiveResponse();
-
-        _response._finishedAt = Clock.currTime;
-
-        auto connection = "connection" in _response._responseHeaders;
-        if ( !connection || *connection == "close" ) {
-            tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
-            _stream.close();
-        }
-        if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
-            if ( _method != "GET" ) {
-                return this.get();
-            }
-            goto connect;
-        }
-        _response._history = _history;
-        return _response;
     }
     ///
     /// send file(s) using POST
@@ -972,6 +919,9 @@ public struct HTTPRequest {
         _response._history = _history;
         return _response;
     }
+    HTTPResponse exec(string method="GET")(string url, string[string] params) {
+        return exec!method(url, params.byKeyValue.map!(p => QueryParam(p.key, p.value)).array);
+    }
     ///
     /// Send request without data
     /// Request parameters will be encoded into request string
@@ -985,13 +935,13 @@ public struct HTTPRequest {
     ///     rs = Request().exec!"GET"("http://httpbin.org/get", ["c":"d", "a":"b"]);
     ///  ---------------------------------------------------------------------------------
     ///     
-    HTTPResponse exec(string method="GET")(string url = null, string[string] params = null) if (method != "POST")
-    {
+    HTTPResponse exec(string method="GET")(string url = null, QueryParam[] params = null) {
 
         _method = method;
         _response = new HTTPResponse;
         _history.length = 0;
         bool restartedRequest = false; // True if this is restarted keepAlive request
+        string encoded;
 
         checkURL(url);
         _response.uri = _uri;
@@ -1005,12 +955,26 @@ public struct HTTPRequest {
         }
         _response._connectedAt = Clock.currTime;
 
+        auto h = requestHeaders();
+
         Appender!string req;
-        req.put(requestString(params));
-        requestHeaders().byKeyValue.
+
+        if ( _method == "POST" && params ) {
+            encoded = params2query(params);
+            h["Content-Type"] = "application/x-www-form-urlencoded";
+            h["Content-Length"] = to!string(encoded.length);
+            req.put(requestString());
+        } else {
+            req.put(requestString(params));
+        }
+
+        h.byKeyValue.
             map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
             each!(h => req.put(h));
         req.put("\r\n");
+        if ( encoded ) {
+            req.put(encoded);
+        }
         trace(req.data);
 
         if ( _verbosity >= 1 ) {
@@ -1161,6 +1125,22 @@ package unittest {
         assert(rs.code==200);
         auto data = parseJSON(rs.responseBody.data).object["data"].str;
         assert(data==s);
+    }
+    {
+        info("Check POST from AA");
+        rs = rq.post("http://httpbin.org/post", ["a":"b", "c":"d"]);
+        assert(rs.code==200);
+        auto data = parseJSON(rs.responseBody.data).object["form"].object;
+        assert(data["a"].str == "b");
+        assert(data["c"].str == "d");
+    }
+    {
+        info("Check POST from QueryParams");
+        rs = rq.post("http://httpbin.org/post", queryParams("name[]", "first", "name[]", 2));
+        assert(rs.code==200);
+        auto data = parseJSON(rs.responseBody.data).object["form"].object;
+        assert((data["name[]"].array[0].str == "first"));
+        assert((data["name[]"].array[1].str == "2"));
     }
     // associative array
     rs = rq.post("http://httpbin.org/post", ["a":"b ", "c":"d"]);

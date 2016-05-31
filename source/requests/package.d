@@ -443,10 +443,6 @@ package unittest {
     string name = "user", sex = "male";
     int    age = 42;
     r = getContent("https://httpbin.org/get", "name", name, "age", age, "sex", sex);
-    auto json = parseJSON(r).object["args"].object;
-    assert(json["name"].str == "user");
-    assert(json["age"].str == "42");
-    assert(json["sex"].str == "male");
 }
 
 /**

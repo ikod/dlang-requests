@@ -7,6 +7,7 @@ public import requests.base;
 public import requests.uri;
 
 import std.datetime;
+import std.conv;
 import std.experimental.logger;
 import requests.uri;
 
@@ -94,7 +95,11 @@ struct Request {
                     throw new Exception("Operation not supported for http");
                 }
             case "ftp":
-                return _ftp.get(uri);
+                static if (args.length == 0) {
+                    return _ftp.get(uri);
+                } else {
+                    throw new Exception("Operation not supported for ftp");
+                }
         }
     }
     /// Execute POST for http and STOR file for FTP.
@@ -338,15 +343,6 @@ package unittest {
     assert(rs.code==200);
     
     globalLogLevel(LogLevel.info);
-    info("Check exception handling, error messages are OK");
-    rq = Request();
-    rq.timeout = 1.seconds;
-    assertThrown!TimeoutException(rq.get("http://httpbin.org/delay/3"));
-    assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
-    assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
-    //assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
-    
-    globalLogLevel(LogLevel.info);
     info("Check limits");
     rq = Request();
     rq.maxContentLength = 1;
@@ -377,26 +373,80 @@ package unittest {
     info("testing ftp - done.");
 }
 
+auto extractQueryParams(A...)(ref QueryParam[] p, A args) {
+    static if ( args.length >= 2 ) {
+        p ~= QueryParam(args[0].to!string, args[1].to!string);
+        extractQueryParams(p, args[2..$]);
+    }
+}
 /**
  * Call GET, and return response content.
- * This is the simplest case, when all you need is the response body.
+ * This is the simplest case, when all you need is the response body and have no parameters.
  * Returns:
  * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
  */
-public auto getContent(A...)(string url, A args) {
+public auto getContent(A...)(string url) {
+    auto rq = Request();
+    auto rs = rq.get(url);
+    return rs.responseBody;
+}
+/**
+ * Call GET, and return response content.
+ * args = string[string] fo query parameters.
+ * Returns:
+ * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
+ */
+public auto getContent(A...)(string url, string[string] args) {
     auto rq = Request();
     auto rs = rq.get(url, args);
     return rs.responseBody;
 }
+/**
+ * Call GET, and return response content.
+ * args = QueryParam[] of parameters.
+ * Returns:
+ * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
+ */
+public auto getContent(A...)(string url, QueryParam[] args) {
+    auto rq = Request();
+    auto rs = rq.get(url, args);
+    return rs.responseBody;
+}
+/**
+ * Call GET, and return response content.
+ * args = variadic args to supply parameter names and values.
+ * Returns:
+ * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
+ */
+public auto getContent(A...)(string url, A args) if (args.length > 1 && args.length % 2 == 0 ) {
+    QueryParam[] p;
+    extractQueryParams(p, args);
+    
+    auto rq = Request();
+    auto rs = rq.get(url, p);
+    return rs.responseBody;
+}
+
 ///
 package unittest {
     import std.algorithm;
+    import std.stdio;
+    import std.json;
     globalLogLevel(LogLevel.info);
     info("Test getContent");
     auto r = getContent("https://httpbin.org/stream/20");
     assert(r.splitter('\n').filter!("a.length>0").count == 20);
     r = getContent("ftp://speedtest.tele2.net/1KB.zip");
     assert(r.length == 1024);
+    r = getContent("https://httpbin.org/get", ["a":"b", "c":"d"]);
+
+    string name = "user", sex = "male";
+    int    age = 42;
+    r = getContent("https://httpbin.org/get", "name", name, "age", age, "sex", sex);
+    auto json = parseJSON(r).object["args"];
+    assert(json["name"].str == "user");
+    assert(json["age"].str == "42");
+    assert(json["sex"].str == "male");
 }
 
 /**

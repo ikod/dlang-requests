@@ -30,6 +30,17 @@ void main() {
 ```
 getContent returns Buffer, filled with data. Buffer looks like Appender!ubyte (it have method data()), but also support many Range operations.
 
+If you have to send some parameters to request you can use next simple inrerface:
+```
+    string name = "user";
+    r = getContent("https://httpbin.org/get", "name", name, "age", 42);
+    auto json = parseJSON(r).object["args"];
+    assert(json["name"].str == "user");
+    assert(json["age"].str == "42");
+
+```
+
+
 When you need access to response code, you have to use *Request* and *Response* structures:
 
 ```d

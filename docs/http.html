@@ -460,7 +460,7 @@ tracef(<span style="color:red">"http tests - ok"</span>);
 </table>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="HTTPRequest.exec"></a>HTTPResponse <u>exec</u>(string method = "POST")(string <code><i>url</i></code>, PostFile[] <code><i>files</i></code>);
+<dt class="decl"><p><code><a name="HTTPRequest.exec"></a>HTTPResponse <u>exec</u>(string method = "POST")(string <code><i>url</i></code>, PostFile[] <code><i>files</i></code>) if (method == "POST");
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>send file(s) using POST
 </p>
@@ -492,7 +492,7 @@ rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red
 </dd>
 <dt class="decl"><p><code><a name="HTTPRequest.exec.2"></a>HTTPResponse <u>exec</u>(string method = "POST", R)(string <code><i>url</i></code>, R <code><i>content</i></code>, string <code><i>contentType</i></code> = "text/html") if (rank!R == 1 || rank!R == 2 &amp;&amp; isSomeChar!(Unqual!(typeof(<code><i>content</i></code>.front.front))) || rank!R == 2 &amp;&amp; is(Unqual!(typeof(<code><i>content</i></code>.front.front)) == ubyte));
 </code></p></dt>
-<dd class="decl desc"><div class="sections"><p>POST data from some string(with Content-Length), or from range of strings (use Transfer-Encoding: chunked)
+<dd class="decl desc"><div class="sections"><p>POST/PATH/PUT/... data from some string(with Content-Length), or from range of strings (use Transfer-Encoding: chunked)
 </p>
 <p><h4 class="sec">Parameters:</h4>
 <code><i>url</i></code> = <code><i>url</i></code>
@@ -554,6 +554,11 @@ rs = Request().<u>exec</u>!<span style="color:red">"GET"</span>(<span style="col
 
 </pre>
 </p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="HTTPRequest.exec.4"></a>HTTPResponse <u>exec</u>(string method = "GET")(string <code><i>url</i></code>, string[string] <code><i>params</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>wrappers</p>
 </div>
 </dd>
 <dt class="decl"><p><code><a name="HTTPRequest.get"></a>HTTPResponse <u>get</u>(A...)(A <code><i>args</i></code>);

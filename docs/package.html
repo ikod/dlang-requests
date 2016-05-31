@@ -337,15 +337,6 @@ rs = rq.get(<span style="color:red">"http://httpbin.org/basic-auth/user/passwd"<
 <span style="color:blue">assert</span>(rs.code==200);
 
 globalLogLevel(LogLevel.info);
-info(<span style="color:red">"Check exception handling, error messages are OK"</span>);
-rq = <u>Request</u>();
-rq.timeout = 1.seconds;
-assertThrown!TimeoutException(rq.get(<span style="color:red">"http://httpbin.org/delay/3"</span>));
-assertThrown!ConnectError(rq.get(<span style="color:red">"http://0.0.0.0:65000/"</span>));
-assertThrown!ConnectError(rq.get(<span style="color:red">"http://1.1.1.1/"</span>));
-<span style="color:green">//assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
-</span>
-globalLogLevel(LogLevel.info);
 info(<span style="color:red">"Check limits"</span>);
 rq = <u>Request</u>();
 rq.maxContentLength = 1;
@@ -472,20 +463,55 @@ When arguments do not conform scheme you will receive Exception("Operation not s
 </dd>
 </dl>
 </dd>
-<dt class="decl"><p><code><a name="getContent"></a>auto <u>getContent</u>(A...)(string <code><i>url</i></code>, A <code><i>args</i></code>);
+<dt class="decl"><p><code><a name="getContent"></a>auto <u>getContent</u>(A...)(string <code><i>url</i></code>);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Call GET, and return response content.
- This is the simplest case, when all you need is the response body.
+ This is the simplest case, when all you need is the response body and have no parameters.
+</p>
+<h4 class="sec">Returns:</h4> <p>Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="getContent"></a>auto <u>getContent</u>(A...)(string <code><i>url</i></code>, string[string] <code><i>args</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Call GET, and return response content.
+ <code><i>args</i></code> = string[string] fo query parameters.
+</p>
+<h4 class="sec">Returns:</h4> <p>Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="getContent"></a>auto <u>getContent</u>(A...)(string <code><i>url</i></code>, QueryParam[] <code><i>args</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Call GET, and return response content.
+ <code><i>args</i></code> = QueryParam[] of parameters.
+</p>
+<h4 class="sec">Returns:</h4> <p>Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="getContent"></a>auto <u>getContent</u>(A...)(string <code><i>url</i></code>, A <code><i>args</i></code>) if (<code><i>args</i></code>.length &gt; 1 &amp;&amp; <code><i>args</i></code>.length % 2 == 0);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Call GET, and return response content.
+ <code><i>args</i></code> = variadic <code><i>args</i></code> to supply parameter names and values.
 </p>
 <h4 class="sec">Returns:</h4> <p>Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.</p>
 <h4 class="sec">Examples:</h4> <p><pre class="d_code">
 <span style="color:blue">import</span> std.algorithm;
+<span style="color:blue">import</span> std.stdio;
+<span style="color:blue">import</span> std.json;
 globalLogLevel(LogLevel.info);
 info(<span style="color:red">"Test getContent"</span>);
 <span style="color:blue">auto</span> r = <u>getContent</u>(<span style="color:red">"https://httpbin.org/stream/20"</span>);
 <span style="color:blue">assert</span>(r.splitter('\n').filter!(<span style="color:red">"a.length&gt;0"</span>).count == 20);
 r = <u>getContent</u>(<span style="color:red">"ftp://speedtest.tele2.net/1KB.zip"</span>);
 <span style="color:blue">assert</span>(r.length == 1024);
+r = <u>getContent</u>(<span style="color:red">"https://httpbin.org/get"</span>, [<span style="color:red">"a"</span>:<span style="color:red">"b"</span>, <span style="color:red">"c"</span>:<span style="color:red">"d"</span>]);
+
+string name = <span style="color:red">"user"</span>, sex = <span style="color:red">"male"</span>;
+<span style="color:blue">int</span>    age = 42;
+r = <u>getContent</u>(<span style="color:red">"https://httpbin.org/get"</span>, <span style="color:red">"name"</span>, name, <span style="color:red">"age"</span>, age, <span style="color:red">"sex"</span>, sex);
+<span style="color:blue">auto</span> json = parseJSON(r).object[<span style="color:red">"args"</span>];
+<span style="color:blue">assert</span>(json[<span style="color:red">"name"</span>].str == <span style="color:red">"user"</span>);
+<span style="color:blue">assert</span>(json[<span style="color:red">"age"</span>].str == <span style="color:red">"42"</span>);
+<span style="color:blue">assert</span>(json[<span style="color:red">"sex"</span>].str == <span style="color:red">"male"</span>);
 </pre>
 </p></div>
 </dd>

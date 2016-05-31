@@ -98,7 +98,7 @@ public auto queryParams(T...)(T params) pure nothrow @safe
             queryParamsHelper(params[2..$], output);
         }
     }
-    
+
     queryParamsHelper(params, output);
     return output;
 }
@@ -672,6 +672,12 @@ public struct HTTPRequest {
         _bodyDecoder.flush();
         _response._responseBody.put(_bodyDecoder.get());
     }
+    private bool serverClosedKeepAliveConnection() pure @safe nothrow {
+        return _response._responseHeaders.length == 0 && _keepAlive;
+    }
+    private bool isIdempotent(in string method) pure @safe nothrow {
+        return ["GET", "HEAD"].canFind(method);
+    }
     ///
     /// send file(s) using POST
     /// Parameters:
@@ -688,7 +694,7 @@ public struct HTTPRequest {
     ///    rs = rq.exec!"POST"("http://httpbin.org/post", files);
     /// ---------------------------------------------------------------
     /// 
-    HTTPResponse exec(string method="POST")(string url, PostFile[] files) {
+    HTTPResponse exec(string method="POST")(string url, PostFile[] files) if (method=="POST") {
         import std.uuid;
         import std.file;
         //
@@ -768,17 +774,16 @@ public struct HTTPRequest {
 
         receiveResponse();
 
-        if ( _response._responseHeaders.length == 0 
-            && _keepAlive
+        if ( serverClosedKeepAliveConnection()
             && !restartedRequest
-            && _method == "GET"
-            ) {
+            && isIdempotent(_method)
+        ) {
             tracef("Server closed keepalive connection");
             _stream.close();
             restartedRequest = true;
             goto connect;
         }
-
+        
         _response._finishedAt = Clock.currTime;
         ///
         auto connection = "connection" in _response._responseHeaders;
@@ -797,7 +802,7 @@ public struct HTTPRequest {
         return _response;
     }
     ///
-    /// POST data from some string(with Content-Length), or from range of strings (use Transfer-Encoding: chunked)
+    /// POST/PATH/PUT/... data from some string(with Content-Length), or from range of strings (use Transfer-Encoding: chunked)
     /// 
     /// Parameters:
     ///    url = url
@@ -819,16 +824,15 @@ public struct HTTPRequest {
     ///      rs = rq.exec!"POST"("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
     ///  --------------------------------------------------------------------------------------------------------
     HTTPResponse exec(string method="POST", R)(string url, R content, string contentType="text/html")
-        if ( (rank!R == 1) //isSomeString!R
+        if ( (rank!R == 1)
             || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front)))) 
             || (rank!R == 2 && (is(Unqual!(typeof(content.front.front)) == ubyte)))
-            )
-    {
+        ) {
         //
         // application/json
         //
         bool restartedRequest = false;
-        
+
         _method = method;
         
         _response = new HTTPResponse;
@@ -890,11 +894,10 @@ public struct HTTPRequest {
 
         receiveResponse();
 
-        if ( _response._responseHeaders.length == 0 
-            && _keepAlive
+        if ( serverClosedKeepAliveConnection()
             && !restartedRequest
-            && _method == "GET"
-            ) {
+            && isIdempotent(_method)
+        ) {
             tracef("Server closed keepalive connection");
             _stream.close();
             restartedRequest = true;
@@ -918,9 +921,6 @@ public struct HTTPRequest {
         ///
         _response._history = _history;
         return _response;
-    }
-    HTTPResponse exec(string method="GET")(string url, string[string] params) {
-        return exec!method(url, params.byKeyValue.map!(p => QueryParam(p.key, p.value)).array);
     }
     ///
     /// Send request without data
@@ -975,6 +975,7 @@ public struct HTTPRequest {
         if ( encoded ) {
             req.put(encoded);
         }
+
         trace(req.data);
 
         if ( _verbosity >= 1 ) {
@@ -989,16 +990,16 @@ public struct HTTPRequest {
 
         receiveResponse();
 
-        if ( _response._responseHeaders.length == 0 
-            && _keepAlive
+        if ( serverClosedKeepAliveConnection()
             && !restartedRequest
-            && _method == "GET"
+            && isIdempotent(_method)
         ) {
             tracef("Server closed keepalive connection");
             _stream.close();
             restartedRequest = true;
             goto connect;
         }
+
         _response._finishedAt = Clock.currTime;
 
         ///
@@ -1021,6 +1022,10 @@ public struct HTTPRequest {
         ///
         _response._history = _history;
         return _response;
+    }
+    /// wrappers
+    HTTPResponse exec(string method="GET")(string url, string[string] params) {
+        return exec!method(url, params.byKeyValue.map!(p => QueryParam(p.key, p.value)).array);
     }
     ///
     /// GET request. Simple wrapper over exec!"GET"

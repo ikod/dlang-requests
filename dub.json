@@ -12,6 +12,10 @@
         "docs": {
             "buildOptions": ["syntaxOnly"],
             "dflags" : ["-c", "-Dddocs", "source/requests/viola.ddoc"]
+        },
+        "localtest": {
+            "buildOptions": ["unittests", "debugMode", "debugInfo"],
+            "versions": ["localtest"]
         }
     }
 }

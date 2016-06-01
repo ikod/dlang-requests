@@ -373,11 +373,12 @@ package unittest {
     info("testing ftp - done.");
 }
 
-auto extractQueryParams(A...)(ref QueryParam[] p, A args) {
+auto extractQueryParams(A...)(A args) pure @safe nothrow {
+    QueryParam[] res;
     static if ( args.length >= 2 ) {
-        p ~= QueryParam(args[0].to!string, args[1].to!string);
-        extractQueryParams(p, args[2..$]);
+        res = QueryParam(args[0].to!string, args[1].to!string) ~ extractQueryParams(args[2..$]);
     }
+    return res;
 }
 /**
  * Call GET, and return response content.
@@ -419,12 +420,9 @@ public auto getContent(A...)(string url, QueryParam[] args) {
  * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
  */
 public auto getContent(A...)(string url, A args) if (args.length > 1 && args.length % 2 == 0 ) {
-    QueryParam[] p;
-    extractQueryParams(p, args);
-    
-    auto rq = Request();
-    auto rs = rq.get(url, p);
-    return rs.responseBody;
+    return Request().
+            get(url, extractQueryParams(args)).
+            responseBody;
 }
 
 ///

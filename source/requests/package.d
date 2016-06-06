@@ -132,35 +132,6 @@ struct Request {
 }
 ///
 package unittest {
-    globalLogLevel(LogLevel.info);
-    info("Test get in parallel");
-    import std.stdio;
-    import std.parallelism;
-    import std.algorithm;
-    import std.string;
-    import core.atomic;
-    
-    immutable auto urls = [
-        "http://httpbin.org/stream/10",
-        "https://httpbin.org/stream/20",
-        "http://httpbin.org/stream/30",
-        "https://httpbin.org/stream/40",
-        "http://httpbin.org/stream/50",
-        "https://httpbin.org/stream/60",
-        "http://httpbin.org/stream/70",
-    ];
-    
-    defaultPoolThreads(5);
-    
-    shared short lines;
-    
-    foreach(url; parallel(urls)) {
-        atomicOp!"+="(lines, getContent(url).splitter("\n").count);
-    }
-    assert(lines == 287);
-}
-///
-package unittest {
     import std.algorithm;
     import std.range;
     import std.array;
@@ -441,6 +412,35 @@ package unittest {
     string name = "user", sex = "male";
     int    age = 42;
     r = getContent("https://httpbin.org/get", "name", name, "age", age, "sex", sex);
+}
+///
+package unittest {
+    globalLogLevel(LogLevel.info);
+    info("Test get in parallel");
+    import std.stdio;
+    import std.parallelism;
+    import std.algorithm;
+    import std.string;
+    import core.atomic;
+    
+    immutable auto urls = [
+        "http://httpbin.org/stream/10",
+        "https://httpbin.org/stream/20",
+        "http://httpbin.org/stream/30",
+        "https://httpbin.org/stream/40",
+        "http://httpbin.org/stream/50",
+        "https://httpbin.org/stream/60",
+        "http://httpbin.org/stream/70",
+    ];
+    
+    defaultPoolThreads(5);
+    
+    shared short lines;
+    
+    foreach(url; parallel(urls)) {
+        atomicOp!"+="(lines, getContent(url).splitter("\n").count);
+    }
+    assert(lines == 287);
 }
 
 /**

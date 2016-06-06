@@ -138,5 +138,5 @@ Usage example:
 
 
 ##### For Windows users
-Requests distributed with binary ssl and crypto libraries. These libararies were downloaded from https://slproweb.com/products/Win32OpenSSL.html (full version) and converted using "implib /system" http://ftp.digitalmars.com/bup.zip.
+If building or testing under windows fails with message about ssl, then inslall libssl32.lib and ssleay32.lib into dmd or ldc2 library path. You can find this libs on https://github.com/ikod/dlang-requests/tree/master/lib/win-i386. These libararies were downloaded from https://slproweb.com/products/Win32OpenSSL.html (full version) and converted using "implib /system" http://ftp.digitalmars.com/bup.zip.
 If you know better way to link windows libraries, please, let me know.

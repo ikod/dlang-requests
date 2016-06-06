@@ -127,34 +127,6 @@
  <u>Request</u> has methods get, post and exec which routed to proper concrete handler (http or ftp, etc).
  To enable some protocol-specific featutes you have to use protocol interface directly (see docs for HTTPRequest or FTPRequest)</p>
 <h4 class="sec">Examples:</h4> <p><pre class="d_code">
-globalLogLevel(LogLevel.info);
-info(<span style="color:red">"Test get in parallel"</span>);
-<span style="color:blue">import</span> std.stdio;
-<span style="color:blue">import</span> std.parallelism;
-<span style="color:blue">import</span> std.algorithm;
-<span style="color:blue">import</span> std.string;
-<span style="color:blue">import</span> core.atomic;
-
-<span style="color:blue">immutable</span> <span style="color:blue">auto</span> urls = [
-    <span style="color:red">"http://httpbin.org/stream/10"</span>,
-    <span style="color:red">"https://httpbin.org/stream/20"</span>,
-    <span style="color:red">"http://httpbin.org/stream/30"</span>,
-    <span style="color:red">"https://httpbin.org/stream/40"</span>,
-    <span style="color:red">"http://httpbin.org/stream/50"</span>,
-    <span style="color:red">"https://httpbin.org/stream/60"</span>,
-    <span style="color:red">"http://httpbin.org/stream/70"</span>,
-];
-
-defaultPoolThreads(5);
-
-<span style="color:blue">shared</span> <span style="color:blue">short</span> lines;
-
-<span style="color:blue">foreach</span>(url; parallel(urls)) {
-    atomicOp!<span style="color:red">"+="</span>(lines, getContent(url).splitter(<span style="color:red">"\n"</span>).count);
-}
-<span style="color:blue">assert</span>(lines == 287);
-</pre>
-</p><h4 class="sec">Examples:</h4> <p><pre class="d_code">
 <span style="color:blue">import</span> std.algorithm;
 <span style="color:blue">import</span> std.range;
 <span style="color:blue">import</span> std.array;
@@ -508,6 +480,34 @@ r = <u>getContent</u>(<span style="color:red">"https://httpbin.org/get"</span>, 
 string name = <span style="color:red">"user"</span>, sex = <span style="color:red">"male"</span>;
 <span style="color:blue">int</span>    age = 42;
 r = <u>getContent</u>(<span style="color:red">"https://httpbin.org/get"</span>, <span style="color:red">"name"</span>, name, <span style="color:red">"age"</span>, age, <span style="color:red">"sex"</span>, sex);
+</pre>
+</p><h4 class="sec">Examples:</h4> <p><pre class="d_code">
+globalLogLevel(LogLevel.info);
+info(<span style="color:red">"Test get in parallel"</span>);
+<span style="color:blue">import</span> std.stdio;
+<span style="color:blue">import</span> std.parallelism;
+<span style="color:blue">import</span> std.algorithm;
+<span style="color:blue">import</span> std.string;
+<span style="color:blue">import</span> core.atomic;
+
+<span style="color:blue">immutable</span> <span style="color:blue">auto</span> urls = [
+    <span style="color:red">"http://httpbin.org/stream/10"</span>,
+    <span style="color:red">"https://httpbin.org/stream/20"</span>,
+    <span style="color:red">"http://httpbin.org/stream/30"</span>,
+    <span style="color:red">"https://httpbin.org/stream/40"</span>,
+    <span style="color:red">"http://httpbin.org/stream/50"</span>,
+    <span style="color:red">"https://httpbin.org/stream/60"</span>,
+    <span style="color:red">"http://httpbin.org/stream/70"</span>,
+];
+
+defaultPoolThreads(5);
+
+<span style="color:blue">shared</span> <span style="color:blue">short</span> lines;
+
+<span style="color:blue">foreach</span>(<i>url</i>; parallel(urls)) {
+    atomicOp!<span style="color:red">"+="</span>(lines, <u>getContent</u>(<i>url</i>).splitter(<span style="color:red">"\n"</span>).count);
+}
+<span style="color:blue">assert</span>(lines == 287);
 </pre>
 </p></div>
 </dd>

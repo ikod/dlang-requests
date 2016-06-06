@@ -167,7 +167,7 @@ public struct PostFile {
 /// 
 public interface FiniteReadable {
     /// size of the content
-    abstract size_t  getSize();
+    abstract ulong  getSize();
     /// file-like read()
     abstract ubyte[] read();
 }
@@ -193,7 +193,7 @@ public auto formData(string name, ubyte[] b, string[string] parameters = null) {
 }
 public class FormDataBytes : FiniteReadable {
     private {
-        size_t  _size;
+        ulong   _size;
         ubyte[] _data;
         size_t  _offset;
         bool    _exhausted;
@@ -202,7 +202,7 @@ public class FormDataBytes : FiniteReadable {
         _data = data;
         _size = data.length;
     }
-    final override size_t getSize() {
+    final override ulong getSize() {
         return _size;
     }
     final override ubyte[] read() {
@@ -220,7 +220,7 @@ public class FormDataFile : FiniteReadable {
     import  std.file;
     private {
         File    _fileHandle;
-        size_t  _fileSize;
+        ulong   _fileSize;
         size_t  _processed;
         bool    _exhausted;
     }
@@ -229,7 +229,7 @@ public class FormDataFile : FiniteReadable {
         _fileHandle = file;
         _fileSize = std.file.getSize(file.name);
     }
-    final override size_t  getSize() pure nothrow @safe {
+    final override ulong getSize() pure nothrow @safe {
         return _fileSize;
     }
     final override ubyte[] read() {

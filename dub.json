@@ -5,6 +5,7 @@
 	"authors": ["ikod"],
     "license": "BSL-1.0",
     "libs-posix": ["ssl", "crypto"],
+    "libs-windows": ["libssl32", "libeay32"],
 	"dependencies": {
 	},
     "buildTypes": {

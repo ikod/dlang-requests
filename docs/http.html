@@ -188,6 +188,90 @@ Response.history - for redirected responses contain all history</p>
 </dd>
 </dl>
 </dd>
+<dt class="decl"><p><code><a name="FiniteReadable"></a>interface <u>FiniteReadable</u>;
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>This is File-like interface for sending data to multipart fotms
+</p>
+</div>
+<h3 class="memb">Members:</h3>
+  <dl><dt class="decl"><p><code><a name="FiniteReadable.getSize"></a>abstract size_t <u>getSize</u>();
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>size of the content</p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="FiniteReadable.read"></a>abstract ubyte[] <u>read</u>();
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>file-like <u>read</u>()</p>
+</div>
+</dd>
+</dl>
+</dd>
+<dt class="decl"><p><code><a name="formData"></a>auto <u>formData</u>(string <code><i>name</i></code>, File <code><i>f</i></code>, string[string] <code><i>parameters</i></code> = null);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Helper to create form elements from File.
+</p>
+<h4 class="sec">Parameters:</h4>
+  <table class="params"><tr><td class="paramname"><code>string <code><i>name</i></code></code></td>
+<td class="paramdesc"><p><code><i>name</i></code> of the field in form</p></td></tr>
+<tr><td class="paramname"><code>File <code><i>f</i></code></code></td>
+<td class="paramdesc"><p>opened std.stio.File to send to server</p></td></tr>
+<tr><td class="paramname"><code>string[string] <code><i>parameters</i></code></code></td>
+<td class="paramdesc"><p>optional <code><i>parameters</i></code> (most important are "filename" and "Content-Type")</p></td></tr>
+</table>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="formData"></a>auto <u>formData</u>(string <code><i>name</i></code>, ubyte[] <code><i>b</i></code>, string[string] <code><i>parameters</i></code> = null);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>Helper to create form elements from ubyte[].
+</p>
+<h4 class="sec">Parameters:</h4>
+  <table class="params"><tr><td class="paramname"><code>string <code><i>name</i></code></code></td>
+<td class="paramdesc"><p><code><i>name</i></code> of the field in form</p></td></tr>
+<tr><td class="paramname"><code>ubyte[] <code><i>b</i></code></code></td>
+<td class="paramdesc"><p>data to send to server</p></td></tr>
+<tr><td class="paramname"><code>string[string] <code><i>parameters</i></code></code></td>
+<td class="paramdesc"><p>optional <code><i>parameters</i></code> (can be "filename" and "Content-Type")</p></td></tr>
+</table>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="MultipartForm"></a>struct <u>MultipartForm</u>;
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>This struct used to bulld POST's to forms.
+</p>
+<h4 class="sec">Examples:</h4> <p><pre class="d_code">
+<span style="color:blue">import</span> std.file;
+<span style="color:blue">import</span> std.path;
+globalLogLevel(LogLevel.info);
+info(<span style="color:red">"Check POST files"</span>);
+<span style="color:green">/// preapare files
+</span><span style="color:blue">auto</span> tmpd = tempDir();
+<span style="color:blue">auto</span> tmpfname1 = tmpd ~ dirSeparator ~ <span style="color:red">"request_test1.txt"</span>;
+<span style="color:blue">auto</span> f = File(tmpfname1, <span style="color:red">"wb"</span>);
+f.rawWrite(<span style="color:red">"file1 content\n"</span>);
+f.close();
+<span style="color:blue">auto</span> tmpfname2 = tmpd ~ dirSeparator ~ <span style="color:red">"request_test2.txt"</span>;
+f = File(tmpfname2, <span style="color:red">"wb"</span>);
+f.rawWrite(<span style="color:red">"file2 content\n"</span>);
+f.close();
+<span style="color:green">///
+</span><span style="color:green">/// files ready, send them.
+</span><span style="color:green">/// 
+</span>File f1 = File(tmpfname1, <span style="color:red">"rb"</span>);
+File f2 = File(tmpfname2, <span style="color:red">"rb"</span>);
+<span style="color:blue">scope</span>(exit) {
+    f1.close();
+    f2.close();
+}
+<u>MultipartForm</u> form = <u>MultipartForm</u>().
+    add(formData(<span style="color:red">"Field1"</span>, <span style="color:blue">cast</span>(<span style="color:blue">ubyte</span>[])<span style="color:red">"form field from memory"</span>)).
+    add(formData(<span style="color:red">"Field2"</span>, <span style="color:blue">cast</span>(<span style="color:blue">ubyte</span>[])<span style="color:red">"file field from memory"</span>, [<span style="color:red">"filename"</span>:<span style="color:red">"data2"</span>])).
+    add(formData(<span style="color:red">"File1"</span>, f1, [<span style="color:red">"filename"</span>:<span style="color:red">"file1"</span>, <span style="color:red">"Content-Type"</span>: <span style="color:red">"application/octet-stream"</span>])).
+    add(formData(<span style="color:red">"File2"</span>, f2, [<span style="color:red">"filename"</span>:<span style="color:red">"file2"</span>, <span style="color:red">"Content-Type"</span>: <span style="color:red">"application/octet-stream"</span>]));
+<span style="color:blue">auto</span> rq = HTTPRequest();
+<span style="color:blue">auto</span> rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, form);
+</pre>
+</p></div>
+</dd>
 <dt class="decl"><p><code><a name="HTTPRequest"></a>struct <u>HTTPRequest</u>;
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Request.
@@ -460,37 +544,7 @@ tracef(<span style="color:red">"http tests - ok"</span>);
 </table>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="HTTPRequest.exec"></a>HTTPResponse <u>exec</u>(string method = "POST")(string <code><i>url</i></code>, PostFile[] <code><i>files</i></code>) if (method == "POST");
-</code></p></dt>
-<dd class="decl desc"><div class="sections"><p>send file(s) using POST
-</p>
-<p><h4 class="sec">Parameters:</h4>
-<code><i>url</i></code> = <code><i>url</i></code>
-</p><p>
-
-<code><i>files</i></code> = array of PostFile structures
-
-</p>
-<h4 class="sec">Returns:</h4> <p>Response
-
-</p>
-<p><h4 class="sec">Example:</h4>
-<pre class="d_code">
-PostFile[] <i>files</i> = [
-
-{fileName:<span style="color:red">"tests/abc.txt"</span>, fieldName:<span style="color:red">"abc"</span>, contentType:<span style="color:red">"application/octet-stream"</span>},
-
-{fileName:<span style="color:red">"tests/test.txt"</span>}
-
-];
-
-rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red">"http://httpbin.org/post"</span>, <i>files</i>);
-
-</pre>
-</p>
-</div>
-</dd>
-<dt class="decl"><p><code><a name="HTTPRequest.exec.2"></a>HTTPResponse <u>exec</u>(string method = "POST", R)(string <code><i>url</i></code>, R <code><i>content</i></code>, string <code><i>contentType</i></code> = "text/html") if (rank!R == 1 || rank!R == 2 &amp;&amp; isSomeChar!(Unqual!(typeof(<code><i>content</i></code>.front.front))) || rank!R == 2 &amp;&amp; is(Unqual!(typeof(<code><i>content</i></code>.front.front)) == ubyte));
+<dt class="decl"><p><code><a name="HTTPRequest.exec"></a>HTTPResponse <u>exec</u>(string method = "POST", R)(string <code><i>url</i></code>, R <code><i>content</i></code>, string <code><i>contentType</i></code> = "text/html") if (rank!R == 1 || rank!R == 2 &amp;&amp; isSomeChar!(Unqual!(typeof(<code><i>content</i></code>.front.front))) || rank!R == 2 &amp;&amp; is(Unqual!(typeof(<code><i>content</i></code>.front.front)) == ubyte));
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>POST/PATH/PUT/... data from some string(with Content-Length), or from range of strings (use Transfer-Encoding: chunked)
 </p>
@@ -532,7 +586,7 @@ rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red
 </p>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="HTTPRequest.exec.3"></a>HTTPResponse <u>exec</u>(string method = "GET")(string <code><i>url</i></code> = null, QueryParam[] <code><i>params</i></code> = null);
+<dt class="decl"><p><code><a name="HTTPRequest.exec.2"></a>HTTPResponse <u>exec</u>(string method = "GET")(string <code><i>url</i></code> = null, QueryParam[] <code><i>params</i></code> = null);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Send request without data
 </p>
@@ -556,9 +610,37 @@ rs = Request().<u>exec</u>!<span style="color:red">"GET"</span>(<span style="col
 </p>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="HTTPRequest.exec.4"></a>HTTPResponse <u>exec</u>(string method = "GET")(string <code><i>url</i></code>, string[string] <code><i>params</i></code>);
+<dt class="decl"><p><code><a name="HTTPRequest.exec.3"></a>HTTPResponse <u>exec</u>(string method = "POST")(string <code><i>url</i></code>, PostFile[] <code><i>files</i></code>) if (method == "POST");
 </code></p></dt>
-<dd class="decl desc"><div class="sections"><p>wrappers</p>
+<dd class="decl desc"><div class="sections"><p>WRAPPERS
+</p>
+<p>send file(s) using POST
+
+</p>
+<p><h4 class="sec">Parameters:</h4>
+<code><i>url</i></code> = <code><i>url</i></code>
+</p><p>
+
+<code><i>files</i></code> = array of PostFile structures
+
+</p>
+<h4 class="sec">Returns:</h4> <p>Response
+
+</p>
+<p><h4 class="sec">Example:</h4>
+<pre class="d_code">
+PostFile[] <i>files</i> = [
+
+{fileName:<span style="color:red">"tests/abc.txt"</span>, fieldName:<span style="color:red">"abc"</span>, contentType:<span style="color:red">"application/octet-stream"</span>},
+
+{fileName:<span style="color:red">"tests/test.txt"</span>}
+
+];
+
+rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red">"http://httpbin.org/post"</span>, <i>files</i>);
+
+</pre>
+</p>
 </div>
 </dd>
 <dt class="decl"><p><code><a name="HTTPRequest.get"></a>HTTPResponse <u>get</u>(A...)(A <code><i>args</i></code>);

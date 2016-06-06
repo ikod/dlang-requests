@@ -37,6 +37,25 @@ If you have to send some parameters with request, then you can use next simple i
 
 ```
 
+The simple way to upload content is postContent() API call.
+
+Posting to forms using x-form/x-www-form-urlencoded:
+```
+postContent("http://httpbin.org/post", queryParams("first", "a", "second", 2));
+```
+
+Using multipart/form-data (also upload files to forms, see examples in unitests for HTTPRequest):
+```
+MultipartForm form;
+form.add(formData("greeting", cast(ubyte[])"hello"));
+postContent("http://httpbin.org/post", form);
+```
+
+If you do not need upload to form, then you can post from range(see more examples in section HTTPRequest).
+
+```
+postContent("http://httpbin.org/post", `{"a":"b", "c":1}`, "application/json");
+```
 
 When you need access to response code, you have to use *Request* and *Response* structures:
 

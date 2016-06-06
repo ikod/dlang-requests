@@ -508,10 +508,6 @@ r = <u>getContent</u>(<span style="color:red">"https://httpbin.org/get"</span>, 
 string name = <span style="color:red">"user"</span>, sex = <span style="color:red">"male"</span>;
 <span style="color:blue">int</span>    age = 42;
 r = <u>getContent</u>(<span style="color:red">"https://httpbin.org/get"</span>, <span style="color:red">"name"</span>, name, <span style="color:red">"age"</span>, age, <span style="color:red">"sex"</span>, sex);
-<span style="color:blue">auto</span> json = parseJSON(r).object[<span style="color:red">"args"</span>];
-<span style="color:blue">assert</span>(json[<span style="color:red">"name"</span>].str == <span style="color:red">"user"</span>);
-<span style="color:blue">assert</span>(json[<span style="color:red">"age"</span>].str == <span style="color:red">"42"</span>);
-<span style="color:blue">assert</span>(json[<span style="color:red">"sex"</span>].str == <span style="color:red">"male"</span>);
 </pre>
 </p></div>
 </dd>
@@ -521,12 +517,35 @@ r = <u>getContent</u>(<span style="color:red">"https://httpbin.org/get"</span>, 
 <h4 class="sec">Examples:</h4> <p><pre class="d_code">
 <span style="color:blue">import</span> std.json;
 <span style="color:blue">import</span> std.string;
+<span style="color:blue">import</span> std.stdio;
 globalLogLevel(LogLevel.info);
 info(<span style="color:red">"Test postContent"</span>);
 <span style="color:blue">auto</span> r = <u>postContent</u>(<span style="color:red">"http://httpbin.org/post"</span>, <span style="color:red">`{"a":"b", "c":1}`</span>, <span style="color:red">"application/json"</span>);
 <span style="color:blue">assert</span>(parseJSON(r.data).object[<span style="color:red">"json"</span>].object[<span style="color:red">"c"</span>].integer == 1);
+
+<span style="color:green">/// ftp upload from range
+</span>info(<span style="color:red">"Test postContent ftp"</span>);
 r = <u>postContent</u>(<span style="color:red">"ftp://speedtest.tele2.net/upload/TEST.TXT"</span>, <span style="color:red">"test, ignore please\n"</span>.representation);
 <span style="color:blue">assert</span>(r.length == 0);
+
+<span style="color:green">/// Posting to forms (for small data)
+</span><span style="color:green">///
+</span><span style="color:green">/// posting query parameters using "application/x-www-form-urlencoded"
+</span>info(<span style="color:red">"Test postContent using query params"</span>);
+<u>postContent</u>(<span style="color:red">"http://httpbin.org/post"</span>, queryParams(<span style="color:red">"first"</span>, <span style="color:red">"a"</span>, <span style="color:red">"second"</span>, 2));
+
+<span style="color:green">/// posting using multipart/form-data (large data and files). See docs fot HTTPRequest
+</span>info(<span style="color:red">"Test postContent form"</span>);
+MultipartForm form;
+form.add(formData(<span style="color:green">/* field name */</span> <span style="color:red">"greeting"</span>, <span style="color:green">/* content */</span> <span style="color:blue">cast</span>(<span style="color:blue">ubyte</span>[])<span style="color:red">"hello"</span>));
+<u>postContent</u>(<span style="color:red">"http://httpbin.org/post"</span>, form);
+
+<span style="color:green">/// you can do this using Request struct to access response details
+</span>info(<span style="color:red">"Test postContent form via Request()"</span>);
+<span style="color:blue">auto</span> rq = Request();
+form = MultipartForm().add(formData(<span style="color:green">/* field name */</span> <span style="color:red">"greeting"</span>, <span style="color:green">/* content */</span> <span style="color:blue">cast</span>(<span style="color:blue">ubyte</span>[])<span style="color:red">"hello"</span>));
+<span style="color:blue">auto</span> rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, form);
+<span style="color:blue">assert</span>(rs.code == 200);
 </pre>
 </p></div>
 </dd>

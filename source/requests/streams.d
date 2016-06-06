@@ -16,6 +16,9 @@ import std.zlib;
 import std.datetime;
 import std.socket;
 
+pragma(lib, "ssl");
+pragma(lib, "crypto");
+
 alias InDataHandler = DataPipeIface!ubyte;
 
 public class ConnectError: Exception {

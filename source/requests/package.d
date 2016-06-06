@@ -373,10 +373,10 @@ package unittest {
     info("testing ftp - done.");
 }
 
-auto extractQueryParams(A...)(A args) pure @safe nothrow {
+auto queryParams(A...)(A args) pure @safe nothrow {
     QueryParam[] res;
     static if ( args.length >= 2 ) {
-        res = QueryParam(args[0].to!string, args[1].to!string) ~ extractQueryParams(args[2..$]);
+        res = QueryParam(args[0].to!string, args[1].to!string) ~ queryParams(args[2..$]);
     }
     return res;
 }
@@ -421,7 +421,7 @@ public auto getContent(A...)(string url, QueryParam[] args) {
  */
 public auto getContent(A...)(string url, A args) if (args.length > 1 && args.length % 2 == 0 ) {
     return Request().
-            get(url, extractQueryParams(args)).
+            get(url, queryParams(args)).
             responseBody;
 }
 
@@ -456,11 +456,34 @@ public auto postContent(A...)(string url, A args) {
 package unittest {
     import std.json;
     import std.string;
+    import std.stdio;
     globalLogLevel(LogLevel.info);
     info("Test postContent");
     auto r = postContent("http://httpbin.org/post", `{"a":"b", "c":1}`, "application/json");
     assert(parseJSON(r.data).object["json"].object["c"].integer == 1);
+
+    /// ftp upload from range
+    info("Test postContent ftp");
     r = postContent("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
     assert(r.length == 0);
+
+    /// Posting to forms (for small data)
+    ///
+    /// posting query parameters using "application/x-www-form-urlencoded"
+    info("Test postContent using query params");
+    postContent("http://httpbin.org/post", queryParams("first", "a", "second", 2));
+
+    /// posting using multipart/form-data (large data and files). See docs fot HTTPRequest
+    info("Test postContent form");
+    MultipartForm form;
+    form.add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
+    postContent("http://httpbin.org/post", form);
+
+    /// you can do this using Request struct to access response details
+    info("Test postContent form via Request()");
+    auto rq = Request();
+    form = MultipartForm().add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
+    auto rs = rq.post("http://httpbin.org/post", form);
+    assert(rs.code == 200);
 }
 

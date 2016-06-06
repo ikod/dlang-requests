@@ -26,10 +26,11 @@ static this() {
     globalLogLevel(LogLevel.error);
 }
 
-static immutable ushort[] redirectCodes = [301, 302, 303];
-
 public alias Cookie     = Tuple!(string, "path", string, "domain", string, "attr", string, "value");
 public alias QueryParam = Tuple!(string, "key", string, "value");
+
+static immutable ushort[] redirectCodes = [301, 302, 303];
+enum defaultBufferSize = 16*1024;
 
 static string urlEncoded(string p) pure @safe {
     immutable string[dchar] translationTable = [
@@ -162,6 +163,147 @@ public struct PostFile {
     string contentType;
 }
 ///
+/// This is File-like interface for sending data to multipart fotms
+/// 
+public interface FiniteReadable {
+    /// size of the content
+    abstract size_t  getSize();
+    /// file-like read()
+    abstract ubyte[] read();
+}
+///
+/// Helper to create form elements from File.
+/// Params:
+/// name = name of the field in form
+/// f = opened std.stio.File to send to server
+/// parameters = optional parameters (most important are "filename" and "Content-Type")
+/// 
+public auto formData(string name, File f, string[string] parameters = null) {
+    return MultipartForm.FormData(name, new FormDataFile(f), parameters);
+}
+///
+/// Helper to create form elements from ubyte[].
+/// Params:
+/// name = name of the field in form
+/// b = data to send to server
+/// parameters = optional parameters (can be "filename" and "Content-Type")
+/// 
+public auto formData(string name, ubyte[] b, string[string] parameters = null) {
+    return MultipartForm.FormData(name, new FormDataBytes(b), parameters);
+}
+public class FormDataBytes : FiniteReadable {
+    private {
+        size_t  _size;
+        ubyte[] _data;
+        size_t  _offset;
+        bool    _exhausted;
+    }
+    this(ubyte[] data) {
+        _data = data;
+        _size = data.length;
+    }
+    final override size_t getSize() {
+        return _size;
+    }
+    final override ubyte[] read() {
+        enforce( !_exhausted, "You can't read froum exhausted source" );
+        size_t toRead = min(defaultBufferSize, _size - _offset);
+        auto result = _data[_offset.._offset+toRead];
+        _offset += toRead;
+        if ( toRead == 0 ) {
+            _exhausted = true;
+        }
+        return result;
+    }
+}
+public class FormDataFile : FiniteReadable {
+    import  std.file;
+    private {
+        File    _fileHandle;
+        size_t  _fileSize;
+        size_t  _processed;
+        bool    _exhausted;
+    }
+    this(File file) {
+        import std.file;
+        _fileHandle = file;
+        _fileSize = std.file.getSize(file.name);
+    }
+    final override size_t  getSize() pure nothrow @safe {
+        return _fileSize;
+    }
+    final override ubyte[] read() {
+        enforce( !_exhausted, "You can't read froum exhausted source" );
+        auto b = new ubyte[defaultBufferSize];
+        auto r = _fileHandle.rawRead(b);
+        auto toRead = min(r.length, _fileSize - _processed);
+        if ( toRead == 0 ) {
+            _exhausted = true;
+        }
+        _processed += toRead;
+        return r[0..toRead];
+    }
+}
+///
+/// This struct used to bulld POST's to forms.
+/// 
+public struct MultipartForm {
+    package struct FormData {
+        FiniteReadable  input;
+        string          name;
+        string[string]  parameters;
+        this(string name, FiniteReadable i, string[string] parameters = null) {
+            this.input = i;
+            this.name = name;
+            this.parameters = parameters;
+        }
+    }
+
+    private FormData[] _sources;
+    auto add(FormData d) {
+        _sources ~= d;
+        return this;
+    }
+    auto add(string name, FiniteReadable i, string[string]parameters = null) {
+        _sources ~= FormData(name, i, parameters);
+        return this;
+    }
+}
+///
+package unittest {
+    import std.file;
+    import std.path;
+    globalLogLevel(LogLevel.info);
+    info("Check POST files");
+    /// preapare files
+    auto tmpd = tempDir();
+    auto tmpfname1 = tmpd ~ dirSeparator ~ "request_test1.txt";
+    auto f = File(tmpfname1, "wb");
+    f.rawWrite("file1 content\n");
+    f.close();
+    auto tmpfname2 = tmpd ~ dirSeparator ~ "request_test2.txt";
+    f = File(tmpfname2, "wb");
+    f.rawWrite("file2 content\n");
+    f.close();
+    ///
+    /// files ready, send them.
+    /// 
+    File f1 = File(tmpfname1, "rb");
+    File f2 = File(tmpfname2, "rb");
+    scope(exit) {
+        f1.close();
+        f2.close();
+    }
+    MultipartForm form = MultipartForm().
+        add(formData("Field1", cast(ubyte[])"form field from memory")).
+        add(formData("Field2", cast(ubyte[])"file field from memory", ["filename":"data2"])).
+        add(formData("File1", f1, ["filename":"file1", "Content-Type": "application/octet-stream"])).
+        add(formData("File2", f2, ["filename":"file2", "Content-Type": "application/octet-stream"]));
+    auto rq = HTTPRequest();
+    auto rs = rq.post("http://httpbin.org/post", form);
+}
+
+///
 /// Request.
 /// Configurable parameters:
 /// $(B method) - string, method to use (GET, POST, ...)
@@ -195,7 +337,7 @@ public struct HTTPRequest {
         string         _proxy;
         uint           _verbosity = 0;  // 0 - no output, 1 - headers, 2 - headers+body info
         Duration       _timeout = 30.seconds;
-        size_t         _bufferSize = 16*1024; // 16k
+        size_t         _bufferSize = defaultBufferSize; // 16k
 
         SocketStream   _stream;
         HTTPResponse   _response;
@@ -678,23 +820,8 @@ public struct HTTPRequest {
     private bool isIdempotent(in string method) pure @safe nothrow {
         return ["GET", "HEAD"].canFind(method);
     }
-    ///
-    /// send file(s) using POST
-    /// Parameters:
-    ///     url = url
-    ///     files = array of PostFile structures
-    /// Returns:
-    ///     Response
-    /// Example:
-    /// ---------------------------------------------------------------
-    ///    PostFile[] files = [
-    ///                   {fileName:"tests/abc.txt", fieldName:"abc", contentType:"application/octet-stream"}, 
-    ///                   {fileName:"tests/test.txt"}
-    ///               ];
-    ///    rs = rq.exec!"POST"("http://httpbin.org/post", files);
-    /// ---------------------------------------------------------------
-    /// 
-    HTTPResponse exec(string method="POST")(string url, PostFile[] files) if (method=="POST") {
+
+    HTTPResponse exec(string method="POST")(string url, MultipartForm sources) if (method=="POST") {
         import std.uuid;
         import std.file;
         //
@@ -708,7 +835,7 @@ public struct HTTPRequest {
         checkURL(url);
         _response.uri = _uri;
         _response.finalURI = _uri;
- 
+        
     connect:
         _response._startedAt = Clock.currTime;
         setupConnection();
@@ -717,67 +844,77 @@ public struct HTTPRequest {
             return _response;
         }
         _response._connectedAt = Clock.currTime;
-
+        
         Appender!string req;
         req.put(requestString());
         
         string   boundary = randomUUID().toString;
         string[] partHeaders;
         size_t   contentLength;
-
-        foreach(part; files) {
-            string fieldName = part.fieldName ? part.fieldName : part.fileName;
+        
+        foreach(ref part; sources._sources) {
             string h = "--" ~ boundary ~ "\r\n";
-            h ~= `Content-Disposition: form-data; name="%s"; filename="%s"`.
-                format(fieldName, part.fileName) ~ "\r\n";
-            if ( part.contentType ) {
-                h ~= "Content-Type: " ~ part.contentType ~ "\r\n";
+            string disposition = "form-data; name=%s".format(part.name);
+            string optionals = part.
+                parameters.byKeyValue().
+                filter!(p => p.key!="Content-Type").
+                map!   (p => "%s=%s".format(p.key, p.value)).
+                join("; ");
+
+            h ~= `Content-Disposition: ` ~ [disposition, optionals].join("; ") ~ "\r\n";
+
+            auto contentType = "Content-Type" in part.parameters;
+            if ( contentType ) {
+                h ~= "Content-Type: " ~ *contentType ~ "\r\n";
             }
+
             h ~= "\r\n";
             partHeaders ~= h;
-            contentLength += h.length + getSize(part.fileName) + "\r\n".length;
+            contentLength += h.length + part.input.getSize() + "\r\n".length;
         }
         contentLength += "--".length + boundary.length + "--\r\n".length;
-
+        
         auto h = requestHeaders();
         h["Content-Type"] = "multipart/form-data; boundary=" ~ boundary;
         h["Content-Length"] = to!string(contentLength);
         h.byKeyValue.
             map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
-            each!(h => req.put(h));
+                each!(h => req.put(h));
         req.put("\r\n");
         
         trace(req.data);
         if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
-
+        
         auto rc = _stream.send(req.data());
         if ( rc == -1 ) {
             errorf("Error sending request: ", lastSocketError);
             return _response;
         }
-        foreach(hdr, f; zip(partHeaders, files)) {
+        foreach(ref source; sources._sources) {
+            auto hdr = partHeaders.front;
+            partHeaders.popFront;
             tracef("sending part headers <%s>", hdr);
             _stream.send(hdr);
-            auto file = File(f.fileName, "rb");
-            scope(exit) {
-                file.close();
-            }
-            foreach(chunk; file.byChunk(16*1024)) {
+            while (true) {
+                auto chunk = source.input.read();
+                if ( chunk.length <= 0 ) {
+                    break;
+                }
                 _stream.send(chunk);
             }
             _stream.send("\r\n");
         }
         _stream.send("--" ~ boundary ~ "--\r\n");
         _response._requestSentAt = Clock.currTime;
-
+        
         receiveResponse();
-
+        
         if ( serverClosedKeepAliveConnection()
             && !restartedRequest
             && isIdempotent(_method)
-        ) {
+            ) {
             tracef("Server closed keepalive connection");
             _stream.close();
             restartedRequest = true;
@@ -1023,7 +1160,39 @@ public struct HTTPRequest {
         _response._history = _history;
         return _response;
     }
-    /// wrappers
+
+    /// WRAPPERS
+
+    ///
+    /// send file(s) using POST
+    /// Parameters:
+    ///     url = url
+    ///     files = array of PostFile structures
+    /// Returns:
+    ///     Response
+    /// Example:
+    /// ---------------------------------------------------------------
+    ///    PostFile[] files = [
+    ///                   {fileName:"tests/abc.txt", fieldName:"abc", contentType:"application/octet-stream"}, 
+    ///                   {fileName:"tests/test.txt"}
+    ///               ];
+    ///    rs = rq.exec!"POST"("http://httpbin.org/post", files);
+    /// ---------------------------------------------------------------
+    /// 
+    HTTPResponse exec(string method="POST")(string url, PostFile[] files) if (method=="POST") {
+        MultipartForm multipart;
+        File[]        toClose;
+        foreach(ref f; files) {
+            File file = File(f.fileName, "rb");
+            toClose ~= file;
+            string fileName = f.fileName ? f.fileName : f.fieldName;
+            string contentType = f.contentType ? f.contentType : "application/octetstream";
+            multipart.add(f.fieldName, new FormDataFile(file), ["filename":fileName, "Content-Type": contentType]);
+        }
+        auto res = exec!"POST"(url, multipart);
+        toClose.each!"a.close";
+        return res;
+    }
     HTTPResponse exec(string method="GET")(string url, string[string] params) {
         return exec!method(url, params.byKeyValue.map!(p => QueryParam(p.key, p.value)).array);
     }

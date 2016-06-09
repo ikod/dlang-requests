@@ -77,6 +77,7 @@ The easy way to post with Requests is *postContent*. There are several way to po
  1. Post to web-form using "form-urlencode" - for posting short data.
  2. Post to web-form using multipart - for large data and file uploads.
  3.  Post data to server without forms.
+
 #### Form-urlencode ####
 Call postContent in the same way as getContent with parameters:
 ```d
@@ -253,7 +254,7 @@ For example to authorize with Basic authorization use next code:
     rq.authenticator = new BasicAuthentication("user", "passwd");
     rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
 ```
-Here is short descrition of some Request options:
+Here is short descrition of some Request options, you can set:
 
 | name             | type           | meaning                                | default    |
 |------------------|----------------|----------------------------------------|------------|
@@ -266,6 +267,69 @@ Here is short descrition of some Request options:
 | verbosity        | uint           | verbosity level (0, 1 or 2)            | 0          |
 | proxy            | string         | url of the http proxy                  | null       |
 | headers          | string[string] | additional headers                     | null       |
+| useStreaming     | bool           | receive data as lazy InputRange        | false      |
+| cookie           | Cookie[]       | cookies you will send to server        | null       |
+| authenticator    | Auth           | authenticatior                         | null       |
+Request() properties you can read:
+
+| name             | type           | meaning                                             |
+| cookie           | Cookie[]       | cookie, server sent to us                           |
+| contentLength    | long           | current document content Length or -1 if unknown    |
+| contentReceived  | long           | content recived                                     |
+
+contentLength and contentReceived can be used to monitor streaming response:
+
+```d
+import std.stdio;
+import requests;
+
+void main()
+{
+    auto rq = Request();
+    rq.useStreaming = true;
+    rq.verbosity = 2;
+    auto rs = rq.get("http://httpbin.org/image/jpeg");
+    auto stream = rs.contentIterator();
+    while(!stream.empty) {
+        writefln("Received %d bytes, total received %d from document legth %d", stream.front.length, rq.contentReceived, rq.contentLength);
+        stream.popFront;
+    }
+}
+```
+Produce console output:
+```
+> GET /image/jpeg HTTP/1.1
+> Connection: Keep-Alive
+> User-Agent: dlang-requests
+> Accept-Encoding: gzip, deflate
+> Host: httpbin.org
+>
+< HTTP/1.1 200 OK
+< server: nginx
+< date: Thu, 09 Jun 2016 16:25:57 GMT
+< content-type: image/jpeg
+< content-length: 35588
+< connection: keep-alive
+< access-control-allow-origin: *
+< access-control-allow-credentials: true
+< 1232 bytes of body received
+< 1448 bytes of body received
+Received 2680 bytes, total received 2680 from document legth 35588
+Received 2896 bytes, total received 5576 from document legth 35588
+Received 2896 bytes, total received 8472 from document legth 35588
+Received 2896 bytes, total received 11368 from document legth 35588
+Received 1448 bytes, total received 12816 from document legth 35588
+Received 1448 bytes, total received 14264 from document legth 35588
+Received 1448 bytes, total received 15712 from document legth 35588
+Received 2896 bytes, total received 18608 from document legth 35588
+Received 2896 bytes, total received 21504 from document legth 35588
+Received 2896 bytes, total received 24400 from document legth 35588
+Received 1448 bytes, total received 25848 from document legth 35588
+Received 2896 bytes, total received 28744 from document legth 35588
+Received 2896 bytes, total received 31640 from document legth 35588
+Received 2896 bytes, total received 34536 from document legth 35588
+Received 1052 bytes, total received 35588 from document legth 35588
+```
 
 You can use *requests* in parallel tasks (but you can't share single *Request* structure between threads):
 ```

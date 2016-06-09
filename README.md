@@ -10,54 +10,233 @@ HTTP requests library with goals:
 
 API docs: [Wiki](https://github.com/ikod/dlang-requests/wiki)
 
-In simplest scenario you just need to fetch and process document from remote site. In this case you can call getContent
+###Make a simple Request###
+
+Making http/https/ftp request with dlang-requests is very simple. First of all install and import *requests* module:
 ```d
-import std.stdio;
-import std.algorithm;
 import requests;
-
-pragma(lib, "ssl");
-pragma(lib, "crypto");
-
-void main() {
-    writeln(
-        getContent("https://httpbin.org/")
-        .splitter('\n')
-        .filter!("a.length>0")
-        .count
-    );
-}
 ```
-getContent returns Buffer, filled with data. Buffer looks like Appender!ubyte (it have method data()), but also support many Range operations.
-
-If you have to send some parameters with request, then you can use next simple inrerface:
+Now, if all we need is content of some webpage, then we can call getContent to receive it:
+```d
+auto content = getContent("http://httpbin.org/");
 ```
-    string name = "user";
-    r = getContent("https://httpbin.org/get", "name", name, "age", 42);
-
+*getContent* fetch complete document to buffer and return this buffer to the caller. *content* can be converted to string, or can be used as range. For example, if you need to count lines in *content*, you can directly apply *splitter* and *count*:
+```d
+writeln(content.splitter('\n').count);
 ```
-
-The simple way to upload content is postContent() API call.
-
-Posting to forms using x-form/x-www-form-urlencoded:
+or count non-empty lines:
+```d
+writeln(content.splitter('\n').filter!"a!=``".count);
 ```
-postContent("http://httpbin.org/post", queryParams("first", "a", "second", 2));
+ Actually buffer is *ForwardRange* with *length* and *random access*, so you can apply many algorithms directly to it. Or you can extract data in form of ubyte[], using method data:
+```d
+ubyte[] data = content.data;
 ```
+###Request with Parameters ###
 
-Using multipart/form-data (also upload files to forms, see examples in unitests for HTTPRequest):
+Requests propose simple way to make request with parameters. For example you have to simulate a search query for person: **name** - person name, **age** - person age, and so on... You can pass all parameters to get using *queryParams()* helper:
+```d
+auto content = getContent("http://httpbin.org/get", queryParams("name", "any name", "age", 42));
 ```
-MultipartForm form;
-form.add(formData("greeting", cast(ubyte[])"hello"));
-postContent("http://httpbin.org/post", form);
+If you check httpbin response, you will see that server recognized all parameters:
+```d
+    {
+      "args": {
+        "age": "42",
+        "name": "any name"
+      },
+      "headers": {
+        "Accept-Encoding": "gzip, deflate",
+        "Host": "httpbin.org",
+        "User-Agent": "dlang-requests"
+      },
+      "origin": "xxx.xxx.xxx.xxx",
+      "url": "http://httpbin.org/get?name=any name&age=42"
+    }
 ```
+Or, you can pass dictionary:
+```d
+auto content = getContent("http://httpbin.org/get", ["name": "any name", "age": "42"]);
+```
+Which give you the same response.
 
-If you do not need upload to form, then you can post from range(see more examples in section HTTPRequest).
+### If getContent fails###
 
-```
-postContent("http://httpbin.org/post", `{"a":"b", "c":1}`, "application/json");
-```
+ *getContent()* (and any other API call) can throw exceptions:
 
-When you need access to response code, you have to use *Request* and *Response* structures:
+ * *ConnectError* when we can't connect to document origin for some reason (can't resolve name, connection refused,...)   
+ * *TimeoutException* when any single operation *connect, receive, send* timed out.  
+ * *ErrnoException* when we geceive ErrnoException from
+   any underlying call.
+ * *RequestException* in case in some other
+   cases.
+
+###Posting data to server###
+The easy way to post with Requests is *postContent*. There are several way to post data to server:
+
+ 1. Post to web-form using "form-urlencode" - for posting short data.
+ 2. Post to web-form using multipart - for large data and file uploads.
+ 3.  Post data to server without forms.
+#### Form-urlencode ####
+Call postContent in the same way as getContent with parameters:
+```d
+    $ cat e.d; ./e
+    import std.stdio;
+    import requests;
+    
+    pragma(lib, "ssl");
+    pragma(lib, "crypto");
+    
+    void main() {
+        auto content = postContent("http://httpbin.org/post", queryParams("name", "any name", "age", 42));
+        writeln(content);
+    }
+```
+Output:
+```
+    {
+      "args": {},
+      "data": "",
+      "files": {},
+      "form": {
+        "age": "42",
+        "name": "any name"
+      },
+      "headers": {
+        "Accept-Encoding": "gzip, deflate",
+        "Content-Length": "22",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Host": "httpbin.org",
+        "User-Agent": "dlang-requests"
+      },
+      "json": null,
+      "origin": "xxx.xxx.xxx.xxx",
+      "url": "http://httpbin.org/post"
+    }
+```
+#### Multipart form ####
+Posting multipart forms required MultipartForm structure to be prepared:
+```d
+    import std.stdio;
+    import std.conv;
+    import std.string;
+    import requests;
+    
+    pragma(lib, "ssl");
+    pragma(lib, "crypto");
+    
+    void main() {
+        MultipartForm form;
+        form.add(formData("name", "any name"));
+        form.add(formData("age", to!string(42)));
+        form.add(formData("raw data", "some bytes".dup.representation));
+        auto content = postContent("http://httpbin.org/post", form);
+        writeln("Output:");
+        writeln(content);
+    }
+    Output:
+    {
+      "args": {},
+      "data": "",
+      "files": {},
+      "form": {
+        "age": "42",
+        "name": "any name",
+        "raw data": "some bytes"
+      },
+      "headers": {
+        "Accept-Encoding": "gzip, deflate",
+        "Content-Length": "332",
+        "Content-Type": "multipart/form-data; boundary=e3beab0d-d240-4ec1-91bb-d47b08af5999",
+        "Host": "httpbin.org",
+        "User-Agent": "dlang-requests"
+      },
+      "json": null,
+      "origin": "xxx.xxx.xxx.xxx",
+      "url": "http://httpbin.org/post"
+    }
+```
+Here is example on posting file:
+```d
+    import std.stdio;
+    import std.conv;
+    import std.string;
+    import requests;
+    
+    void main() {
+        MultipartForm form;
+        form.add(formData("file", File("test.txt", "rb"), ["filename":"test.txt", "Content-Type": "text/plain"]));
+        form.add(formData("age", "42"));
+        auto content = postContent("http://httpbin.org/post", form);
+    
+        writeln("Output:");
+        writeln(content);
+    }
+    Output:
+    {
+      "args": {},
+      "data": "",
+      "files": {
+        "file": "this is test file\n"
+      },
+      "form": {
+        "age": "42"
+      },
+      "headers": {
+        "Accept-Encoding": "gzip, deflate",
+        "Content-Length": "282",
+        "Content-Type": "multipart/form-data; boundary=3fd7317f-7082-4d63-82e2-16cfeaa416b4",
+        "Host": "httpbin.org",
+        "User-Agent": "dlang-requests"
+      },
+      "json": null,
+      "origin": "xxx.xxx.xxx.xxx",
+      "url": "http://httpbin.org/post"
+    }
+```
+#### Posting raw data without forms ####
+*postContent()* can post from InputRanges. For example to post file content:
+```d
+    import std.stdio;
+    import requests;
+    
+    pragma(lib, "ssl");
+    pragma(lib, "crypto");
+    
+    void main() {
+        auto f = File("test.txt", "rb");
+        auto content = postContent("http://httpbin.org/post", f.byChunk(5), "application/binary");
+        writeln("Output:");
+        writeln(content);
+    }
+   
+    Output:
+    {
+      "args": {},
+      "data": "this is test file\n",
+      "files": {},
+      "form": {},
+      "headers": {
+        "Accept-Encoding": "gzip, deflate",
+        "Content-Length": "18",
+        "Content-Type": "application/binary",
+        "Host": "httpbin.org",
+        "User-Agent": "dlang-requests"
+      },
+      "json": null,
+      "origin": "xxx.xxx.xxx.xxx",
+      "url": "http://httpbin.org/post"
+    }
+```
+Or if your keep your data in memory, then just use something like this:
+```d
+auto content = postContent("http://httpbin.org/post", "ABCDEFGH", "application/binary");
+```
+That is all details about simple API with default request parameters. Next section will describe a lower level interface through *Request* structure.
+
+### Request() structure ###
+
+When you need access to response code, or configure request details you have to use *Request* and *Response* structures:
 
 ```d
 Request rq = Request();
@@ -65,14 +244,28 @@ Response rs = rq.get("https://httpbin.org/");
 assert(rs.code==200);
 ```
 
-For anything other than default, you can configure *Request* structure for keep-alive, redirects, headers, or for different io-buffer and maximum sizes of response headers and body.
+For anything other than default, you can configure *Request* structure for keep-alive, redirects, headers, o
+r for different io-buffer and maximum sizes of response headers and body.
 
 For example to authorize with Basic authorization use next code:
-```c
+```d
     rq = Request();
     rq.authenticator = new BasicAuthentication("user", "passwd");
     rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
 ```
+Here is short descrition of some Request options:
+
+| name             | type           | meaning                                | default    |
+|------------------|----------------|----------------------------------------|------------|
+| keepAlive        | bool           | request keepalive connection           | false      |
+| maxRedirects     | uint           | maximum redirect depth                 | 10         |
+| maxHeadersLength | size_t         | max.acceptable response headers length | 32KB       |
+| maxContentLength | size_t         | max.acceptable content length          | 5MB        |
+| timeout          | Duration       | timeout on connect or data transfer    | 30.seconds |
+| bufferSize       | size_t         | socket io buffer size                  | 16KB       |
+| verbosity        | uint           | verbosity level (0, 1 or 2)            | 0          |
+| proxy            | string         | url of the http proxy                  | null       |
+| headers          | string[string] | additional headers                     | null       |
 
 You can use *requests* in parallel tasks (but you can't share single *Request* structure between threads):
 ```
@@ -92,51 +285,15 @@ immutable auto urls = [
     "http://httpbin.org/stream/70",
 ];
 
-void main() {    
+void main() {
     defaultPoolThreads(5);
 
     shared short lines;
-    
+
     foreach(url; parallel(urls)) {
         atomicOp!"+="(lines, getContent(url).splitter("\n").count);
     }
     assert(lines == 287);
 }
 ```
-Here is short descrition of some Request options:
 
-| name             | type           | meaning                                | default    |
-|------------------|----------------|----------------------------------------|------------|
-| keepAlive        | bool           | request keepalive connection           | false      |
-| maxRedirects     | uint           | maximum redirect depth                 | 10         |
-| maxHeadersLength | size_t         | max.acceptable response headers length | 32KB       |
-| maxContentLength | size_t         | max.acceptable content length          | 5MB        |
-| timeout          | Duration       | timeout on connect or data transfer    | 30.seconds |
-| bufferSize       | size_t         | socket io buffer size                  | 16KB       |
-| verbosity        | uint           | verbosity level (0, 1 or 2)            | 0          |
-| proxy            | string         | url of the http proxy                  | null       |
-| headers          | string[string] | additional headers                     | null       |
-
-Usage example:
-```d
- auto rq = Request();
- auto rs = rq.get("http://httpbin.org/");
- writeln(rs.responseBody.data!string);
-
- rq.keepAlive = true;
- rs = rq.post("http://httpbin.org/post", `{"a":"b", "c":[1,2,3]}`, "application/json");
- assert(rs.code==200);
-
- auto f = File("tests/test.txt", "rb");
- rs = rq.post("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
- assert(rs.code==200);
- auto data = parseJSON(rs.responseBody.data).object["data"].str;
- assert(data=="abcdefgh\n12345678\n");
- f.close();
-
-```
-
-
-##### For Windows users
-If building or testing under windows fails with message about ssl, then inslall libssl32.lib and ssleay32.lib into dmd or ldc2 library path. You can find this libs on https://github.com/ikod/dlang-requests/tree/master/lib/win-i386. These libararies were downloaded from https://slproweb.com/products/Win32OpenSSL.html (full version) and converted using "implib /system" http://ftp.digitalmars.com/bup.zip.
-If you know better way to link windows libraries, please, let me know.

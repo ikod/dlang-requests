@@ -432,6 +432,21 @@ package unittest {
     string name = "user", sex = "male";
     int    age = 42;
     r = getContent("https://httpbin.org/get", "name", name, "age", age, "sex", sex);
+
+    info("Test contentIterator with GET");
+    auto rq = Request();
+    rq.useStreaming = true;
+    rq.bufferSize = 16;
+    auto rs = rq.get("http://httpbin.org/get");
+    auto stream = rs.contentIterator();
+    ubyte[] streamedContent;
+    while( !stream.empty() ) {
+        streamedContent ~= stream.front;
+        stream.popFront();
+    }
+    rq = Request();
+    rs = rq.get("http://httpbin.org/get");
+    assert(streamedContent == rs.responseBody.data);
 }
 ///
 package unittest {
@@ -477,6 +492,8 @@ package unittest {
     import std.json;
     import std.string;
     import std.stdio;
+    import std.range;
+
     globalLogLevel(LogLevel.info);
     info("Test postContent");
     auto r = postContent("http://httpbin.org/post", `{"a":"b", "c":1}`, "application/json");
@@ -505,5 +522,22 @@ package unittest {
     form = MultipartForm().add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
     auto rs = rq.post("http://httpbin.org/post", form);
     assert(rs.code == 200);
+
+    info("Test contentIterator with POST");
+    rq = Request();
+    rq.useStreaming = true;
+    rq.bufferSize = 16;
+    string s = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    rs = rq.post("http://httpbin.org/post", s.representation.chunks(10), "application/octet-stream");
+    auto stream = rs.contentIterator();
+    ubyte[] streamedContent;
+    while( !stream.empty() ) {
+        streamedContent ~= stream.front;
+        stream.popFront();
+    }
+    rq = Request();
+    rs = rq.post("http://httpbin.org/post", s.representation.chunks(10), "application/octet-stream");
+    assert(streamedContent == rs.responseBody.data);
+
 }
 

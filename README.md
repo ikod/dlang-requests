@@ -270,9 +270,12 @@ Here is short descrition of some Request options, you can set:
 | useStreaming     | bool           | receive data as lazy InputRange        | false      |
 | cookie           | Cookie[]       | cookies you will send to server        | null       |
 | authenticator    | Auth           | authenticatior                         | null       |
+
+
 Request() properties you can read:
 
 | name             | type           | meaning                                             |
+|------------------|----------------|-----------------------------------------------------|
 | cookie           | Cookie[]       | cookie, server sent to us                           |
 | contentLength    | long           | current document content Length or -1 if unknown    |
 | contentReceived  | long           | content recived                                     |

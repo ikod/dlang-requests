@@ -77,6 +77,26 @@ struct Request {
     @property Cookie[] cookie()  pure @nogc nothrow {
         return _http.cookie;
     }
+    @property void useStreaming(bool v) pure @nogc nothrow {
+        _http.useStreaming = v;
+        _ftp.useStreaming = v;
+    }
+    @property long contentReceived() pure @nogc nothrow {
+        final switch ( _uri.scheme ) {
+            case "http", "https":
+                return _http.contentReceived;
+            case "ftp":
+                return _ftp.contentReceived;
+        }
+    }
+    @property long contentLength() pure @nogc nothrow {
+        final switch ( _uri.scheme ) {
+            case "http", "https":
+                return _http.contentLength;
+            case "ftp":
+                return _ftp.contentLength;
+        }
+    }
     /// Execute GET for http and retrieve file for FTP.
     /// You have to provide at least $(B uri). All other arguments should conform to HTTPRequest.get or FTPRequest.get depending on the URI scheme.
     /// When arguments do not conform scheme (for example you try to call get("ftp://somehost.net/pub/README", {"a":"b"}) which doesn't make sense)

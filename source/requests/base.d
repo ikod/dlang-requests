@@ -10,14 +10,39 @@ public class RequestException: Exception {
     }
 }
 
+public struct ContentIterator {
+    bool empty() {
+        return data.length == 0;
+    };
+    ubyte[] front() {
+        return data.data;
+    };
+    void popFront() {
+        if ( read ) {
+            // get new portion
+            data = read();
+        } else {
+            // we can't read any new data
+            data = Buffer!(ubyte).init;
+        }
+    };
+    package {
+        bool            activated;
+        Buffer!ubyte    data;
+        Buffer!ubyte    delegate() read;
+        ubyte[]         b;
+    }
+}
+
 public class Response {
     package {
-        ushort         _code;
-        Buffer!ubyte   _responseBody;
+        ushort           _code;
+        Buffer!ubyte     _responseBody;
         /// Initial URI
-        URI            _uri;
+        URI              _uri;
         /// Final URI. Can differ from __URI if request go through redirections.
-        URI            _finalURI;
+        URI              _finalURI;
+        ContentIterator  _contentIterator;
         mixin(Setter!ushort("code"));
         mixin(Setter!URI("uri"));
         mixin(Setter!URI("finalURI"));
@@ -27,5 +52,8 @@ public class Response {
     mixin(Getter!URI("finalURI"));
     @property auto responseBody() pure @safe nothrow {
         return _responseBody;
+    }
+    @property auto ref contentIterator() pure @safe nothrow {
+        return _contentIterator;
     }
 }

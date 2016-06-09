@@ -191,6 +191,9 @@ public auto formData(string name, File f, string[string] parameters = null) {
 public auto formData(string name, ubyte[] b, string[string] parameters = null) {
     return MultipartForm.FormData(name, new FormDataBytes(b), parameters);
 }
+public auto formData(string name, string b, string[string] parameters = null) {
+    return MultipartForm.FormData(name, new FormDataBytes(b.dup.representation), parameters);
+}
 public class FormDataBytes : FiniteReadable {
     private {
         ulong   _size;
@@ -338,15 +341,18 @@ public struct HTTPRequest {
         uint           _verbosity = 0;  // 0 - no output, 1 - headers, 2 - headers+body info
         Duration       _timeout = 30.seconds;
         size_t         _bufferSize = defaultBufferSize; // 16k
+        bool           _useStreaming; // return iterator instead of completed request
 
         SocketStream   _stream;
-        HTTPResponse   _response;
         HTTPResponse[] _history; // redirects history
         DataPipe!ubyte _bodyDecoder;
         DecodeChunked  _unChunker;
-        ptrdiff_t      _contentLength;
+        long           _contentLength;
+        long           _contentReceived;
         Cookie[]       _cookie;
     }
+    package HTTPResponse   _response;
+
     mixin(Getter_Setter!string   ("method"));
     mixin(Getter_Setter!bool     ("keepAlive"));
     mixin(Getter_Setter!size_t   ("maxContentLength"));
@@ -357,6 +363,9 @@ public struct HTTPRequest {
     mixin(Getter_Setter!string   ("proxy"));
     mixin(Getter_Setter!Duration ("timeout"));
     mixin(Setter!Auth            ("authenticator"));
+    mixin(Getter_Setter!bool     ("useStreaming"));
+    mixin(Getter!long            ("contentLength"));
+    mixin(Getter!long            ("contentReceived"));
 
     @property final void cookie(Cookie[] s) pure @safe @nogc nothrow {
         _cookie = s;
@@ -471,7 +480,7 @@ public struct HTTPRequest {
         auto contentLength = "content-length" in headers;
         if ( contentLength ) {
             try {
-                _contentLength = to!ptrdiff_t(*contentLength);
+                _contentLength = to!long(*contentLength);
                 if ( _maxContentLength && _contentLength > _maxContentLength) {
                     throw new RequestException("ContentLength > maxContentLength (%d>%d)".
                                 format(_contentLength, _maxContentLength));
@@ -710,14 +719,16 @@ public struct HTTPRequest {
         _bodyDecoder = new DataPipe!ubyte();
         auto b = new ubyte[_bufferSize];
         scope(exit) {
-            _bodyDecoder = null;
-            _unChunker = null;
-            b = null;
+            if ( !_useStreaming ) {
+                _bodyDecoder = null;
+                _unChunker = null;
+                b = null;
+            }
         }
 
         auto buffer = Buffer!ubyte();
         Buffer!ubyte ResponseHeaders, partialBody;
-        size_t receivedBodyLength;
+//        size_t receivedBodyLength;
         ptrdiff_t read;
         string separator;
         
@@ -754,13 +765,14 @@ public struct HTTPRequest {
                 auto s = buffer.data!(ubyte[]).findSplit(separator);
                 ResponseHeaders = Buffer!ubyte(s[0]);
                 partialBody = Buffer!ubyte(s[2]);
-                receivedBodyLength += partialBody.length;
+                _contentReceived += partialBody.length;
                 parseResponseHeaders(ResponseHeaders);
                 break;
             }
         }
         
         analyzeHeaders(_response._responseHeaders);
+
         _bodyDecoder.put(partialBody);
 
         if ( _verbosity >= 2 ) {
@@ -773,14 +785,66 @@ public struct HTTPRequest {
         }
 
         while( true ) {
-            if ( _contentLength >= 0 && receivedBodyLength >= _contentLength ) {
+            if ( _contentLength >= 0 && _contentReceived >= _contentLength ) {
                 trace("Body received.");
                 break;
             }
             if ( _unChunker && _unChunker.done ) {
                 break;
             }
+            if ( _useStreaming && _response._responseBody.length && !redirectCodes.canFind(_response.code) ) {
+                trace("streaming requested");
+                _response.contentIterator.activated = true;
+                _response.contentIterator.data = _response._responseBody;
+                _response.contentIterator.b = new ubyte[_bufferSize];
+                _response.contentIterator.read = delegate Buffer!ubyte () {
+                    Buffer!ubyte result;
+                    while(true) {
+                        // check if we received everything we need
+                        if ( ( _unChunker && _unChunker.done )
+                            || !_stream.isOpen() 
+                            || (_contentLength > 0 && _contentReceived >= _contentLength) ) 
+                        {
+                            trace("streaming_in receive completed");
+                            _bodyDecoder.flush();
+                            result = Buffer!ubyte(_bodyDecoder.get());
+                            break;
+                        }
+                        // have to continue
+                        read = _stream.receive(_response.contentIterator.b);
+                        tracef("streaming_in received %d bytes", read);
+                        if ( read < 0 ) {
+                            version(Posix) {
+                                if ( errno == EINTR ) {
+                                    continue;
+                                }
+                            }
+                            throw new RequestException("streaming_in error reading from socket");
+                        }
+
+                        if ( read == 0 ) {
+                            tracef("streaming_in: server closed connection");
+                            _bodyDecoder.flush();
+                            result = Buffer!ubyte(_bodyDecoder.get());
+                            break;
+                        }
+
+                        _contentReceived += read;
+                        _bodyDecoder.put(_response.contentIterator.b[0..read].dup);
+                        result = Buffer!ubyte(_bodyDecoder.get());
+                        if ( result.length ) {
+                            tracef("return %d bytes: %s", _response.contentIterator.data.length, _response.contentIterator.data.toString);
+                            break;
+                        }
+                    }
+                    return result;
+                };
+                // we prepared for streaming
+                return;
+            }
+
             read = _stream.receive(b);
+
             if ( read < 0 ) {
                 version(Posix) {
                     if ( errno == EINTR ) {
@@ -800,15 +864,15 @@ public struct HTTPRequest {
                 trace("read done");
                 break;
             }
-            receivedBodyLength += read;
-            if ( _maxContentLength && receivedBodyLength > _maxContentLength ) {
+            _contentReceived += read;
+            if ( _maxContentLength && _contentReceived > _maxContentLength ) {
                 throw new RequestException("ContentLength > maxContentLength (%d>%d)".
                     format(_contentLength, _maxContentLength));
             }
 
             _bodyDecoder.put(b[0..read].dup);
             _response._responseBody.put(_bodyDecoder.get());
-            tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", receivedBodyLength, _contentLength, _response._responseBody.length);
+            tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", _contentReceived, _contentLength, _response._responseBody.length);
 
         }
         _bodyDecoder.flush();
@@ -835,7 +899,8 @@ public struct HTTPRequest {
         checkURL(url);
         _response.uri = _uri;
         _response.finalURI = _uri;
-        
+        _contentReceived = 0;
+
     connect:
         _response._startedAt = Clock.currTime;
         setupConnection();
@@ -911,6 +976,15 @@ public struct HTTPRequest {
         
         receiveResponse();
         
+        if ( _useStreaming ) {
+            if ( _response._contentIterator.activated ) {
+                trace("streaming_in activated");
+                return _response;
+            } else {
+                _response._contentIterator.data = _response.responseBody;
+            }
+        }
+
         if ( serverClosedKeepAliveConnection()
             && !restartedRequest
             && isIdempotent(_method)
@@ -976,6 +1050,7 @@ public struct HTTPRequest {
         checkURL(url);
         _response.uri = _uri;
         _response.finalURI = _uri;
+        _contentReceived = 0;
 
     connect:
         _response._startedAt = Clock.currTime;
@@ -1031,6 +1106,15 @@ public struct HTTPRequest {
 
         receiveResponse();
 
+        if ( _useStreaming ) {
+            if ( _response._contentIterator.activated ) {
+                trace("streaming_in activated");
+                return _response;
+            } else {
+                _response._contentIterator.data = _response.responseBody;
+            }
+        }
+
         if ( serverClosedKeepAliveConnection()
             && !restartedRequest
             && isIdempotent(_method)
@@ -1083,6 +1167,8 @@ public struct HTTPRequest {
         checkURL(url);
         _response.uri = _uri;
         _response.finalURI = _uri;
+        _contentReceived = 0;
+
     connect:
         _response._startedAt = Clock.currTime;
         setupConnection();
@@ -1127,6 +1213,14 @@ public struct HTTPRequest {
 
         receiveResponse();
 
+        if ( _useStreaming ) {
+            if ( _response._contentIterator.activated ) {
+                trace("streaming_in activated");
+                return _response;
+            } else {
+                _response._contentIterator.data = _response.responseBody;
+            }
+        }
         if ( serverClosedKeepAliveConnection()
             && !restartedRequest
             && isIdempotent(_method)

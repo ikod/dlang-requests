@@ -36,16 +36,21 @@ public struct FTPRequest {
         Duration      _timeout = 60.seconds;
         uint          _verbosity = 0;
         size_t        _bufferSize = 16*1024; // 16k
-        size_t        _maxContentLength;
-        size_t        _contentLength;
+        long          _maxContentLength = 5*1024*1024*1024;
+        long          _contentLength = -1;
+        long          _contentReceived;
         SocketStream  _controlChannel;
         string[]      _responseHistory;
         FTPResponse   _response;
+        bool          _useStreaming;
     }
     mixin(Getter_Setter!Duration("timeout"));
     mixin(Getter_Setter!uint("verbosity"));
     mixin(Getter_Setter!size_t("bufferSize"));
-    mixin(Getter_Setter!size_t("maxContentLength"));
+    mixin(Getter_Setter!long("maxContentLength"));
+    mixin(Getter_Setter!bool("useStreaming"));
+    mixin(Getter!long("contentLength"));
+    mixin(Getter!long("contentReceived"));
 
     @property final string[] responseHistory() @safe @nogc nothrow {
         return _responseHistory;
@@ -297,6 +302,13 @@ public struct FTPRequest {
             _response.code = code;
             return _response;
         }
+
+        code = sendCmdGetResponse("TYPE I\r\n");
+        if ( code/100 > 2 ) {
+            _response.code = code;
+            return _response;
+        }
+        
         code = sendCmdGetResponse("SIZE " ~ baseName(_uri.path) ~ "\r\n");
         if ( code/100 == 2 ) {
             // something like 
@@ -304,7 +316,7 @@ public struct FTPRequest {
             auto s = _responseHistory[$-1].findSplitAfter(" ");
             if ( s.length ) {
                 try {
-                    _contentLength = to!size_t(s[1]);
+                    _contentLength = to!long(s[1]);
                 } catch (ConvException) {
                     trace("Failed to convert string %s to file size".format(s[1]));
                 }
@@ -339,18 +351,12 @@ public struct FTPRequest {
         
         auto dataStream = new TCPSocketStream();
         scope (exit ) {
-            if ( dataStream !is null ) {
+            if ( dataStream !is null && !_response._contentIterator.activated ) {
                 dataStream.close();
             }
         }
         
         dataStream.connect(host, port, _timeout);
-        
-        code = sendCmdGetResponse("TYPE I\r\n");
-        if ( code/100 > 2 ) {
-            _response.code = code;
-            return _response;
-        }
         
         code = sendCmdGetResponse("RETR " ~ baseName(_uri.path) ~ "\r\n");
         if ( code/100 > 1 ) {
@@ -364,11 +370,57 @@ public struct FTPRequest {
                 trace("done");
                 break;
             }
+            _contentReceived += rc;
             tracef("got %d bytes from data channel", rc);
             _response._responseBody.put(b[0..rc]);
 
             if ( _maxContentLength && _response._responseBody.length >= _maxContentLength ) {
                 throw new RequestException("maxContentLength exceeded for ftp data");
+            }
+            if ( _useStreaming ) {
+                _response.contentIterator.activated = true;
+                _response.contentIterator.data = _response._responseBody;
+                _response.contentIterator.b = new ubyte[_bufferSize];
+                _response.contentIterator.read = delegate Buffer!ubyte () {
+                    Buffer!ubyte result;
+                    while(true) {
+                        // check if we received everything we need
+                        if ( _contentReceived >= _maxContentLength ) 
+                        {
+                            throw new RequestException("ContentLength > maxContentLength (%d>%d)".
+                                format(_contentLength, _maxContentLength));
+                        }
+                        // have to continue
+                        auto read = dataStream.receive(_response.contentIterator.b);
+                        tracef("streaming_in received %d bytes", read);
+                        if ( read < 0 ) {
+                            version(Posix) {
+                                if ( errno == EINTR ) {
+                                    continue;
+                                }
+                            }
+                            throw new RequestException("streaming_in error reading from socket");
+                        }
+                        if ( read == 0 ) {
+                            tracef("streaming_in: server closed connection");
+                            dataStream.close();
+                            code = responseToCode(serverResponse());
+                            if ( code/100 == 2 ) {
+                                tracef("Successfully received %d bytes", _response._responseBody.length);
+                            }
+                            _response.code = code;
+                            break;
+                        }
+                        _contentReceived += read;
+                        result = Buffer!ubyte(_response.contentIterator.b[0..read].dup);
+                        if ( result.length ) {
+                            tracef("return %d bytes", result.length);
+                            break;
+                        }
+                    }
+                    return result;
+                };
+                return _response;
             }
         }
         dataStream.close();

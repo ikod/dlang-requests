@@ -30,7 +30,7 @@ public alias Cookie     = Tuple!(string, "path", string, "domain", string, "attr
 public alias QueryParam = Tuple!(string, "key", string, "value");
 
 static immutable ushort[] redirectCodes = [301, 302, 303];
-enum defaultBufferSize = 16*1024;
+enum defaultBufferSize = 2000;
 
 static string urlEncoded(string p) pure @safe {
     immutable string[dchar] translationTable = [
@@ -517,6 +517,7 @@ public struct HTTPRequest {
     /// 
     private void parseResponseHeaders(ref Buffer!ubyte buffer) {
         string lastHeader;
+
         foreach(line; buffer.data!(string).split("\n").map!(l => l.stripRight)) {
             if ( ! _response.status_line.length ) {
                 tracef("statusLine: %s", line);
@@ -728,7 +729,6 @@ public struct HTTPRequest {
 
         auto buffer = Buffer!ubyte();
         Buffer!ubyte ResponseHeaders, partialBody;
-//        size_t receivedBodyLength;
         ptrdiff_t read;
         string separator;
         
@@ -794,10 +794,9 @@ public struct HTTPRequest {
             }
             if ( _useStreaming && _response._responseBody.length && !redirectCodes.canFind(_response.code) ) {
                 trace("streaming requested");
-                _response.contentIterator.activated = true;
-                _response.contentIterator.data = _response._responseBody;
-                _response.contentIterator.b = new ubyte[_bufferSize];
-                _response.contentIterator.read = delegate Buffer!ubyte () {
+                _response.receiveAsRange.activated = true;
+                _response.receiveAsRange.data = _response._responseBody;
+                _response.receiveAsRange.read = delegate Buffer!ubyte () {
                     Buffer!ubyte result;
                     while(true) {
                         // check if we received everything we need
@@ -811,7 +810,8 @@ public struct HTTPRequest {
                             break;
                         }
                         // have to continue
-                        read = _stream.receive(_response.contentIterator.b);
+                        b = new ubyte[_bufferSize];
+                        read = _stream.receive(b);
                         tracef("streaming_in received %d bytes", read);
                         if ( read < 0 ) {
                             version(Posix) {
@@ -830,10 +830,12 @@ public struct HTTPRequest {
                         }
 
                         _contentReceived += read;
-                        _bodyDecoder.put(_response.contentIterator.b[0..read].dup);
+                        Buffer!ubyte buffer;
+                        buffer.putNoCopy(b[0..read]);
+                        _bodyDecoder.put(buffer);
                         result = Buffer!ubyte(_bodyDecoder.get());
                         if ( result.length ) {
-                            tracef("return %d bytes: %s", _response.contentIterator.data.length, _response.contentIterator.data.toString);
+                            tracef("return %d bytes: %s", _response.receiveAsRange.data.length, _response.receiveAsRange.data.toString);
                             break;
                         }
                     }
@@ -843,6 +845,7 @@ public struct HTTPRequest {
                 return;
             }
 
+            b = new ubyte[_bufferSize];
             read = _stream.receive(b);
 
             if ( read < 0 ) {
@@ -870,7 +873,7 @@ public struct HTTPRequest {
                     format(_contentLength, _maxContentLength));
             }
 
-            _bodyDecoder.put(b[0..read].dup);
+            _bodyDecoder.put(b[0..read]);
             _response._responseBody.put(_bodyDecoder.get());
             tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", _contentReceived, _contentLength, _response._responseBody.length);
 
@@ -899,9 +902,9 @@ public struct HTTPRequest {
         checkURL(url);
         _response.uri = _uri;
         _response.finalURI = _uri;
-        _contentReceived = 0;
 
     connect:
+        _contentReceived = 0;
         _response._startedAt = Clock.currTime;
         setupConnection();
         
@@ -977,11 +980,11 @@ public struct HTTPRequest {
         receiveResponse();
         
         if ( _useStreaming ) {
-            if ( _response._contentIterator.activated ) {
+            if ( _response._receiveAsRange.activated ) {
                 trace("streaming_in activated");
                 return _response;
             } else {
-                _response._contentIterator.data = _response.responseBody;
+                _response._receiveAsRange.data = _response.responseBody;
             }
         }
 
@@ -1050,9 +1053,9 @@ public struct HTTPRequest {
         checkURL(url);
         _response.uri = _uri;
         _response.finalURI = _uri;
-        _contentReceived = 0;
 
     connect:
+        _contentReceived = 0;
         _response._startedAt = Clock.currTime;
         setupConnection();
         
@@ -1107,11 +1110,11 @@ public struct HTTPRequest {
         receiveResponse();
 
         if ( _useStreaming ) {
-            if ( _response._contentIterator.activated ) {
+            if ( _response._receiveAsRange.activated ) {
                 trace("streaming_in activated");
                 return _response;
             } else {
-                _response._contentIterator.data = _response.responseBody;
+                _response._receiveAsRange.data = _response.responseBody;
             }
         }
 
@@ -1167,9 +1170,9 @@ public struct HTTPRequest {
         checkURL(url);
         _response.uri = _uri;
         _response.finalURI = _uri;
-        _contentReceived = 0;
 
     connect:
+        _contentReceived = 0;
         _response._startedAt = Clock.currTime;
         setupConnection();
 
@@ -1214,11 +1217,11 @@ public struct HTTPRequest {
         receiveResponse();
 
         if ( _useStreaming ) {
-            if ( _response._contentIterator.activated ) {
+            if ( _response._receiveAsRange.activated ) {
                 trace("streaming_in activated");
                 return _response;
             } else {
-                _response._contentIterator.data = _response.responseBody;
+                _response._receiveAsRange.data = _response.responseBody;
             }
         }
         if ( serverClosedKeepAliveConnection()
@@ -1443,6 +1446,7 @@ package unittest {
     info("Check redirects");
     globalLogLevel(LogLevel.info);
     rq = HTTPRequest();
+    //rq.verbosity = 3;
     rq.keepAlive = true;
     rs = rq.get("http://httpbin.org/relative-redirect/2");
     assert(rs.history.length == 2);

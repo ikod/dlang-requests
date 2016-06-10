@@ -433,12 +433,12 @@ package unittest {
     int    age = 42;
     r = getContent("https://httpbin.org/get", "name", name, "age", age, "sex", sex);
 
-    info("Test contentIterator with GET");
+    info("Test receiveAsRange with GET");
     auto rq = Request();
     rq.useStreaming = true;
     rq.bufferSize = 16;
     auto rs = rq.get("http://httpbin.org/get");
-    auto stream = rs.contentIterator();
+    auto stream = rs.receiveAsRange();
     ubyte[] streamedContent;
     while( !stream.empty() ) {
         streamedContent ~= stream.front;
@@ -447,6 +447,15 @@ package unittest {
     rq = Request();
     rs = rq.get("http://httpbin.org/get");
     assert(streamedContent == rs.responseBody.data);
+    rq.useStreaming = true;
+    streamedContent.length = 0;
+    rs = rq.get("ftp://speedtest.tele2.net/1KB.zip");
+    stream = rs.receiveAsRange;
+    while( !stream.empty() ) {
+        streamedContent ~= stream.front;
+        stream.popFront();
+    }
+
 }
 ///
 package unittest {
@@ -523,13 +532,13 @@ package unittest {
     auto rs = rq.post("http://httpbin.org/post", form);
     assert(rs.code == 200);
 
-    info("Test contentIterator with POST");
+    info("Test receiveAsRange with POST");
     rq = Request();
     rq.useStreaming = true;
     rq.bufferSize = 16;
     string s = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     rs = rq.post("http://httpbin.org/post", s.representation.chunks(10), "application/octet-stream");
-    auto stream = rs.contentIterator();
+    auto stream = rs.receiveAsRange();
     ubyte[] streamedContent;
     while( !stream.empty() ) {
         streamedContent ~= stream.front;

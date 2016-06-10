@@ -402,6 +402,24 @@ public struct Buffer(T) {
         }
         return this;
     }
+    auto putNoCopy(U)(U[] data) pure {
+        if ( data.length == 0 ) {
+            return this;
+        }
+        if ( !__repr ) {
+            __repr = new Repr;
+        }
+        debug tracef("Append %d bytes", data.length);
+        static if (!is(U == T)) {
+            auto d = castFrom!(U[]).to!(T[])(data);
+            __repr.__length += d.length;
+            __repr.__buffer ~= d;
+        } else {
+            __repr.__length += data.length;
+            __repr.__buffer ~= data;
+        }
+        return this;
+    }
     @property auto opDollar() const pure @safe {
         return __repr.__length;
     }

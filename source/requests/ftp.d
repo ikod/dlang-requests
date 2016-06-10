@@ -351,7 +351,7 @@ public struct FTPRequest {
         
         auto dataStream = new TCPSocketStream();
         scope (exit ) {
-            if ( dataStream !is null && !_response._contentIterator.activated ) {
+            if ( dataStream !is null && !_response._receiveAsRange.activated ) {
                 dataStream.close();
             }
         }
@@ -363,8 +363,8 @@ public struct FTPRequest {
             _response.code = code;
             return _response;
         }
-        auto b = new ubyte[_bufferSize];
         while ( true ) {
+            auto b = new ubyte[_bufferSize];
             auto rc = dataStream.receive(b);
             if ( rc <= 0 ) {
                 trace("done");
@@ -372,16 +372,15 @@ public struct FTPRequest {
             }
             _contentReceived += rc;
             tracef("got %d bytes from data channel", rc);
-            _response._responseBody.put(b[0..rc]);
+            _response._responseBody.putNoCopy(b[0..rc]);
 
             if ( _maxContentLength && _response._responseBody.length >= _maxContentLength ) {
                 throw new RequestException("maxContentLength exceeded for ftp data");
             }
             if ( _useStreaming ) {
-                _response.contentIterator.activated = true;
-                _response.contentIterator.data = _response._responseBody;
-                _response.contentIterator.b = new ubyte[_bufferSize];
-                _response.contentIterator.read = delegate Buffer!ubyte () {
+                _response.receiveAsRange.activated = true;
+                _response.receiveAsRange.data = _response._responseBody;
+                _response.receiveAsRange.read = delegate Buffer!ubyte () {
                     Buffer!ubyte result;
                     while(true) {
                         // check if we received everything we need
@@ -391,7 +390,8 @@ public struct FTPRequest {
                                 format(_contentLength, _maxContentLength));
                         }
                         // have to continue
-                        auto read = dataStream.receive(_response.contentIterator.b);
+                        auto b = new ubyte[_bufferSize];
+                        auto read = dataStream.receive(b);
                         tracef("streaming_in received %d bytes", read);
                         if ( read < 0 ) {
                             version(Posix) {
@@ -412,7 +412,8 @@ public struct FTPRequest {
                             break;
                         }
                         _contentReceived += read;
-                        result = Buffer!ubyte(_response.contentIterator.b[0..read].dup);
+
+                        result.putNoCopy(b[0..read]);
                         if ( result.length ) {
                             tracef("return %d bytes", result.length);
                             break;

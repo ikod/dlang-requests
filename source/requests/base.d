@@ -10,7 +10,7 @@ public class RequestException: Exception {
     }
 }
 
-public struct ContentIterator {
+public struct ReceiveAsRange {
     bool empty() {
         return data.length == 0;
     };
@@ -42,7 +42,7 @@ public class Response {
         URI              _uri;
         /// Final URI. Can differ from __URI if request go through redirections.
         URI              _finalURI;
-        ContentIterator  _contentIterator;
+        ReceiveAsRange   _receiveAsRange;
         mixin(Setter!ushort("code"));
         mixin(Setter!URI("uri"));
         mixin(Setter!URI("finalURI"));
@@ -53,7 +53,7 @@ public class Response {
     @property auto responseBody() pure @safe nothrow {
         return _responseBody;
     }
-    @property auto ref contentIterator() pure @safe nothrow {
-        return _contentIterator;
+    @property auto ref receiveAsRange() pure @safe nothrow {
+        return _receiveAsRange;
     }
 }

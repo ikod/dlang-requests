@@ -292,7 +292,7 @@ void main()
     rq.useStreaming = true;
     rq.verbosity = 2;
     auto rs = rq.get("http://httpbin.org/image/jpeg");
-    auto stream = rs.contentIterator();
+    auto stream = rs.receiveAsRange();
     while(!stream.empty) {
         writefln("Received %d bytes, total received %d from document legth %d", stream.front.length, rq.contentReceived, rq.contentLength);
         stream.popFront;

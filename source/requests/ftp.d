@@ -30,12 +30,14 @@ public class FTPServerResponseError: Exception {
 public class FTPResponse : Response {
 }
 
+enum defaultBufferSize = 8192;
+
 public struct FTPRequest {
     private {
         URI           _uri;
         Duration      _timeout = 60.seconds;
         uint          _verbosity = 0;
-        size_t        _bufferSize = 16*1024; // 16k
+        size_t        _bufferSize = defaultBufferSize;
         long          _maxContentLength = 5*1024*1024*1024;
         long          _contentLength = -1;
         long          _contentReceived;
@@ -370,8 +372,9 @@ public struct FTPRequest {
                 trace("done");
                 break;
             }
-            _contentReceived += rc;
             tracef("got %d bytes from data channel", rc);
+
+            _contentReceived += rc;
             _response._responseBody.putNoCopy(b[0..rc]);
 
             if ( _maxContentLength && _response._responseBody.length >= _maxContentLength ) {
@@ -392,7 +395,12 @@ public struct FTPRequest {
                         // have to continue
                         auto b = new ubyte[_bufferSize];
                         auto read = dataStream.receive(b);
-                        tracef("streaming_in received %d bytes", read);
+
+                        if ( read > 0 ) {
+                            _contentReceived += read;
+                            result.putNoCopy(b[0..read]);
+                            return result;
+                        }
                         if ( read < 0 ) {
                             version(Posix) {
                                 if ( errno == EINTR ) {
@@ -402,20 +410,13 @@ public struct FTPRequest {
                             throw new RequestException("streaming_in error reading from socket");
                         }
                         if ( read == 0 ) {
-                            tracef("streaming_in: server closed connection");
+                            debug tracef("streaming_in: server closed connection");
                             dataStream.close();
                             code = responseToCode(serverResponse());
                             if ( code/100 == 2 ) {
                                 tracef("Successfully received %d bytes", _response._responseBody.length);
                             }
                             _response.code = code;
-                            break;
-                        }
-                        _contentReceived += read;
-
-                        result.putNoCopy(b[0..read]);
-                        if ( result.length ) {
-                            tracef("return %d bytes", result.length);
                             break;
                         }
                     }

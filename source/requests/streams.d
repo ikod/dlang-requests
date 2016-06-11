@@ -37,6 +37,7 @@ public interface DataPipeIface(E) {
     bool empty();
     /// Put next data portion for processing
     void put(E[]);
+    void putNoCopy(E[]);
     /// Get any ready data
     E[] get();
     /// Signal on end of incoming data stream.
@@ -76,6 +77,17 @@ public class DataPipe(E) : DataPipeIface!E {
             t = process(p, t);
         }
         t.each!(b => buffer.put(b));
+    }
+    void putNoCopy(E[] data) {
+        if ( pipe.empty ) {
+            buffer.putNoCopy(data);
+            return;
+        }
+        auto t = process(pipe.front, [data]);
+        foreach(ref p; pipe[1..$]) {
+            t = process(p, t);
+        }
+        t.each!(b => buffer.putNoCopy(b));
     }
     /// Process next data portion. Data passed over pipeline and store result in buffer.
     /// Params:
@@ -147,6 +159,12 @@ public class Decompressor(E) : DataPipeIface!E {
 //            __buff.put(__zlib.uncompress(r.take(l)));
 //        }
 //    }
+    override void putNoCopy(E[] data) {
+        if ( __zlib is null  ) {
+            __zlib = new UnCompress();
+        }
+        __buff.put(__zlib.uncompress(data));
+    }
     override void put(E[] data) {
         if ( __zlib is null  ) {
             __zlib = new UnCompress();
@@ -227,6 +245,9 @@ public class DecodeChunked : DataPipeIface!ubyte {
         size_t       chunk_size, to_receive;
         Buffer!ubyte buff;
         ubyte[]      linebuff;
+    }
+    void putNoCopy(eType[] data) {
+        assert(0, "Not implemented");
     }
     void put(eType[] data) {
         while ( data.length ) {
@@ -529,6 +550,11 @@ public struct Buffer(T) {
 //        return -1;
 //    }
     @property auto data(U=T[])() const pure {
+        static if ( is(U==T[]) ) {
+            if ( __repr && __repr.__buffer && __repr.__buffer.length == 1 ) {
+                return __repr.__buffer.front.dup;
+            }
+        }
         Appender!(T[]) a;
         if ( __repr && __repr.__buffer ) {
             foreach(ref b; __repr.__buffer) {

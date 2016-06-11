@@ -30,7 +30,6 @@ public struct ReceiveAsRange {
         bool            activated;
         Buffer!ubyte    data;
         Buffer!ubyte    delegate() read;
-        ubyte[]         b;
     }
 }
 

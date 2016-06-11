@@ -30,7 +30,7 @@ public alias Cookie     = Tuple!(string, "path", string, "domain", string, "attr
 public alias QueryParam = Tuple!(string, "key", string, "value");
 
 static immutable ushort[] redirectCodes = [301, 302, 303];
-enum defaultBufferSize = 2000;
+enum defaultBufferSize = 8192;
 
 static string urlEncoded(string p) pure @safe {
     immutable string[dchar] translationTable = [
@@ -786,7 +786,7 @@ public struct HTTPRequest {
 
         while( true ) {
             if ( _contentLength >= 0 && _contentReceived >= _contentLength ) {
-                trace("Body received.");
+                debug trace("Body received.");
                 break;
             }
             if ( _unChunker && _unChunker.done ) {
@@ -806,13 +806,12 @@ public struct HTTPRequest {
                         {
                             trace("streaming_in receive completed");
                             _bodyDecoder.flush();
-                            result = Buffer!ubyte(_bodyDecoder.get());
-                            break;
+                            return Buffer!ubyte(_bodyDecoder.get());
                         }
                         // have to continue
                         b = new ubyte[_bufferSize];
                         read = _stream.receive(b);
-                        tracef("streaming_in received %d bytes", read);
+                        debug tracef("streaming_in received %d bytes", read);
                         if ( read < 0 ) {
                             version(Posix) {
                                 if ( errno == EINTR ) {
@@ -823,23 +822,16 @@ public struct HTTPRequest {
                         }
 
                         if ( read == 0 ) {
-                            tracef("streaming_in: server closed connection");
+                            debug tracef("streaming_in: server closed connection");
                             _bodyDecoder.flush();
-                            result = Buffer!ubyte(_bodyDecoder.get());
-                            break;
+                            return Buffer!ubyte(_bodyDecoder.get());
                         }
 
                         _contentReceived += read;
-                        Buffer!ubyte buffer;
-                        buffer.putNoCopy(b[0..read]);
-                        _bodyDecoder.put(buffer);
-                        result = Buffer!ubyte(_bodyDecoder.get());
-                        if ( result.length ) {
-                            tracef("return %d bytes: %s", _response.receiveAsRange.data.length, _response.receiveAsRange.data.toString);
-                            break;
-                        }
+                        _bodyDecoder.putNoCopy(b[0..read]);
+                        return Buffer!ubyte(_bodyDecoder.get());
                     }
-                    return result;
+                    assert(0);
                 };
                 // we prepared for streaming
                 return;
@@ -859,27 +851,28 @@ public struct HTTPRequest {
                 }
                 throw new ErrnoException("receiving body");
             }
+            if ( read == 0 ) {
+                debug trace("read done");
+                break;
+            }
             if ( _verbosity >= 2 ) {
                 writefln("< %d bytes of body received", read);
             }
-            tracef("read: %d", read);
-            if ( read == 0 ) {
-                trace("read done");
-                break;
-            }
+
+            debug tracef("read: %d", read);
             _contentReceived += read;
             if ( _maxContentLength && _contentReceived > _maxContentLength ) {
                 throw new RequestException("ContentLength > maxContentLength (%d>%d)".
                     format(_contentLength, _maxContentLength));
             }
 
-            _bodyDecoder.put(b[0..read]);
-            _response._responseBody.put(_bodyDecoder.get());
-            tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", _contentReceived, _contentLength, _response._responseBody.length);
+            _bodyDecoder.putNoCopy(b[0..read]);
+            _response._responseBody.putNoCopy(_bodyDecoder.get());
+            debug tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", _contentReceived, _contentLength, _response._responseBody.length);
 
         }
         _bodyDecoder.flush();
-        _response._responseBody.put(_bodyDecoder.get());
+        _response._responseBody.putNoCopy(_bodyDecoder.get());
     }
     private bool serverClosedKeepAliveConnection() pure @safe nothrow {
         return _response._responseHeaders.length == 0 && _keepAlive;

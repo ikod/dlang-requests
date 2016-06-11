@@ -81,7 +81,6 @@ The easy way to post with Requests is *postContent*. There are several way to po
 #### Form-urlencode ####
 Call postContent in the same way as getContent with parameters:
 ```d
-    $ cat e.d; ./e
     import std.stdio;
     import requests;
     
@@ -237,7 +236,7 @@ That is all details about simple API with default request parameters. Next secti
 
 ### Request() structure ###
 
-When you need access to response code, or configure request details you have to use *Request* and *Response* structures:
+When you need access to response code, or configure request details, you have to use *Request* and *Response* structures:
 
 ```d
 Request rq = Request();
@@ -397,3 +396,58 @@ Most frequently needed parts of response are:
 * responseHeaders - response headers in form of string[string] (not available for ftp requests)
 * receiveAsRange - if you set useStreaming in the Request, then receiveAsRange will provide elements(type ubyte[]) of InputRange while receiving data from the server.
 
+### Low level details ###
+
+At the lowest level Request() use several templated overloads of single call exec(). Using this method you can call other than GET or POST HTTP methods (Attention: you have to use HTTPRequest instead of Request, as this calls are specific to HTTP):
+
+```d
+#!/usr/bin/env rdmd -I./source librequests.a -L-lssl -L-lcrypto y.d
+import std.stdio;
+import requests;
+import std.algorithm;
+
+void main()
+{
+    auto file = File("y.d", "rb");
+    auto rq = HTTPRequest();
+    rq.verbosity = 2;
+    auto rs = rq.exec!"PUT"("http://httpbin.org/put?exampleTitle=PUT%20content", file.byChunk(1024));
+    writeln(rs.responseBody);
+}
+
+> PUT /put?exampleTitle=PUT%20content HTTP/1.1
+> Transfer-Encoding: chunked
+> Connection: Keep-Alive
+> User-Agent: dlang-requests
+> Accept-Encoding: gzip, deflate
+> Host: httpbin.org
+> Content-Type: text/html
+>
+< HTTP/1.1 200 OK
+< server: nginx
+< date: Sat, 11 Jun 2016 22:28:13 GMT
+< content-type: application/json
+< content-length: 780
+< connection: keep-alive
+< access-control-allow-origin: *
+< access-control-allow-credentials: true
+< 780 bytes of body received
+{
+  "args": {
+    "exampleTitle": "PUT content"
+  },
+  "data": "#!/usr/bin/env rdmd -I./source librequests.a -L-lssl -L-lcrypto y.d\nimport std.stdio;\nimport requests;\nimport std.algorithm;\n\nvoid main()\n{\n    auto file = File(\"y.d\", \"rb\");\n    auto rq = HTTPRequest();\n    rq.verbosity = 2;\n    auto rs = rq.exec!\"PUT\"(\"http://httpbin.org/put?exampleTitle=PUT%20content\", file.byChunk(1024));\n    writeln(rs.responseBody);\n}\n\n",
+  "files": {},
+  "form": {},
+  "headers": {
+    "Accept-Encoding": "gzip, deflate",
+    "Content-Length": "361",
+    "Content-Type": "text/html",
+    "Host": "httpbin.org",
+    "User-Agent": "dlang-requests"
+  },
+  "json": null,
+  "origin": "xxx.xxx.xxx.xxx",
+  "url": "http://httpbin.org/put?exampleTitle=PUT content"
+}
+```

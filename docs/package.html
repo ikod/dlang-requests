@@ -481,20 +481,28 @@ string name = <span style="color:red">"user"</span>, sex = <span style="color:re
 <span style="color:blue">int</span>    age = 42;
 r = <u>getContent</u>(<span style="color:red">"https://httpbin.org/get"</span>, <span style="color:red">"name"</span>, name, <span style="color:red">"age"</span>, age, <span style="color:red">"sex"</span>, sex);
 
-info(<span style="color:red">"Test contentIterator with GET"</span>);
-rq = Request();
+info(<span style="color:red">"Test receiveAsRange with GET"</span>);
+<span style="color:blue">auto</span> rq = Request();
 rq.useStreaming = <span style="color:blue">true</span>;
 rq.bufferSize = 16;
-rs = rq.get(<span style="color:red">"http://httpbin.org/get"</span>);
-<span style="color:blue">auto</span> stream = rs.contentIterator();
+<span style="color:blue">auto</span> rs = rq.get(<span style="color:red">"http://httpbin.org/get"</span>);
+<span style="color:blue">auto</span> stream = rs.receiveAsRange();
 <span style="color:blue">ubyte</span>[] streamedContent;
 <span style="color:blue">while</span>( !stream.empty() ) {
     streamedContent ~= stream.front;
     stream.popFront();
 }
 rq = Request();
-rs = rq.post(<span style="color:red">"http://httpbin.org/get"</span>);
+rs = rq.get(<span style="color:red">"http://httpbin.org/get"</span>);
 <span style="color:blue">assert</span>(streamedContent == rs.responseBody.data);
+rq.useStreaming = <span style="color:blue">true</span>;
+streamedContent.length = 0;
+rs = rq.get(<span style="color:red">"ftp://speedtest.tele2.net/1KB.zip"</span>);
+stream = rs.receiveAsRange;
+<span style="color:blue">while</span>( !stream.empty() ) {
+    streamedContent ~= stream.front;
+    stream.popFront();
+}
 </pre>
 </p><h4 class="sec">Examples:</h4> <p><pre class="d_code">
 globalLogLevel(LogLevel.info);
@@ -564,13 +572,13 @@ form = MultipartForm().add(formData(<span style="color:green">/* field name */</
 <span style="color:blue">auto</span> rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, form);
 <span style="color:blue">assert</span>(rs.code == 200);
 
-info(<span style="color:red">"Test contentIterator with POST"</span>);
+info(<span style="color:red">"Test receiveAsRange with POST"</span>);
 rq = Request();
 rq.useStreaming = <span style="color:blue">true</span>;
 rq.bufferSize = 16;
 string s = <span style="color:red">"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"</span>;
 rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, s.representation.chunks(10), <span style="color:red">"application/octet-stream"</span>);
-<span style="color:blue">auto</span> stream = rs.contentIterator();
+<span style="color:blue">auto</span> stream = rs.receiveAsRange();
 <span style="color:blue">ubyte</span>[] streamedContent;
 <span style="color:blue">while</span>( !stream.empty() ) {
     streamedContent ~= stream.front;

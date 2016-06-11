@@ -37,6 +37,7 @@ public class Response {
     package {
         ushort           _code;
         Buffer!ubyte     _responseBody;
+        string[string]   _responseHeaders;
         /// Initial URI
         URI              _uri;
         /// Final URI. Can differ from __URI if request go through redirections.
@@ -51,6 +52,9 @@ public class Response {
     mixin(Getter!URI("finalURI"));
     @property auto responseBody() pure @safe nothrow {
         return _responseBody;
+    }
+    @property auto responseHeaders() pure @safe nothrow {
+        return _responseHeaders;
     }
     @property auto ref receiveAsRange() pure @safe nothrow {
         return _receiveAsRange;

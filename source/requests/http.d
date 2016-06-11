@@ -116,15 +116,11 @@ public auto queryParams(T...)(T params) pure nothrow @safe
 public class HTTPResponse : Response {
     private {
         string         _status_line;
-        string[string] _responseHeaders;
 
         HTTPResponse[] _history; // redirects history
         SysTime        _startedAt, _connectedAt, _requestSentAt, _finishedAt;
 
         mixin(Setter!string("status_line"));
-        @property final void responseHeaders(string[string] s) @safe @nogc nothrow {
-            _responseHeaders = s;
-        }
     }
 
     ~this() {

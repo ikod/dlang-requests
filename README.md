@@ -245,6 +245,27 @@ Response rs = rq.get("https://httpbin.org/");
 assert(rs.code==200);
 ```
 
+By default we use KeepAlive requests, so you can reuse connection:
+```d
+import std.stdio;
+import requests;
+
+void main()
+{
+    auto rq = Request();
+    rq.verbosity = 2;
+    auto rs = rq.get("http://httpbin.org/image/jpeg");
+    writeln(rs.responseBody.length);
+    rs = rq.get("http://httpbin.org/image/png");
+    writeln(rs.responseBody.length);
+}
+```
+Second rq.get() will reuse previous connection to server. Request() will authomatically reopen connection when host, protocol or port changes(so it is safe to send different requests through single instance of Request). It also recover when server prematurely close keepalive connection. You can turn keepAlive off when needed:
+```d
+rq.keepAlive = false;
+```
+
+
 For anything other than default, you can configure *Request* structure for keep-alive, redirects, headers, o
 r for different io-buffer and maximum sizes of response headers and body.
 
@@ -254,6 +275,7 @@ For example to authorize with Basic authorization use next code:
     rq.authenticator = new BasicAuthentication("user", "passwd");
     rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
 ```
+
 Here is short descrition of some Request options, you can set:
 
 | name             | type           | meaning                                | default    |
@@ -363,4 +385,15 @@ void main() {
     assert(lines == 287);
 }
 ```
+
+### Response() structure ###
+
+This structure present details about received response.
+
+Most frequently needed parts of response are:
+
+* code - http or ftp response code as received from server.
+* responseBody - contain complete document body when no streaming in use. You can't use it when in streaming mode.
+* responseHeaders - response headers in form of string[string] (not available for ftp requests)
+* receiveAsRange - if you set useStreaming in the Request, then receiveAsRange will provide elements(type ubyte[]) of InputRange while receiving data from the server.
 

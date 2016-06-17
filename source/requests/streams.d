@@ -224,11 +224,7 @@ public class DecodeChunked : DataPipeIface!ubyte {
                     throw new DecodingExceptioin("Can't find chunk size in the body");
                 }
                 data = data[i..$];
-//                if ( i < data.length ) {
-//                    data = data[i .. $];
-//                } else {
-//                    data.length = 0;
-//                }
+
                 if (!linebuff.canFind(CRLF)) {
                     continue;
                 }
@@ -341,11 +337,24 @@ static long reprAlloc;
 static long reprCacheHit;
 static long reprCacheRequests;
 
+
 public struct Buffer(T) {
     static Repr[CACHESIZE]  cache;
-    static uint       cacheIndex;
+    static uint             cacheIndex;
 
     private {
+        Repr  cachedOrNew() {
+            Repr repr;
+            reprCacheRequests++;
+            if ( cacheIndex>0 ) {
+                cacheIndex -= 1;
+                repr = cache[cacheIndex];
+                reprCacheHit++;
+            } else {
+                repr = new Repr;
+            }
+            return repr;
+        }
         class Repr {
             size_t         __length;
             Unqual!T[][]   __buffer;
@@ -367,19 +376,7 @@ public struct Buffer(T) {
     alias toString = data!string;
     
     this(this) {
-        reprCacheRequests++;
-        if ( cacheIndex>0 ) {
-            cacheIndex -= 1;
-            auto n__repr = cache[cacheIndex];
-            if ( __repr ) {
-                n__repr.__length = __repr.__length;
-                n__repr.__buffer = __repr.__buffer.dup;
-            }
-            __repr = n__repr;
-            reprCacheHit++;
-        } else {
-            __repr = new Repr(__repr);
-        }
+        __repr = new Repr(__repr);
     }
     this(U)(U[] data) {
         put(data);
@@ -404,14 +401,7 @@ public struct Buffer(T) {
             return this;
         }
         if ( !__repr ) {
-            reprCacheRequests++;
-            if ( cacheIndex>0 ) {
-                cacheIndex -= 1;
-                __repr = cache[cacheIndex];
-                reprCacheHit++;
-            } else {
-                __repr = new Repr;
-            }
+            __repr = cachedOrNew();
         }
         //        if ( !__repr ) {
         //            __repr = new Repr;
@@ -431,14 +421,7 @@ public struct Buffer(T) {
             return this;
         }
         if ( !__repr ) {
-            reprCacheRequests++;
-            if ( cacheIndex>0 ) {
-                cacheIndex--;
-                __repr = cache[cacheIndex];
-                reprCacheHit++;
-            } else {
-                __repr = new Repr;
-            }
+            __repr = cachedOrNew();
         }
         static if (!is(U == T)) {
             auto d = castFrom!(U[]).to!(T[])(data);

@@ -424,7 +424,6 @@ package unittest {
     globalLogLevel(LogLevel.info);
     info("Test getContent");
     auto r = getContent("https://httpbin.org/stream/20");
-    writeln(r);
     assert(r.splitter('\n').filter!("a.length>0").count == 20);
     r = getContent("ftp://speedtest.tele2.net/1KB.zip");
     assert(r.length == 1024);

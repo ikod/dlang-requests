@@ -382,6 +382,8 @@ public struct HTTPRequest {
         _headers = null;
         _authenticator = null;
         _history = null;
+        _bodyDecoder = null;
+        _unChunker = null;
     }
 
     @property void uri(in URI newURI) {
@@ -611,7 +613,7 @@ public struct HTTPRequest {
     ///
     /// Do we received \r\n\r\n?
     /// 
-    private bool headersHaveBeenReceived(in ubyte[] data, ref Buffer!ubyte buffer, out string separator) pure const @safe {
+    private bool headersHaveBeenReceived(in ubyte[] data, ref Buffer!ubyte buffer, out string separator) const @safe {
         foreach(s; ["\r\n\r\n", "\n\n"]) {
             if ( data.canFind(s) || buffer.canFind(s) ) {
                 separator = s;
@@ -658,7 +660,7 @@ public struct HTTPRequest {
     private void handleURLChange(in URI from, in URI to) {
         if ( _stream !is null && _stream.isConnected && 
             ( from.scheme != to.scheme || from.host != to.host || from.port != to.port) ) {
-            tracef("Have to reopen stream, because of URI change");
+            debug tracef("Have to reopen stream, because of URI change");
             _stream.close();
         }
     }
@@ -714,12 +716,10 @@ public struct HTTPRequest {
         }
 
         _bodyDecoder = new DataPipe!ubyte();
-        auto b = new ubyte[_bufferSize];
         scope(exit) {
             if ( !_useStreaming ) {
                 _bodyDecoder = null;
                 _unChunker = null;
-                b = null;
             }
         }
 
@@ -730,8 +730,10 @@ public struct HTTPRequest {
         
         while(true) {
 
+            auto b = new ubyte[_bufferSize];
             read = _stream.receive(b);
-            tracef("read: %d", read);
+
+            debug tracef("read: %d", read);
             if ( read < 0 ) {
                 version(Windows) {
                     if ( errno == 0 ) {
@@ -751,9 +753,9 @@ public struct HTTPRequest {
             if ( read == 0 ) {
                 break;
             }
-            
             auto data = b[0..read];
-            buffer.put(data);
+            buffer.putNoCopy(data);
+
             if ( buffer.length > maxHeadersLength ) {
                 throw new RequestException("Headers length > maxHeadersLength (%d > %d)".format(buffer.length, maxHeadersLength));
             }
@@ -769,7 +771,7 @@ public struct HTTPRequest {
         
         analyzeHeaders(_response._responseHeaders);
 
-        _bodyDecoder.put(partialBody);
+        _bodyDecoder.putNoCopy(partialBody.data);
 
         if ( _verbosity >= 2 ) {
             writefln("< %d bytes of body received", partialBody.length);
@@ -791,9 +793,8 @@ public struct HTTPRequest {
             if ( _useStreaming && _response._responseBody.length && !redirectCodes.canFind(_response.code) ) {
                 trace("streaming requested");
                 _response.receiveAsRange.activated = true;
-                _response.receiveAsRange.data = _response._responseBody;
-                _response.receiveAsRange.read = delegate Buffer!ubyte () {
-                    Buffer!ubyte result;
+                _response.receiveAsRange.data = _response._responseBody.data;
+                _response.receiveAsRange.read = delegate ubyte[] () {
                     while(true) {
                         // check if we received everything we need
                         if ( ( _unChunker && _unChunker.done )
@@ -802,10 +803,10 @@ public struct HTTPRequest {
                         {
                             trace("streaming_in receive completed");
                             _bodyDecoder.flush();
-                            return Buffer!ubyte(_bodyDecoder.get());
+                            return _bodyDecoder.get();
                         }
                         // have to continue
-                        b = new ubyte[_bufferSize];
+                        auto b = new ubyte[_bufferSize];
                         read = _stream.receive(b);
                         debug tracef("streaming_in received %d bytes", read);
                         if ( read < 0 ) {
@@ -820,12 +821,12 @@ public struct HTTPRequest {
                         if ( read == 0 ) {
                             debug tracef("streaming_in: server closed connection");
                             _bodyDecoder.flush();
-                            return Buffer!ubyte(_bodyDecoder.get());
+                            return _bodyDecoder.get();
                         }
 
                         _contentReceived += read;
                         _bodyDecoder.putNoCopy(b[0..read]);
-                        return Buffer!ubyte(_bodyDecoder.get());
+                        return _bodyDecoder.get();
                     }
                     assert(0);
                 };
@@ -833,7 +834,7 @@ public struct HTTPRequest {
                 return;
             }
 
-            b = new ubyte[_bufferSize];
+            auto b = new ubyte[_bufferSize];
             read = _stream.receive(b);
 
             if ( read < 0 ) {
@@ -877,7 +878,7 @@ public struct HTTPRequest {
         return ["GET", "HEAD"].canFind(method);
     }
 
-    HTTPResponse exec(string method="POST")(string url, MultipartForm sources) if (method=="POST") {
+    HTTPResponse exec(string method="POST")(string url, MultipartForm sources) {
         import std.uuid;
         import std.file;
         //
@@ -973,7 +974,7 @@ public struct HTTPRequest {
                 trace("streaming_in activated");
                 return _response;
             } else {
-                _response._receiveAsRange.data = _response.responseBody;
+                _response._receiveAsRange.data = _response.responseBody.data;
             }
         }
 
@@ -1068,7 +1069,7 @@ public struct HTTPRequest {
             each!(h => req.put(h));
         req.put("\r\n");
 
-        trace(req.data);
+        debug trace(req.data);
         if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
@@ -1085,7 +1086,7 @@ public struct HTTPRequest {
             while ( !content.empty ) {
                 auto chunk = content.front;
                 auto chunkHeader = "%x\r\n".format(chunk.length);
-                tracef("sending %s%s", chunkHeader, chunk);
+                debug tracef("sending %s%s", chunkHeader, chunk);
                 _stream.send(chunkHeader);
                 _stream.send(chunk);
                 _stream.send("\r\n");
@@ -1100,10 +1101,10 @@ public struct HTTPRequest {
 
         if ( _useStreaming ) {
             if ( _response._receiveAsRange.activated ) {
-                trace("streaming_in activated");
+                debug trace("streaming_in activated");
                 return _response;
             } else {
-                _response._receiveAsRange.data = _response.responseBody;
+                _response._receiveAsRange.data = _response.responseBody.data;
             }
         }
 
@@ -1111,7 +1112,7 @@ public struct HTTPRequest {
             && !restartedRequest
             && isIdempotent(_method)
         ) {
-            tracef("Server closed keepalive connection");
+            debug tracef("Server closed keepalive connection");
             _stream.close();
             restartedRequest = true;
             goto connect;
@@ -1210,7 +1211,7 @@ public struct HTTPRequest {
                 trace("streaming_in activated");
                 return _response;
             } else {
-                _response._receiveAsRange.data = _response.responseBody;
+                _response._receiveAsRange.data = _response.responseBody.data;
             }
         }
         if ( serverClosedKeepAliveConnection()
@@ -1480,7 +1481,6 @@ package unittest {
     globalLogLevel(LogLevel.info);
     rq = HTTPRequest();
     rq.keepAlive = true;
-    rq.bufferSize = 16*1024;
     rs = rq.get("http://httpbin.org/range/1024");
     assert(rs.code==200);
     assert(rs.responseBody.length==1024);
@@ -1497,8 +1497,8 @@ package unittest {
     rq = HTTPRequest();
     rq.timeout = 1.seconds;
     assertThrown!TimeoutException(rq.get("http://httpbin.org/delay/3"));
-    assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
-    assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
+//    assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
+//    assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
     //assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
 
     globalLogLevel(LogLevel.info);

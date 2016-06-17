@@ -424,6 +424,7 @@ package unittest {
     globalLogLevel(LogLevel.info);
     info("Test getContent");
     auto r = getContent("https://httpbin.org/stream/20");
+    writeln(r);
     assert(r.splitter('\n').filter!("a.length>0").count == 20);
     r = getContent("ftp://speedtest.tele2.net/1KB.zip");
     assert(r.length == 1024);
@@ -477,7 +478,7 @@ package unittest {
         "http://httpbin.org/stream/70",
     ];
     
-    defaultPoolThreads(5);
+    defaultPoolThreads(3);
     
     shared short lines;
     

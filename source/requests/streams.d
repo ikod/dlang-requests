@@ -36,7 +36,7 @@ public interface DataPipeIface(E) {
     /// Is there any processed data ready for reading?
     bool empty();
     /// Put next data portion for processing
-    void put(E[]);
+    //void put(E[]);
     void putNoCopy(E[]);
     /// Get any ready data
     E[] get();
@@ -60,24 +60,14 @@ public class DataPipe(E) : DataPipeIface!E {
     }
     E[][] process(DataPipeIface!E p, E[][] data) {
         E[][] result;
-        data.each!(e => p.put(e));
+        data.each!(e => p.putNoCopy(e));
         while(!p.empty()) result ~= p.get();
         return result;
     }
-    /// Process next data portion. Data passed over pipeline and result stored in buffer.
+    /// Process next data portion. Data passed over pipeline and store result in buffer.
     /// Params:
-    /// data = input data array.
-    void put(E[] data) {
-        if ( pipe.empty ) {
-            buffer.put(data);
-            return;
-        }
-        auto t = process(pipe.front, [data]);
-        foreach(ref p; pipe[1..$]) {
-            t = process(p, t);
-        }
-        t.each!(b => buffer.put(b));
-    }
+    /// buff = input data buffer.
+    /// NoCopy means we do not copy data to buffer, we keep reference
     void putNoCopy(E[] data) {
         if ( pipe.empty ) {
             buffer.putNoCopy(data);
@@ -89,29 +79,10 @@ public class DataPipe(E) : DataPipeIface!E {
         }
         t.each!(b => buffer.putNoCopy(b));
     }
-    /// Process next data portion. Data passed over pipeline and store result in buffer.
-    /// Params:
-    /// buff = input data buffer.
-    void put(Buffer!E buff) {
-        if ( pipe.empty ) {
-            if ( buffer.__repr is null ) {
-                buffer = buff;
-                return;
-            }
-            buffer.__repr.__buffer ~= buff.__repr.__buffer;
-            buffer.__repr.__length += buff.length;
-            return;
-        }
-        auto t = process(pipe.front, buff.__repr.__buffer);
-        foreach(ref p; pipe[1..$]) {
-            t = process(p, t);
-        }
-        t.each!(b => buffer.put(b));
-    }
     /// Get what was collected in internal buffer and clear it. 
     /// Returns:
     /// data collected.
-    E[] get() pure {
+    E[] get()  {
         if ( buffer.empty ) {
             return E[].init;
         }
@@ -128,7 +99,7 @@ public class DataPipe(E) : DataPipeIface!E {
     void flush() {
         E[][] product;
         foreach(ref p; pipe) {
-            product.each!(e => p.put(e));
+            product.each!(e => p.putNoCopy(e));
             p.flush();
             product.length = 0;
             while( !p.empty ) product ~= p.get();
@@ -150,26 +121,11 @@ public class Decompressor(E) : DataPipeIface!E {
         __buff = Buffer!ubyte();
         __zlib = new UnCompress();
     }
-//    this(E[] r) {
-//        //__range = r;
-//        __buff = Buffer!ubyte();
-//        __zlib = new UnCompress();
-//        auto l = r.length;
-//        if ( l ) {
-//            __buff.put(__zlib.uncompress(r.take(l)));
-//        }
-//    }
     override void putNoCopy(E[] data) {
         if ( __zlib is null  ) {
             __zlib = new UnCompress();
         }
-        __buff.put(__zlib.uncompress(data));
-    }
-    override void put(E[] data) {
-        if ( __zlib is null  ) {
-            __zlib = new UnCompress();
-        }
-        __buff.put(__zlib.uncompress(data));
+        __buff.putNoCopy(__zlib.uncompress(data));
     }
     override E[] get() pure {
         assert(__buff.length);
@@ -247,32 +203,40 @@ public class DecodeChunked : DataPipeIface!ubyte {
         ubyte[]      linebuff;
     }
     void putNoCopy(eType[] data) {
-        assert(0, "Not implemented");
-    }
-    void put(eType[] data) {
         while ( data.length ) {
             if ( state == States.trailer ) {
                 return;
             }
             if ( state == States.huntingSize ) {
-                linebuff ~= data;
-                data.length = 0;
-                auto s = linebuff.findSplit(CRLF);
-                if ( !s[1].length ) {
-                    if ( linebuff.length >= 80 ) {
-                        throw new DecodingExceptioin("Can't find chunk size in the body");
+                import std.ascii;
+                ubyte[10] digits;
+                int i;
+                for(i=0;i<data.length;i++) {
+                    ubyte v = data[i];
+                    digits[i] = v;
+                    if ( v == '\n' ) {
+                        i+=1;
+                        break;
                     }
+                }
+                linebuff ~= digits[0..i];
+                if ( linebuff.length >= 80 ) {
+                    throw new DecodingExceptioin("Can't find chunk size in the body");
+                }
+                data = data[i..$];
+//                if ( i < data.length ) {
+//                    data = data[i .. $];
+//                } else {
+//                    data.length = 0;
+//                }
+                if (!linebuff.canFind(CRLF)) {
                     continue;
                 }
-                string x = castFrom!(ubyte[]).to!string(s[0]);
-                formattedRead(x, "%x", &chunk_size);
-                tracef("Got chunk size %s", chunk_size);
+                chunk_size = linebuff.filter!isHexDigit.map!toUpper.map!"a<='9'?a-'0':a-'A'+10".reduce!"a*16+b";
                 state = States.receiving;
                 to_receive = chunk_size;
-                data = s[2];
                 if ( chunk_size == 0 ) {
                     state = States.trailer;
-                    tracef("Unchunk completed");
                     return;
                 }
                 continue;
@@ -280,15 +244,13 @@ public class DecodeChunked : DataPipeIface!ubyte {
             if ( state == States.receiving ) {
                 if (to_receive > 0 ) {
                     auto can_store = min(to_receive, data.length);
-                    buff.put(data[0..can_store]);
+                    buff.putNoCopy(data[0..can_store]);
                     data = data[can_store..$];
                     to_receive -= can_store;
-                    tracef("Unchunked %d bytes from %d", can_store, chunk_size);
+                    //tracef("Unchunked %d bytes from %d", can_store, chunk_size);
                     if ( to_receive == 0 ) {
-                        tracef("switch to huntig separator");
+                        //tracef("switch to huntig separator");
                         state = States.huntingSeparator;
-                        to_receive = 2;
-                        linebuff.length = 0;
                         continue;
                     }
                     continue;
@@ -296,17 +258,13 @@ public class DecodeChunked : DataPipeIface!ubyte {
                 assert(false);
             }
             if ( state == States.huntingSeparator ) {
-                linebuff ~= data;
-                data.length = 0;
-                auto s = linebuff.findSplit(CRLF);
-                if ( s[1].length ) {
-                    data = s[2];
-                    chunk_size = 0;
-                    linebuff.length = 0;
-                    state = States.huntingSize;
-                    tracef("switch to huntig size");
+                if ( data[0] == '\n' || data[0]=='\r') {
+                    data = data[1..$];
                     continue;
                 }
+                state = States.huntingSize;
+                linebuff.length = 0;
+                continue;
             }
         }
     }
@@ -337,28 +295,28 @@ unittest {
         0x08, 0x00, 0x00, 0x00
     ]; // "abc\ndef\n"
     auto d = new Decompressor!eType();
-    d.put(gzipped[0..2]);
-    d.put(gzipped[2..10]);
-    d.put(gzipped[10..$]);
+    d.putNoCopy(gzipped[0..2].dup);
+    d.putNoCopy(gzipped[2..10].dup);
+    d.putNoCopy(gzipped[10..$].dup);
     d.flush();
     assert(equal(d.filter!(a => a!='b'), "ac\ndef\n"));
 
     auto e = new Decompressor!eType();
-    e.put(gzipped[0..10]);
-    e.put(gzipped[10..$]);
+    e.putNoCopy(gzipped[0..10].dup);
+    e.putNoCopy(gzipped[10..$].dup);
     e.flush();
     assert(equal(e.filter!(a => a!='b'), "ac\ndef\n"));
     //    writeln(gzipped.decompress.filter!(a => a!='b').array);
     auto dp = new DataPipe!eType;
     dp.insert(new Decompressor!eType());
-    dp.put(gzipped[0..2]);
-    dp.put(gzipped[2..$]);
+    dp.putNoCopy(gzipped[0..2].dup);
+    dp.putNoCopy(gzipped[2..$].dup);
     dp.flush();
     assert(equal(dp.get(), "abc\ndef\n"));
     // empty datapipe shoul just pass input to output
     auto dpu = new DataPipe!ubyte;
-    dpu.put("abcd".dup.representation);
-    dpu.put("efgh".dup.representation);
+    dpu.putNoCopy("abcd".dup.representation);
+    dpu.putNoCopy("efgh".dup.representation);
     dpu.flush();
     assert(equal(dpu.get(), "abcdefgh"));
     info("Testing DataPipe - done");
@@ -373,15 +331,30 @@ unittest {
  *  $(LI data method: return collected data (like Appender.data))
  * )
  */
+static this() {
+}
+static ~this() {
+}
+enum   CACHESIZE = 1024;
+
+static long reprAlloc;
+static long reprCacheHit;
+static long reprCacheRequests;
+
 public struct Buffer(T) {
+    static Repr[CACHESIZE]  cache;
+    static uint       cacheIndex;
+
     private {
         class Repr {
             size_t         __length;
             Unqual!T[][]   __buffer;
             this() {
+                reprAlloc++;
                 __length = 0;
             }
             this(Repr other) {
+                reprAlloc++;
                 if ( other is null )
                     return;
                 __length = other.__length;
@@ -390,29 +363,59 @@ public struct Buffer(T) {
         }
         Repr __repr;
     }
-
+    
     alias toString = data!string;
-
+    
     this(this) {
-        __repr = new Repr(__repr);
+        reprCacheRequests++;
+        if ( cacheIndex>0 ) {
+            cacheIndex -= 1;
+            auto n__repr = cache[cacheIndex];
+            if ( __repr ) {
+                n__repr.__length = __repr.__length;
+                n__repr.__buffer = __repr.__buffer.dup;
+            }
+            __repr = n__repr;
+            reprCacheHit++;
+        } else {
+            __repr = new Repr(__repr);
+        }
     }
-    this(U)(U[] data) pure {
+    this(U)(U[] data) {
         put(data);
     }
-   ~this() {
-        __repr = null;
+    ~this() {
+        if ( cacheIndex >= CACHESIZE ) {
+            __repr = null;
+            return;
+        }
+        if ( __repr ) {
+            __repr.__length = 0;
+            __repr.__buffer.length = 0;
+            cache[cacheIndex] = __repr;
+            cacheIndex += 1;
+        }
     }
     /***************
      * store data. Data copied
      */
-    auto put(U)(U[] data) pure {
+    auto put(U)(U[] data) {
         if ( data.length == 0 ) {
             return this;
         }
         if ( !__repr ) {
-            __repr = new Repr;
+            reprCacheRequests++;
+            if ( cacheIndex>0 ) {
+                cacheIndex -= 1;
+                __repr = cache[cacheIndex];
+                reprCacheHit++;
+            } else {
+                __repr = new Repr;
+            }
         }
-        debug tracef("Append %d bytes", data.length);
+        //        if ( !__repr ) {
+        //            __repr = new Repr;
+        //        }
         static if (!is(U == T)) {
             auto d = castFrom!(U[]).to!(T[])(data);
             __repr.__length += d.length;
@@ -423,14 +426,20 @@ public struct Buffer(T) {
         }
         return this;
     }
-    auto putNoCopy(U)(U[] data) pure {
+    auto putNoCopy(U)(U[] data) {
         if ( data.length == 0 ) {
             return this;
         }
         if ( !__repr ) {
-            __repr = new Repr;
+            reprCacheRequests++;
+            if ( cacheIndex>0 ) {
+                cacheIndex--;
+                __repr = cache[cacheIndex];
+                reprCacheHit++;
+            } else {
+                __repr = new Repr;
+            }
         }
-        debug tracef("Append %d bytes", data.length);
         static if (!is(U == T)) {
             auto d = castFrom!(U[]).to!(T[])(data);
             __repr.__length += d.length;
@@ -495,7 +504,7 @@ public struct Buffer(T) {
         __repr.__length--;
     }
     @property void popBackN(size_t n) pure @safe {
-        assert(n <= length);
+        assert(n <= length, "n: %d, length: %d".format(n, length));
         __repr.__length -= n;
         while( n ) {
             if ( n <= __repr.__buffer.back.length ) {
@@ -509,7 +518,7 @@ public struct Buffer(T) {
             __repr.__buffer.popBack;
         }
     }
-    @property auto save() pure @safe {
+    @property auto save() @safe {
         auto n = Buffer!T();
         n.__repr = new Repr(__repr);
         return n;
@@ -525,34 +534,19 @@ public struct Buffer(T) {
         assert(false, "Impossible");
     }
     Buffer!T opSlice(size_t m, size_t n) {
-        assert( m <= n && n <= __repr.__length);
-        auto res = Buffer!T();
-        if ( m == n ) {
-            res.__repr = new Repr;
-            return res;
+        if ( empty || m == n ) {
+            return Buffer!T();
         }
-        res.__repr = new Repr(this.__repr);
-        res.popBackN(res.length-n);
+        assert( m <= n && n <= __repr.__length);
+        auto res = this.save();
+        res.popBackN(res.__repr.__length-n);
         res.popFrontN(m);
         return res;
     }
-//    ptrdiff_t countUntil(in T[] needle) const pure @safe {
-//        ptrdiff_t haystackpos, needlepos;
-//        while(haystackpos < length) {
-//            if ( opIndex(haystackpos) == needle[needlepos] ) {
-//
-//                return haystackpos;
-//            } else {
-//                needlepos = 0;
-//                haystackpos++;
-//            }
-//        }
-//        return -1;
-//    }
-    @property auto data(U=T[])() const pure {
+    @property auto data(U=T[])() pure {
         static if ( is(U==T[]) ) {
             if ( __repr && __repr.__buffer && __repr.__buffer.length == 1 ) {
-                return __repr.__buffer.front.dup;
+                return __repr.__buffer.front;
             }
         }
         Appender!(T[]) a;
@@ -573,6 +567,7 @@ public struct Buffer(T) {
     bool opEquals(U)(U x) {
         return cast(U)this == x;
     }
+
 }
 ///
 public unittest {

@@ -15,7 +15,7 @@ public struct ReceiveAsRange {
         return data.length == 0;
     };
     ubyte[] front() {
-        return data.data;
+        return data;
     };
     void popFront() {
         if ( read ) {
@@ -23,13 +23,13 @@ public struct ReceiveAsRange {
             data = read();
         } else {
             // we can't read any new data
-            data = Buffer!(ubyte).init;
+            data.length = 0;
         }
     };
     package {
         bool            activated;
-        Buffer!ubyte    data;
-        Buffer!ubyte    delegate() read;
+        ubyte[]         data;
+        ubyte[]         delegate() read;
     }
 }
 
@@ -50,7 +50,7 @@ public class Response {
     mixin(Getter!ushort("code"));
     mixin(Getter!URI("uri"));
     mixin(Getter!URI("finalURI"));
-    @property auto responseBody() pure @safe nothrow {
+    @property auto responseBody() @safe nothrow {
         return _responseBody;
     }
     @property auto responseHeaders() pure @safe nothrow {

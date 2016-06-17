@@ -382,8 +382,8 @@ public struct FTPRequest {
             }
             if ( _useStreaming ) {
                 _response.receiveAsRange.activated = true;
-                _response.receiveAsRange.data = _response._responseBody;
-                _response.receiveAsRange.read = delegate Buffer!ubyte () {
+                _response.receiveAsRange.data = _response._responseBody.data;
+                _response.receiveAsRange.read = delegate ubyte[] () {
                     Buffer!ubyte result;
                     while(true) {
                         // check if we received everything we need
@@ -399,7 +399,7 @@ public struct FTPRequest {
                         if ( read > 0 ) {
                             _contentReceived += read;
                             result.putNoCopy(b[0..read]);
-                            return result;
+                            return result.data;
                         }
                         if ( read < 0 ) {
                             version(Posix) {
@@ -420,7 +420,7 @@ public struct FTPRequest {
                             break;
                         }
                     }
-                    return result;
+                    return result.data;
                 };
                 return _response;
             }

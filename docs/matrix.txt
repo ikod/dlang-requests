@@ -1,0 +1,86 @@
+libcurl and dlang-requests comparison matrix
+libcurl                                                            | dlang-requests
+-------------------------------------------------------------------|---------------------------------------------------------------------------
+ - full URL syntax with no length limit                            | yes, for supported protocols
+ - custom maximum download time                                    | no, can be added
+ - custom least download speed acceptable                          | no, can be added
+ - custom output result after completion                           | ?
+ - guesses protocol from host name unless specified                | no
+ - uses .netrc                                                     | no
+ - progress bar with time statistics while downloading             | not builtin progress bar, but can be easyly implemented with streaming mode
+ - "standard" proxy environment variables support                  | no, can be added
+ - compiles on win32 (reported builds on 40+ operating systems)    | yes
+ - selectable network interface for outgoing traffic               | no
+ - IPv6 support on unix and Windows                                | yes
+ - persistent connections                                          | yes
+ - socks 4 + 5 support, with or without local name resolving       | no
+ - supports user name and password in proxy environment variables  | see line 9
+ - operations through proxy "tunnel" (using CONNECT)               | no
+ - support for large files (>2GB and >4GB) 
+   during upload and download    | follows Phobos
+ - replaceable memory functions (malloc, free, realloc, etc)       | no
+ - asynchronous name resolving (*6)                                | no
+ - both a push and a pull style interface                          | yes if that means sending and receiving from ranges.
+ - international domain names (*11)                                | can be added
+ 
+HTTP
+ HTTP/1.1 compliant (optionally uses 1.0)                          | yes. User can set any method for request.
+ GET                                                               | yes
+ PUT                                                               | yes
+ HEAD                                                              | yes
+ POST                                                              | yes
+ Pipelining                                                        | no, but i'd like to implement it
+ multipart formpost (RFC1867-style)                                | yes
+ authentication: Basic, Digest, NTLM (*9)
+   and Negotiate (SPNEGO) (*3)                                     | Basic
+   to server and proxy
+ resume (both GET and PUT)                                         | no
+ follow redirects                                                  | yes
+ maximum amount of redirects to follow                             | yes
+ custom HTTP request                                               | ?
+ cookie get/send fully parsed                                      | yes
+ reads/writes the netscape cookie file format                      | no
+ custom headers (replace/remove internally generated headers)      | yes
+ custom user-agent string                                          | yes
+ custom referrer string                                            | yes
+ range                                                             | user controlled
+ proxy authentication                                              | yes, but not tested
+ time conditions                                                   | ?
+ via http-proxy                                                    | yes
+ retrieve file modification date                                   | no
+ Content-Encoding support for deflate and gzip                     | yes
+ "Transfer-Encoding: chunked" support in uploads                   | yes
+ data compression (*12)                                            | no, but can be added
+ HTTP/2 (*5)                                                       | no
+
+HTTPS (*1)
+ (all the HTTP features)                                           | yes
+ using client certificates                                         | no, have plan to add
+ verify server certificate                                         | no, have plan to add
+ via http-proxy                                                    | yes
+ select desired encryption                                         | no
+ force usage of a specific SSL version (SSLv2 (*7), 
+ SSLv3 (*10) or TLSv1) | forces TLS
+ 
+FTP
+ download                                                          | yes
+ authentication                                                    | yes
+ Kerberos 5 (*14)                                                  | no
+ active/passive using PORT, EPRT, PASV or EPSV                     | always use PASV
+ single file size information (compare to HTTP HEAD)               | ?... use SIZE
+ 'type=' URL support                                               | no
+ dir listing                                                       | no
+ dir listing names-only                                            | no
+ upload                                                            | yes
+ upload append                                                     | no
+ upload via http-proxy as HTTP PUT                                 | no
+ download resume                                                   | no, can be added
+ upload resume                                                     | no, can be added
+ custom ftp commands (before and/or after the transfer             | no
+ simple "range" support                                            | no
+ via http-proxy                                                    | no, shoud be fixed
+ all operations can be tunneled through a http-proxy               | no
+ customizable to retrieve file modification date                   | no
+ no dir depth limit                                                | no
+
+

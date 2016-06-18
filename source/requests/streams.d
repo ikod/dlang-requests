@@ -104,7 +104,7 @@ public class DataPipe(E) : DataPipeIface!E {
             product.length = 0;
             while( !p.empty ) product ~= p.get();
         }
-        product.each!(b => buffer.put(b));
+        product.each!(b => buffer.putNoCopy(b));
     }
 }
 
@@ -315,6 +315,20 @@ unittest {
     dpu.putNoCopy("efgh".dup.representation);
     dpu.flush();
     assert(equal(dpu.get(), "abcdefgh"));
+    info("Test unchunker properties");
+    ubyte[] twoChunks = "2\r\n12\r\n2\r\n34\r\n0\r\n".dup.representation;
+    ubyte[][] result;
+    auto uc = new DecodeChunked();
+    uc.putNoCopy(twoChunks);
+    while(!uc.empty) {
+        result ~= uc.get();
+    }
+    assert(equal(result[0], ['1', '2']));
+    assert(equal(result[1], ['3', '4']));
+    info("unchunker correctness - ok");
+    result[0][0] = '5';
+    assert(twoChunks[3] == '5');
+    info("unchunker zero copy - ok");
     info("Testing DataPipe - done");
 }
 /**
@@ -376,6 +390,9 @@ public struct Buffer(T) {
     alias toString = data!string;
     
     this(this) {
+        if ( !__repr ) {
+            return;
+        }
         __repr = new Repr(__repr);
     }
     this(U)(U[] data) {

@@ -30,7 +30,7 @@ public alias Cookie     = Tuple!(string, "path", string, "domain", string, "attr
 public alias QueryParam = Tuple!(string, "key", string, "value");
 
 static immutable ushort[] redirectCodes = [301, 302, 303];
-enum defaultBufferSize = 8192;
+static immutable uint     defaultBufferSize = 12*1024;
 
 static string urlEncoded(string p) pure @safe {
     immutable string[dchar] translationTable = [
@@ -1294,6 +1294,7 @@ public struct HTTPRequest {
     ///
     /// POST request. Simple wrapper over exec!"POST"
     /// Params:
+    /// uri = endpoint uri
     /// args = request parameters. see exec docs.
     ///
     HTTPResponse post(A...)(string uri, A args) {

@@ -492,7 +492,6 @@ info(<span style="color:red">"Check chunked content"</span>);
 globalLogLevel(LogLevel.info);
 rq = <u>HTTPRequest</u>();
 rq.keepAlive = <span style="color:blue">true</span>;
-rq.bufferSize = 16*1024;
 rs = rq.get(<span style="color:red">"http://httpbin.org/range/1024"</span>);
 <span style="color:blue">assert</span>(rs.code==200);
 <span style="color:blue">assert</span>(rs.responseBody.length==1024);
@@ -509,9 +508,9 @@ info(<span style="color:red">"Check exception handling, error messages are OK"</
 rq = <u>HTTPRequest</u>();
 rq.timeout = 1.seconds;
 assertThrown!TimeoutException(rq.get(<span style="color:red">"http://httpbin.org/delay/3"</span>));
-assertThrown!ConnectError(rq.get(<span style="color:red">"http://0.0.0.0:65000/"</span>));
-assertThrown!ConnectError(rq.get(<span style="color:red">"http://1.1.1.1/"</span>));
-<span style="color:green">//assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
+<span style="color:green">//    assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
+</span><span style="color:green">//    assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
+</span><span style="color:green">//assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
 </span>
 globalLogLevel(LogLevel.info);
 info(<span style="color:red">"Check limits"</span>);
@@ -659,7 +658,9 @@ rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red
 <dd class="decl desc"><div class="sections"><p>POST request. Simple wrapper over exec!"POST"
 </p>
 <h4 class="sec">Parameters:</h4>
-  <table class="params"><tr><td class="paramname"><code>A <code><i>args</i></code></code></td>
+  <table class="params"><tr><td class="paramname"><code>string <code><i>uri</i></code></code></td>
+<td class="paramdesc"><p>endpoint <code><i>uri</i></code></p></td></tr>
+<tr><td class="paramname"><code>A <code><i>args</i></code></code></td>
 <td class="paramdesc"><p>request parameters. see exec docs.</p></td></tr>
 </table>
 </div>

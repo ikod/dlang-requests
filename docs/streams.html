@@ -131,7 +131,7 @@
 <dd class="decl desc"><div class="sections"><p>Is there any processed data ready for reading?</p>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="DataPipeIface.put"></a>void <u>put</u>(E[]);
+<dt class="decl"><p><code><a name="DataPipeIface.putNoCopy"></a>void <u>putNoCopy</u>(E[]);
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Put next data portion for processing</p>
 </div>
@@ -165,27 +165,20 @@
 </table>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="DataPipe.put"></a>void <u>put</u>(E[] <code><i>data</i></code>);
+<dt class="decl"><p><code><a name="DataPipe.putNoCopy"></a>void <u>putNoCopy</u>(E[] <code><i>data</i></code>);
 </code></p></dt>
-<dd class="decl desc"><div class="sections"><p>Process next <code><i>data</i></code> portion. Data passed over pipeline and result stored in buffer.
+<dd class="decl desc"><div class="sections"><p>Process next <code><i>data</i></code> portion. Data passed over pipeline and store result in buffer.
 </p>
 <h4 class="sec">Parameters:</h4>
   <table class="params"><tr><td class="paramname"><code>E[] <code><i>data</i></code></code></td>
-<td class="paramdesc"><p>input <code><i>data</i></code> array.</p></td></tr>
+<td class="paramdesc"><p>input <code><i>data</i></code> buffer.
+</p><p>
+
+NoCopy means we do not copy <code><i>data</i></code> to buffer, we keep reference</p></td></tr>
 </table>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="DataPipe.put.2"></a>void <u>put</u>(Buffer!E <code><i>buff</i></code>);
-</code></p></dt>
-<dd class="decl desc"><div class="sections"><p>Process next data portion. Data passed over pipeline and store result in buffer.
-</p>
-<h4 class="sec">Parameters:</h4>
-  <table class="params"><tr><td class="paramname"><code>Buffer!E <code><i>buff</i></code></code></td>
-<td class="paramdesc"><p>input data buffer.</p></td></tr>
-</table>
-</div>
-</dd>
-<dt class="decl"><p><code><a name="DataPipe.get"></a>pure E[] <u>get</u>();
+<dt class="decl"><p><code><a name="DataPipe.get"></a>E[] <u>get</u>();
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Get what was collected in internal buffer and clear it.
 </p>
@@ -211,70 +204,6 @@
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>Unchunk chunked http responce body.</p>
 </div>
-</dd>
-<dt class="decl"><p><code><a name="Buffer"></a>struct <u>Buffer</u>(T);
-</code></p></dt>
-<dd class="decl desc"><div class="sections"><p><u>Buffer</u> used to collect and process data from network. It remainds Appender, but support
- also Range interface.
- <p>To place data in buffer use put() method.</p>
- <p> To retrieve data from buffer you can use several methods:</p>
- <ul>  <li>Range methods: front, back, index []</li>
-  <li>data method: return collected data (like Appender.data)</li>
- </ul></p>
-<h4 class="sec">Examples:</h4> <p><pre class="d_code">
-
-<span style="color:blue">static</span> <span style="color:blue">assert</span>(isInputRange!(<u>Buffer</u>!<span style="color:blue">ubyte</span>));
-<span style="color:blue">static</span> <span style="color:blue">assert</span>(isForwardRange!(<u>Buffer</u>!<span style="color:blue">ubyte</span>));
-<span style="color:blue">static</span> <span style="color:blue">assert</span>(hasLength!(<u>Buffer</u>!<span style="color:blue">ubyte</span>));
-<span style="color:blue">static</span> <span style="color:blue">assert</span>(hasSlicing!(<u>Buffer</u>!<span style="color:blue">ubyte</span>));
-<span style="color:blue">static</span> <span style="color:blue">assert</span>(isBidirectionalRange!(<u>Buffer</u>!<span style="color:blue">ubyte</span>));
-<span style="color:blue">static</span> <span style="color:blue">assert</span>(isRandomAccessRange!(<u>Buffer</u>!<span style="color:blue">ubyte</span>));
-
-<span style="color:blue">auto</span> b = <u>Buffer</u>!<span style="color:blue">ubyte</span>();
-b.put(<span style="color:red">"abc"</span>.representation.dup);
-b.put(<span style="color:red">"def"</span>.representation.dup);
-<span style="color:blue">assert</span>(b.length == 6);
-<span style="color:blue">assert</span>(b.toString == <span style="color:red">"abcdef"</span>);
-<span style="color:blue">assert</span>(b.front == 'a');
-<span style="color:blue">assert</span>(b.back == 'f');
-<span style="color:blue">assert</span>(equal(b[0..$], <span style="color:red">"abcdef"</span>));
-<span style="color:blue">assert</span>(equal(b[$-2..$], <span style="color:red">"ef"</span>));
-<span style="color:blue">assert</span>(b == <span style="color:red">"abcdef"</span>);
-b.popFront;
-b.popBack;
-<span style="color:blue">assert</span>(b.front == 'b');
-<span style="color:blue">assert</span>(b.back == 'e');
-<span style="color:blue">assert</span>(b.length == 4);
-<span style="color:blue">assert</span>(retro(b).front == 'e');
-<span style="color:blue">assert</span>(countUntil(b, 'e') == 3);
-<span style="color:blue">assert</span>(equal(splitter(b, 'c').array[1], ['d', 'e'])); <span style="color:green">// split "bcde" on 'c'
-</span><span style="color:blue">assert</span>(equal(b, <span style="color:red">"bcde"</span>));
-b.popFront; b.popFront;
-<span style="color:blue">assert</span>(b.front == 'd');
-<span style="color:blue">assert</span>(b.front == b[0]);
-<span style="color:blue">assert</span>(b.back == b[$-1]);
-
-<span style="color:blue">auto</span> c = <u>Buffer</u>!<span style="color:blue">ubyte</span>();
-c.put(<span style="color:red">"Header0: value0\n"</span>.representation.dup);
-c.put(<span style="color:red">"Header1: value1\n"</span>.representation.dup);
-c.put(<span style="color:red">"Header2: value2\n\nbody"</span>.representation.dup);
-<span style="color:blue">auto</span> c_length = c.length;
-<span style="color:blue">auto</span> eoh = countUntil(c, <span style="color:red">"\n\n"</span>);
-<span style="color:blue">assert</span>(eoh == 47);
-<span style="color:blue">foreach</span>(header; c[0..eoh].splitter('\n') ) {
-    writeln(castFrom!(<span style="color:blue">ubyte</span>[]).to!(string)(header.data));
-}
-<span style="color:blue">assert</span>(equal(findSplit(c, <span style="color:red">"\n\n"</span>)[2], <span style="color:red">"body"</span>));
-<span style="color:blue">assert</span>(c.length == c_length);
-</pre>
-</p></div>
-<h3 class="memb">Members:</h3>
-  <dl><dt class="decl"><p><code><a name="Buffer.put"></a>pure auto <u>put</u>(U)(U[] <code><i>data</i></code>);
-</code></p></dt>
-<dd class="decl desc"><div class="sections"><p>store <code><i>data</i></code>. Data copied</p>
-</div>
-</dd>
-</dl>
 </dd>
 </dl>
   </div>

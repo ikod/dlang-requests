@@ -50,10 +50,10 @@ public class Response {
     mixin(Getter!ushort("code"));
     mixin(Getter!URI("uri"));
     mixin(Getter!URI("finalURI"));
-    @property auto responseBody() @safe nothrow {
+    @property auto ref responseBody() @safe nothrow {
         return _responseBody;
     }
-    @property auto responseHeaders() pure @safe nothrow {
+    @property auto ref responseHeaders() pure @safe nothrow {
         return _responseHeaders;
     }
     @property auto ref receiveAsRange() pure @safe nothrow {

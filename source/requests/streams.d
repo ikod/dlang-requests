@@ -66,7 +66,7 @@ public class DataPipe(E) : DataPipeIface!E {
     }
     /// Process next data portion. Data passed over pipeline and store result in buffer.
     /// Params:
-    /// buff = input data buffer.
+    /// data = input data buffer.
     /// NoCopy means we do not copy data to buffer, we keep reference
     void putNoCopy(E[] data) {
         if ( pipe.empty ) {
@@ -420,9 +420,6 @@ public struct Buffer(T) {
         if ( !__repr ) {
             __repr = cachedOrNew();
         }
-        //        if ( !__repr ) {
-        //            __repr = new Repr;
-        //        }
         static if (!is(U == T)) {
             auto d = castFrom!(U[]).to!(T[])(data);
             __repr.__length += d.length;

@@ -238,8 +238,14 @@ Response.history - for redirected responses contain all history</p>
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>This struct used to bulld POST's to forms.
 </p>
+<p>Each part have name and data. data is something that can be read-ed and have size.
+</p><p>
+
+For example this can be string-like object (wrapped for reading) or opened File.</p>
 <h4 class="sec">Examples:</h4> <p><pre class="d_code">
-<span style="color:blue">import</span> std.file;
+<span style="color:green">/// This is example on usage files with MultipartForm data.
+</span><span style="color:green">/// For this example we have to create files which will be sent.
+</span><span style="color:blue">import</span> std.file;
 <span style="color:blue">import</span> std.path;
 globalLogLevel(LogLevel.info);
 info(<span style="color:red">"Check POST files"</span>);
@@ -254,7 +260,8 @@ f = File(tmpfname2, <span style="color:red">"wb"</span>);
 f.rawWrite(<span style="color:red">"file2 content\n"</span>);
 f.close();
 <span style="color:green">///
-</span><span style="color:green">/// files ready, send them.
+</span><span style="color:green">/// Ok, files ready.
+</span><span style="color:green">/// Now we will prepare Form data
 </span><span style="color:green">/// 
 </span>File f1 = File(tmpfname1, <span style="color:red">"rb"</span>);
 File f2 = File(tmpfname2, <span style="color:red">"rb"</span>);
@@ -262,12 +269,16 @@ File f2 = File(tmpfname2, <span style="color:red">"rb"</span>);
     f1.close();
     f2.close();
 }
-<u>MultipartForm</u> form = <u>MultipartForm</u>().
+<span style="color:green">///
+</span><span style="color:green">/// for each part we have to set field name, source (ubyte array or opened file) and optional filename and content-type
+</span><span style="color:green">/// 
+</span><u>MultipartForm</u> form = <u>MultipartForm</u>().
     add(formData(<span style="color:red">"Field1"</span>, <span style="color:blue">cast</span>(<span style="color:blue">ubyte</span>[])<span style="color:red">"form field from memory"</span>)).
     add(formData(<span style="color:red">"Field2"</span>, <span style="color:blue">cast</span>(<span style="color:blue">ubyte</span>[])<span style="color:red">"file field from memory"</span>, [<span style="color:red">"filename"</span>:<span style="color:red">"data2"</span>])).
     add(formData(<span style="color:red">"File1"</span>, f1, [<span style="color:red">"filename"</span>:<span style="color:red">"file1"</span>, <span style="color:red">"Content-Type"</span>: <span style="color:red">"application/octet-stream"</span>])).
     add(formData(<span style="color:red">"File2"</span>, f2, [<span style="color:red">"filename"</span>:<span style="color:red">"file2"</span>, <span style="color:red">"Content-Type"</span>: <span style="color:red">"application/octet-stream"</span>]));
-<span style="color:blue">auto</span> rq = HTTPRequest();
+<span style="color:green">/// everything ready, send request
+</span><span style="color:blue">auto</span> rq = HTTPRequest();
 <span style="color:blue">auto</span> rs = rq.post(<span style="color:red">"http://httpbin.org/post"</span>, form);
 </pre>
 </p></div>
@@ -544,9 +555,40 @@ tracef(<span style="color:red">"http tests - ok"</span>);
 </table>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="HTTPRequest.exec"></a>HTTPResponse <u>exec</u>(string method = "POST", R)(string <code><i>url</i></code>, R <code><i>content</i></code>, string <code><i>contentType</i></code> = "text/html") if (rank!R == 1 || rank!R == 2 &amp;&amp; isSomeChar!(Unqual!(typeof(<code><i>content</i></code>.front.front))) || rank!R == 2 &amp;&amp; is(Unqual!(typeof(<code><i>content</i></code>.front.front)) == ubyte));
+<dt class="decl"><p><code><a name="HTTPRequest.exec"></a>HTTPResponse <u>exec</u>(string method = "POST")(string <code><i>url</i></code>, MultipartForm <code><i>sources</i></code>);
 </code></p></dt>
-<dd class="decl desc"><div class="sections"><p>POST/PATH/PUT/... data from some string(with Content-Length), or from range of strings (use Transfer-Encoding: chunked)
+<dd class="decl desc"><div class="sections"><p>Send multipart for request.
+</p>
+<p>You would like to use this method for sending large portions of mixed data or uploading files to forms.
+</p><p>
+
+Content of the posted form consist of <code><i>sources</i></code>. Each source have at least name and value (can be string-like object or opened file, see more docs for MultipartForm struct)
+
+</p>
+<h4 class="sec">Parameters:</h4>
+  <table class="params"><tr><td class="paramname"><code>string <code><i>url</i></code></code></td>
+<td class="paramdesc"><p><code><i>url</i></code></p></td></tr>
+<tr><td class="paramname"><code>MultipartForm <code><i>sources</i></code></code></td>
+<td class="paramdesc"><p>array of <code><i>sources</i></code>.</p></td></tr>
+</table>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="HTTPRequest.exec.2"></a>HTTPResponse <u>exec</u>(string method = "POST", R)(string <code><i>url</i></code>, R <code><i>content</i></code>, string <code><i>contentType</i></code> = "text/html") if (rank!R == 1 || rank!R == 2 &amp;&amp; isSomeChar!(Unqual!(typeof(<code><i>content</i></code>.front.front))) || rank!R == 2 &amp;&amp; is(Unqual!(typeof(<code><i>content</i></code>.front.front)) == ubyte));
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p>POST/PUT/... data from some string(with Content-Length), or from range of strings/bytes (use Transfer-Encoding: chunked).
+</p>
+<p>When rank 1 (flat array) used as <code><i>content</i></code> it must have length. In that case "<code><i>content</i></code>" will be sent directly to network, and Content-Length headers will be added.
+</p><p>
+
+If you are goung to send some range and do not know length at the moment when you start to send request, then you can send chunks of chars or ubyte.
+</p><p>
+
+Try not to send too short chunks as this will put additional load on client and server. Chunks of length 2048 or 4096 are ok.
+</p><p>
+
+</p><p>
+
+
 </p>
 <p><h4 class="sec">Parameters:</h4>
 <code><i>url</i></code> = <code><i>url</i></code>
@@ -586,11 +628,17 @@ rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red
 </p>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="HTTPRequest.exec.2"></a>HTTPResponse <u>exec</u>(string method = "GET")(string <code><i>url</i></code> = null, QueryParam[] <code><i>params</i></code> = null);
+<dt class="decl"><p><code><a name="HTTPRequest.exec.3"></a>HTTPResponse <u>exec</u>(string method = "GET")(string <code><i>url</i></code> = null, QueryParam[] <code><i>params</i></code> = null);
 </code></p></dt>
-<dd class="decl desc"><div class="sections"><p>Send request without data
+<dd class="decl desc"><div class="sections"><p>Send request with pameters.
 </p>
-<p>Request parameters will be encoded into request string
+<p>If used for POST or PUT requests then application/x-www-form-urlencoded used.
+</p><p>
+
+Request parameters will be encoded into request string or placed in request body for POST/PUT
+</p><p>
+
+requests.
 
 </p>
 <p><h4 class="sec">Parameters:</h4>
@@ -610,11 +658,14 @@ rs = Request().<u>exec</u>!<span style="color:red">"GET"</span>(<span style="col
 </p>
 </div>
 </dd>
-<dt class="decl"><p><code><a name="HTTPRequest.exec.3"></a>HTTPResponse <u>exec</u>(string method = "POST")(string <code><i>url</i></code>, PostFile[] <code><i>files</i></code>) if (method == "POST");
+<dt class="decl"><p><code><a name="HTTPRequest.exec.4"></a>HTTPResponse <u>exec</u>(string method = "POST")(string <code><i>url</i></code>, PostFile[] <code><i>files</i></code>) if (method == "POST");
 </code></p></dt>
 <dd class="decl desc"><div class="sections"><p>WRAPPERS
 </p>
-<p>send file(s) using POST
+<p>send file(s) using POST and multipart form.
+</p><p>
+
+This wrapper will be deprecated, use post with MultipartForm - it is more general and clear.
 
 </p>
 <p><h4 class="sec">Parameters:</h4>
@@ -625,6 +676,15 @@ rs = Request().<u>exec</u>!<span style="color:red">"GET"</span>(<span style="col
 
 </p>
 <h4 class="sec">Returns:</h4> <p>Response
+</p><p>
+
+Each PostFile structure contain path to file, and optional field name and content type.
+</p><p>
+
+If no field name provided, then basename of the file will be used.
+</p><p>
+
+application/octet-stream is default when no content type provided.
 
 </p>
 <p><h4 class="sec">Example:</h4>
@@ -641,6 +701,23 @@ rs = rq.<u>exec</u>!<span style="color:red">"POST"</span>(<span style="color:red
 
 </pre>
 </p>
+</div>
+</dd>
+<dt class="decl"><p><code><a name="HTTPRequest.exec.5"></a>HTTPResponse <u>exec</u>(string method = "GET")(string <code><i>url</i></code>, string[string] <code><i>params</i></code>);
+</code></p></dt>
+<dd class="decl desc"><div class="sections"><p><u>exec</u> request with parameters when you can use dictionary (when you have no duplicates in parameter names)
+</p>
+<p>Consider switch to <u>exec</u>(<code><i>url</i></code>, QueryParams) as it more generic and clear.
+
+</p>
+<p><h4 class="sec">Parameters:</h4>
+<code><i>url</i></code> = <code><i>url</i></code>
+</p><p>
+
+<code><i>params</i></code> = dictionary with field names as keys and field values as values.
+
+</p>
+<h4 class="sec">Returns:</h4> <p>Response</p>
 </div>
 </dd>
 <dt class="decl"><p><code><a name="HTTPRequest.get"></a>HTTPResponse <u>get</u>(A...)(A <code><i>args</i></code>);

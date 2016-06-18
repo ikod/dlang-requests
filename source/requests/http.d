@@ -245,6 +245,8 @@ public class FormDataFile : FiniteReadable {
 }
 ///
 /// This struct used to bulld POST's to forms.
+/// Each part have name and data. data is something that can be read-ed and have size.
+/// For example this can be string-like object (wrapped for reading) or opened File.
 /// 
 public struct MultipartForm {
     package struct FormData {
@@ -270,6 +272,8 @@ public struct MultipartForm {
 }
 ///
 package unittest {
+    /// This is example on usage files with MultipartForm data.
+    /// For this example we have to create files which will be sent.
     import std.file;
     import std.path;
     globalLogLevel(LogLevel.info);
@@ -285,7 +289,8 @@ package unittest {
     f.rawWrite("file2 content\n");
     f.close();
     ///
-    /// files ready, send them.
+    /// Ok, files ready.
+    /// Now we will prepare Form data
     /// 
     File f1 = File(tmpfname1, "rb");
     File f2 = File(tmpfname2, "rb");
@@ -293,11 +298,15 @@ package unittest {
         f1.close();
         f2.close();
     }
+    ///
+    /// for each part we have to set field name, source (ubyte array or opened file) and optional filename and content-type
+    /// 
     MultipartForm form = MultipartForm().
         add(formData("Field1", cast(ubyte[])"form field from memory")).
         add(formData("Field2", cast(ubyte[])"file field from memory", ["filename":"data2"])).
         add(formData("File1", f1, ["filename":"file1", "Content-Type": "application/octet-stream"])).
         add(formData("File2", f2, ["filename":"file2", "Content-Type": "application/octet-stream"]));
+    /// everything ready, send request
     auto rq = HTTPRequest();
     auto rs = rq.post("http://httpbin.org/post", form);
 }
@@ -877,7 +886,13 @@ public struct HTTPRequest {
     private bool isIdempotent(in string method) pure @safe nothrow {
         return ["GET", "HEAD"].canFind(method);
     }
-
+    ///
+    /// Send multipart for request.
+    /// You would like to use this method for sending large portions of mixed data or uploading files to forms.
+    /// Content of the posted form consist of sources. Each source have at least name and value (can be string-like object or opened file, see more docs for MultipartForm struct)
+    /// Params:
+    ///     url = url
+    ///     sources = array of sources.
     HTTPResponse exec(string method="POST")(string url, MultipartForm sources) {
         import std.uuid;
         import std.file;
@@ -1006,7 +1021,10 @@ public struct HTTPRequest {
         return _response;
     }
     ///
-    /// POST/PATH/PUT/... data from some string(with Content-Length), or from range of strings (use Transfer-Encoding: chunked)
+    /// POST/PUT/... data from some string(with Content-Length), or from range of strings/bytes (use Transfer-Encoding: chunked).
+    /// When rank 1 (flat array) used as content it must have length. In that case "content" will be sent directly to network, and Content-Length headers will be added.
+    /// If you are goung to send some range and do not know length at the moment when you start to send request, then you can send chunks of chars or ubyte.
+    /// Try not to send too short chunks as this will put additional load on client and server. Chunks of length 2048 or 4096 are ok.
     /// 
     /// Parameters:
     ///    url = url
@@ -1137,8 +1155,10 @@ public struct HTTPRequest {
         return _response;
     }
     ///
-    /// Send request without data
-    /// Request parameters will be encoded into request string
+    /// Send request with pameters.
+    /// If used for POST or PUT requests then application/x-www-form-urlencoded used.
+    /// Request parameters will be encoded into request string or placed in request body for POST/PUT
+    /// requests.
     /// Parameters:
     ///     url = url
     ///     params = request parameters
@@ -1175,7 +1195,7 @@ public struct HTTPRequest {
 
         Appender!string req;
 
-        if ( _method == "POST" && params ) {
+        if ( ["POST", "PUT"].canFind(_method) && params ) {
             encoded = params2query(params);
             h["Content-Type"] = "application/x-www-form-urlencoded";
             h["Content-Length"] = to!string(encoded.length);
@@ -1249,14 +1269,17 @@ public struct HTTPRequest {
     }
 
     /// WRAPPERS
-
     ///
-    /// send file(s) using POST
+    /// send file(s) using POST and multipart form.
+    /// This wrapper will be deprecated, use post with MultipartForm - it is more general and clear.
     /// Parameters:
     ///     url = url
     ///     files = array of PostFile structures
     /// Returns:
     ///     Response
+    /// Each PostFile structure contain path to file, and optional field name and content type.
+    /// If no field name provided, then basename of the file will be used.
+    /// application/octet-stream is default when no content type provided.
     /// Example:
     /// ---------------------------------------------------------------
     ///    PostFile[] files = [
@@ -1280,6 +1303,14 @@ public struct HTTPRequest {
         toClose.each!"a.close";
         return res;
     }
+    ///
+    /// exec request with parameters when you can use dictionary (when you have no duplicates in parameter names)
+    /// Consider switch to exec(url, QueryParams) as it more generic and clear.
+    /// Parameters:
+    ///     url = url
+    ///     params = dictionary with field names as keys and field values as values.
+    /// Returns:
+    ///     Response
     HTTPResponse exec(string method="GET")(string url, string[string] params) {
         return exec!method(url, params.byKeyValue.map!(p => QueryParam(p.key, p.value)).array);
     }

@@ -835,7 +835,27 @@ public struct HTTPRequest {
 
                         _contentReceived += read;
                         _bodyDecoder.putNoCopy(b[0..read]);
-                        return _bodyDecoder.get();
+                        auto res = _bodyDecoder.getNoCopy();
+                        if ( res.length == 0 ) {
+                            // there were nothing to produce (beginning of the chunk or no decompressed data)
+                            continue;
+                        }
+                        //                        
+                        // I'd like to "return _bodyDecoder.getNoCopy().join;" but if is slower
+                        //
+                        if (res.length == 1) {
+                            return res[0];
+                        }
+                        auto total = res.map!(b=>b.length).sum;
+                        // create buffer for joined bytes
+                        ubyte[] joined = new ubyte[total];
+                        size_t p;
+                        // memcopy 
+                        foreach(ref _; res) {
+                            joined[p .. p + _.length] = _;
+                            p += _.length;
+                        }
+                        return joined;
                     }
                     assert(0);
                 };
@@ -872,8 +892,11 @@ public struct HTTPRequest {
                     format(_contentLength, _maxContentLength));
             }
 
-            _bodyDecoder.putNoCopy(b[0..read]);
-            _response._responseBody.putNoCopy(_bodyDecoder.get());
+            _bodyDecoder.putNoCopy(b[0..read]); // send buffer to all decoders
+
+            _bodyDecoder.getNoCopy.             // fetch result and place to body
+                each!(b => _response._responseBody.putNoCopy(b));
+
             debug tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", _contentReceived, _contentLength, _response._responseBody.length);
 
         }

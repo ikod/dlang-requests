@@ -82,11 +82,22 @@ public class DataPipe(E) : DataPipeIface!E {
     /// Get what was collected in internal buffer and clear it. 
     /// Returns:
     /// data collected.
-    E[] get()  {
+    E[] get() {
         if ( buffer.empty ) {
             return E[].init;
         }
         auto res = buffer.data;
+        buffer = Buffer!E.init;
+        return res;
+    }
+    ///
+    /// get without datamove. but user receive [][]
+    /// 
+    E[][] getNoCopy()  {
+        if ( buffer.empty ) {
+            return E[][].init;
+        }
+        E[][] res = buffer.__repr.__buffer;
         buffer = Buffer!E.init;
         return res;
     }
@@ -353,21 +364,20 @@ static long reprCacheRequests;
 
 
 public struct Buffer(T) {
-    static Repr[CACHESIZE]  cache;
-    static uint             cacheIndex;
+//    static Repr[CACHESIZE]  cache;
+//    static uint             cacheIndex;
 
     private {
         Repr  cachedOrNew() {
-            Repr repr;
-            reprCacheRequests++;
-            if ( cacheIndex>0 ) {
-                cacheIndex -= 1;
-                repr = cache[cacheIndex];
-                reprCacheHit++;
-            } else {
-                repr = new Repr;
-            }
-            return repr;
+            return new Repr;
+//            reprCacheRequests++;
+//            if ( false && cacheIndex>0 ) {
+//                reprCacheHit++;
+//                cacheIndex -= 1;
+//                return cache[cacheIndex];
+//            } else {
+//                return new Repr;
+//            }
         }
         class Repr {
             size_t         __length;
@@ -399,23 +409,25 @@ public struct Buffer(T) {
         put(data);
     }
     ~this() {
-        if ( cacheIndex >= CACHESIZE ) {
-            __repr = null;
-            return;
-        }
-        if ( __repr ) {
-            __repr.__length = 0;
-            __repr.__buffer.length = 0;
-            cache[cacheIndex] = __repr;
-            cacheIndex += 1;
-        }
+        __repr = null;
+//        if ( cacheIndex >= CACHESIZE ) {
+//            __repr = null;
+//            return;
+//        }
+//        if ( __repr ) {
+//            __repr.__length = 0;
+//            __repr.__buffer = null;
+//            cache[cacheIndex] = __repr;
+//            cacheIndex += 1;
+//            __repr = null;
+//        }
     }
     /***************
      * store data. Data copied
      */
     auto put(U)(U[] data) {
         if ( data.length == 0 ) {
-            return this;
+            return;
         }
         if ( !__repr ) {
             __repr = cachedOrNew();
@@ -428,11 +440,11 @@ public struct Buffer(T) {
             __repr.__length += data.length;
             __repr.__buffer ~= data.dup;
         }
-        return this;
+        return;
     }
     auto putNoCopy(U)(U[] data) {
         if ( data.length == 0 ) {
-            return this;
+            return;
         }
         if ( !__repr ) {
             __repr = cachedOrNew();
@@ -445,7 +457,7 @@ public struct Buffer(T) {
             __repr.__length += data.length;
             __repr.__buffer ~= data;
         }
-        return this;
+        return;
     }
     @property auto opDollar() const pure @safe {
         return __repr.__length;

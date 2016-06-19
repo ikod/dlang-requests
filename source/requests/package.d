@@ -437,7 +437,7 @@ package unittest {
     auto rq = Request();
     rq.useStreaming = true;
     rq.bufferSize = 16;
-    auto rs = rq.get("http://httpbin.org/get");
+    auto rs = rq.get("http://httpbin.org/stream/20");
     auto stream = rs.receiveAsRange();
     ubyte[] streamedContent;
     while( !stream.empty() ) {
@@ -445,7 +445,7 @@ package unittest {
         stream.popFront();
     }
     rq = Request();
-    rs = rq.get("http://httpbin.org/get");
+    rs = rq.get("http://httpbin.org/stream/20");
     assert(streamedContent == rs.responseBody.data);
     rq.useStreaming = true;
     streamedContent.length = 0;
@@ -455,7 +455,7 @@ package unittest {
         streamedContent ~= stream.front;
         stream.popFront();
     }
-
+    assert(streamedContent.length == 1024);
 }
 ///
 package unittest {

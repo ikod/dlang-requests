@@ -377,7 +377,7 @@ auto queryParams(A...)(A args) pure @safe nothrow {
  * Returns:
  * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
  */
-public auto getContent(A...)(string url) {
+public auto ref getContent(A...)(string url) {
     auto rq = Request();
     auto rs = rq.get(url);
     return rs.responseBody;
@@ -388,7 +388,7 @@ public auto getContent(A...)(string url) {
  * Returns:
  * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
  */
-public auto getContent(A...)(string url, string[string] args) {
+public auto ref getContent(A...)(string url, string[string] args) {
     auto rq = Request();
     auto rs = rq.get(url, args);
     return rs.responseBody;
@@ -399,7 +399,7 @@ public auto getContent(A...)(string url, string[string] args) {
  * Returns:
  * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
  */
-public auto getContent(A...)(string url, QueryParam[] args) {
+public auto ref getContent(A...)(string url, QueryParam[] args) {
     auto rq = Request();
     auto rs = rq.get(url, args);
     return rs.responseBody;
@@ -410,7 +410,7 @@ public auto getContent(A...)(string url, QueryParam[] args) {
  * Returns:
  * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
  */
-public auto getContent(A...)(string url, A args) if (args.length > 1 && args.length % 2 == 0 ) {
+public auto ref getContent(A...)(string url, A args) if (args.length > 1 && args.length % 2 == 0 ) {
     return Request().
             get(url, queryParams(args)).
             responseBody;

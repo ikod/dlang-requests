@@ -759,8 +759,7 @@ public abstract class SocketStream {
         try {
             addresses = getAddress(host, port);
         } catch (Exception e) {
-            errorf("Failed to connect: can't resolve %s - %s", host, e.msg);
-            throw new ConnectError("Can't connect to %s:%d: %s".format(host, port, e.msg));
+            throw new ConnectError("Can't resolve name when connect to %s:%d: %s".format(host, port, e.msg));
         }
         foreach(a; addresses) {
             tracef("Trying %s", a);

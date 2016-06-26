@@ -764,6 +764,9 @@ public struct HTTPRequest {
             }
             auto data = b[0..read];
             buffer.putNoCopy(data);
+            if ( verbosity>=3 ) {
+                writeln(data.dump.join("\n"));
+            }
 
             if ( buffer.length > maxHeadersLength ) {
                 throw new RequestException("Headers length > maxHeadersLength (%d > %d)".format(buffer.length, maxHeadersLength));
@@ -833,6 +836,10 @@ public struct HTTPRequest {
                             return _bodyDecoder.get();
                         }
 
+                        if ( verbosity>=3 ) {
+                            writeln(b[0..read].dump.join("\n"));
+                        }
+
                         _contentReceived += read;
                         _bodyDecoder.putNoCopy(b[0..read]);
                         auto res = _bodyDecoder.getNoCopy();
@@ -883,6 +890,10 @@ public struct HTTPRequest {
             }
             if ( _verbosity >= 2 ) {
                 writefln("< %d bytes of body received", read);
+            }
+
+            if ( verbosity>=3 ) {
+                writeln(b[0..read].dump.join("\n"));
             }
 
             debug tracef("read: %d", read);

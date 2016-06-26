@@ -119,3 +119,36 @@ package unittest {
     assert(!"x.example.com".domainMatches("example.com"));
     assert("example.com".domainMatches("example.com"));
 }
+
+string[] dump(in ubyte[] data) {
+    import std.stdio;
+    import std.range;
+    import std.ascii;
+    import std.format;
+    import std.algorithm;
+
+    string[] res;
+
+    foreach(i,chunk; data.chunks(16).enumerate) {
+        string r;
+        r ~= format("%05X  ", i*16);
+        ubyte[] left, right;
+        if ( chunk.length > 8 ) {
+            left = chunk[0..8].dup;
+            right= chunk[8..$].dup;
+        } else {
+            left = chunk.dup;
+        }
+        r ~= format("%-24.24s ", left.map!(c => format("%02X", c)).join(" "));
+        r ~= format("%-24.24s ", right.map!(c => format("%02X", c)).join(" "));
+        r ~= format("|%-16s|", chunk.map!(c => isPrintable(c)?cast(char)c:'.'));
+        res ~= r;
+    }
+    return res;
+}
+package unittest {
+    import std.string;
+    import std.stdio;
+
+    writeln(dump("abcgkjhgk khgkjh kjhg \t\bdef\n\r".representation).join("\n"));
+}

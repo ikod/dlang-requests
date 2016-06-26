@@ -285,7 +285,7 @@ Here is short descrition of some Request options, you can set:
 | maxContentLength | size_t         | max.acceptable content length          | 5MB        |
 | timeout          | Duration       | timeout on connect or data transfer    | 30.seconds |
 | bufferSize       | size_t         | socket io buffer size                  | 16KB       |
-| verbosity        | uint           | verbosity level (0, 1 or 2)            | 0          |
+| verbosity        | uint           | verbosity level (0, 1, 2 or 3)         | 0          |
 | proxy            | string         | url of the http proxy                  | null       |
 | headers          | string[string] | additional headers                     | null       |
 | useStreaming     | bool           | receive data as lazy InputRange        | false      |
@@ -353,6 +353,32 @@ Received 2896 bytes, total received 28744 from document legth 35588
 Received 2896 bytes, total received 31640 from document legth 35588
 Received 2896 bytes, total received 34536 from document legth 35588
 Received 1052 bytes, total received 35588 from document legth 35588
+```
+With verbosity>=3 you will receive also dump of each data portion received from sockets:
+```
+00000  48 54 54 50 2F 31 2E 31  20 32 30 30 20 4F 4B 0D  |HTTP/1.1 200 OK.|
+00010  0A 53 65 72 76 65 72 3A  20 6E 67 69 6E 78 0D 0A  |.Server: nginx..|
+00020  44 61 74 65 3A 20 53 75  6E 2C 20 32 36 20 4A 75  |Date: Sun, 26 Ju|
+00030  6E 20 32 30 31 36 20 31  36 3A 31 36 3A 30 30 20  |n 2016 16:16:00 |
+00040  47 4D 54 0D 0A 43 6F 6E  74 65 6E 74 2D 54 79 70  |GMT..Content-Typ|
+00050  65 3A 20 61 70 70 6C 69  63 61 74 69 6F 6E 2F 6A  |e: application/j|
+00060  73 6F 6E 0D 0A 54 72 61  6E 73 66 65 72 2D 45 6E  |son..Transfer-En|
+00070  63 6F 64 69 6E 67 3A 20  63 68 75 6E 6B 65 64 0D  |coding: chunked.|
+00080  0A 43 6F 6E 6E 65 63 74  69 6F 6E 3A 20 6B 65 65  |.Connection: kee|
+...
+
+```
+Just for fun: with streaming you can forward content between servers in just two code lines. postContent will authomatically receive next data portion from source and send it to destination:
+```
+import requests;
+
+void main()
+{
+    auto rq = Request();
+    rq.useStreaming = true;
+    auto stream = rq.get("https://api.github.com/search/repositories?order=desc&sort=updated&q=language:D").receiveAsRange();
+    postContent("http://httpbin.org/post", stream);
+}
 ```
 
 You can use *requests* in parallel tasks (but you can't share single *Request* structure between threads):

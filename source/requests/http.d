@@ -51,6 +51,12 @@ public class TimeoutException: Exception {
     }
 }
 
+public class MaxRedirectsException: Exception {
+    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
+        super(msg, file, line);
+    }
+}
+
 public interface Auth {
     string[string] authHeaders(string domain);
 }
@@ -634,7 +640,7 @@ public struct HTTPRequest {
 
     private bool followRedirectResponse() {
         if ( _history.length >= _maxRedirects ) {
-            return false;
+            throw new MaxRedirectsException("%d redirects reached maxRedirects %d.".format(_history.length, _maxRedirects));
         }
         auto location = "location" in _response.responseHeaders;
         if ( !location ) {
@@ -1516,9 +1522,7 @@ package unittest {
 //    rq = Request();
     rq.maxRedirects = 2;
     rq.keepAlive = false;
-    rs = rq.get("https://httpbin.org/absolute-redirect/3");
-    assert(rs.history.length == 2);
-    assert(rs.code==302);
+    assertThrown!MaxRedirectsException(rq.get("https://httpbin.org/absolute-redirect/3"));
     info("Check utf8 content");
     globalLogLevel(LogLevel.info);
     rq = HTTPRequest();

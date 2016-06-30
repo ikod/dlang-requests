@@ -146,9 +146,3 @@ string[] dump(in ubyte[] data) {
     }
     return res;
 }
-package unittest {
-    import std.string;
-    import std.stdio;
-
-    writeln(dump("abcgkjhgk khgkjh kjhg \t\bdef\n\r".representation).join("\n"));
-}

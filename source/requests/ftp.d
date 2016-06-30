@@ -450,9 +450,6 @@ package unittest {
     rs = rq.get("ftp://speedtest.tele2.net/1KB.zip");
     assert(rs.code == 226);
     assert(rs.responseBody.length == 1024);
-    info("ftp get  ", "ftp://ftp.uni-bayreuth.de/README");
-    rs = rq.get("ftp://ftp.uni-bayreuth.de/README");
-    assert(rs.code == 226);
     info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
     rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "another test, ignore please\n".representation);
     assert(rs.code == 226);

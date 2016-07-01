@@ -277,20 +277,22 @@ For example to authorize with Basic authorization use next code:
 
 Here is short descrition of some Request options, you can set:
 
-| name             | type           | meaning                                | default    |
-|------------------|----------------|----------------------------------------|------------|
-| keepAlive        | bool           | request keepalive connection           | false      |
-| maxRedirects     | uint           | maximum redirect depth                 | 10         |
-| maxHeadersLength | size_t         | max.acceptable response headers length | 32KB       |
-| maxContentLength | size_t         | max.acceptable content length          | 5MB        |
-| timeout          | Duration       | timeout on connect or data transfer    | 30.seconds |
-| bufferSize       | size_t         | socket io buffer size                  | 16KB       |
-| verbosity        | uint           | verbosity level (0, 1, 2 or 3)         | 0          |
-| proxy            | string         | url of the http proxy                  | null       |
-| headers          | string[string] | additional headers                     | null       |
-| useStreaming     | bool           | receive data as lazy InputRange        | false      |
-| cookie           | Cookie[]       | cookies you will send to server        | null       |
-| authenticator    | Auth           | authenticatior                         | null       |
+| name                | type           | meaning                                | default    |
+|---------------------|----------------|----------------------------------------|------------|
+| keepAlive           | bool           | request keepalive connection           | false      |
+| maxRedirects *)     | uint           | maximum redirect depth                 | 10         |
+| maxHeadersLength *) | size_t         | max.acceptable response headers length | 32KB       |
+| maxContentLength *) | size_t         | max.acceptable content length          | 5MB        |
+| timeout *)          | Duration       | timeout on connect or data transfer    | 30.seconds |
+| bufferSize          | size_t         | socket io buffer size                  | 16KB       |
+| verbosity           | uint           | verbosity level (0, 1, 2 or 3)         | 0          |
+| proxy               | string         | url of the http proxy                  | null       |
+| headers             | string[string] | additional headers                     | null       |
+| useStreaming        | bool           | receive data as lazy InputRange        | false      |
+| cookie              | Cookie[]       | cookies you will send to server        | null       |
+| authenticator       | Auth           | authenticatior                         | null       |
+
+*) Throw exception when limit reached.
 
 
 Request() properties you can read:

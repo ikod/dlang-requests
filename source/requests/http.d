@@ -809,7 +809,7 @@ public struct HTTPRequest {
                 break;
             }
             if ( _useStreaming && _response._responseBody.length && !redirectCodes.canFind(_response.code) ) {
-                trace("streaming requested");
+                debug trace("streaming requested");
                 _response.receiveAsRange.activated = true;
                 _response.receiveAsRange.data = _response._responseBody.data;
                 _response.receiveAsRange.read = delegate ubyte[] () {
@@ -853,12 +853,12 @@ public struct HTTPRequest {
                             // there were nothing to produce (beginning of the chunk or no decompressed data)
                             continue;
                         }
-                        //                        
-                        // I'd like to "return _bodyDecoder.getNoCopy().join;" but if is slower
-                        //
                         if (res.length == 1) {
                             return res[0];
                         }
+                        //
+                        // I'd like to "return _bodyDecoder.getNoCopy().join;" but if is slower
+                        //
                         auto total = res.map!(b=>b.length).sum;
                         // create buffer for joined bytes
                         ubyte[] joined = new ubyte[total];

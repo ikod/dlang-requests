@@ -724,7 +724,27 @@ public class OpenSslSocket : Socket {
     }
 }
 
-public abstract class SocketStream {
+public interface NetworkStream {
+    @property bool isConnected() @safe @nogc pure const;
+    void close() @trusted;
+
+    ///
+    /// timeout is the socket write timeout.
+    ///
+    NetworkStream connect(string host, ushort port, Duration timeout = 10.seconds);
+
+    ptrdiff_t send(const(void)[] buff) @safe;
+    ptrdiff_t receive(void[] buff) @safe;
+
+    ///
+    /// Set timeout for receive calls. 0 means no timeout.
+    ///
+    @property void readTimeout(Duration timeout) @safe;
+
+    @property string lastError() @safe const;
+}
+
+public abstract class SocketStream : NetworkStream {
     private {
         Duration timeout;
         Socket   s;
@@ -752,7 +772,7 @@ public abstract class SocketStream {
         s = null;
     }
     
-    auto connect(string host, ushort port, Duration timeout = 10.seconds) {
+    SocketStream connect(string host, ushort port, Duration timeout = 10.seconds) {
         tracef(format("Create connection to %s:%d", host, port));
         Address[] addresses;
         __isConnected = false;
@@ -793,6 +813,14 @@ public abstract class SocketStream {
             buff.length = r;
         }
         return r;
+    }
+
+    @property void readTimeout(Duration timeout) @safe {
+        s.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
+    }
+
+    @property string lastError() @safe const {
+        return lastSocketError();
     }
 }
 

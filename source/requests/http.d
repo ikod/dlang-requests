@@ -9,7 +9,6 @@ import std.exception;
 import std.format;
 import std.stdio;
 import std.range;
-import std.socket;
 import std.string;
 import std.traits;
 import std.typecons;
@@ -354,7 +353,7 @@ public struct HTTPRequest {
         size_t         _bufferSize = defaultBufferSize; // 16k
         bool           _useStreaming; // return iterator instead of completed request
 
-        SocketStream   _stream;
+        NetworkStream   _stream;
         HTTPResponse[] _history; // redirects history
         DataPipe!ubyte _bodyDecoder;
         DecodeChunked  _unChunker;
@@ -725,9 +724,9 @@ public struct HTTPRequest {
     /// 
     private void receiveResponse() {
 
-        _stream.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
+        _stream.readTimeout = timeout;
         scope(exit) {
-            _stream.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, 0.seconds);
+            _stream.readTimeout = 0.seconds;
         }
 
         _bodyDecoder = new DataPipe!ubyte();
@@ -816,7 +815,7 @@ public struct HTTPRequest {
                     while(true) {
                         // check if we received everything we need
                         if ( ( _unChunker && _unChunker.done )
-                            || !_stream.isOpen() 
+                            || !_stream.isConnected()
                             || (_contentLength > 0 && _contentReceived >= _contentLength) ) 
                         {
                             trace("streaming_in receive completed");
@@ -1002,7 +1001,7 @@ public struct HTTPRequest {
         
         auto rc = _stream.send(req.data());
         if ( rc == -1 ) {
-            errorf("Error sending request: ", lastSocketError);
+            errorf("Error sending request: ", _stream.lastError);
             return _response;
         }
         foreach(ref source; sources._sources) {
@@ -1134,7 +1133,7 @@ public struct HTTPRequest {
 
         auto rc = _stream.send(req.data());
         if ( rc == -1 ) {
-            errorf("Error sending request: ", lastSocketError);
+            errorf("Error sending request: ", _stream.lastError);
             return _response;
         }
 
@@ -1259,7 +1258,7 @@ public struct HTTPRequest {
         }
         auto rc = _stream.send(req.data());
         if ( rc == -1 ) {
-            errorf("Error sending request: ", lastSocketError);
+            errorf("Error sending request: ", _stream.lastError);
             return _response;
         }
         _response._requestSentAt = Clock.currTime;

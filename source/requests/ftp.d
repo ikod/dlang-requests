@@ -6,7 +6,6 @@ import std.algorithm;
 import std.conv;
 import std.datetime;
 import std.format;
-import std.socket;
 import std.exception;
 import std.string;
 import std.range;
@@ -41,7 +40,7 @@ public struct FTPRequest {
         long          _maxContentLength = 5*1024*1024*1024;
         long          _contentLength = -1;
         long          _contentReceived;
-        SocketStream  _controlChannel;
+        NetworkStream _controlChannel;
         string[]      _responseHistory;
         FTPResponse   _response;
         bool          _useStreaming;
@@ -100,9 +99,9 @@ public struct FTPRequest {
     string serverResponse() {
         string res, buffer;
         immutable bufferLimit = 16*1024;
-        _controlChannel.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, _timeout);
+        _controlChannel.readTimeout = _timeout;
         scope(exit) {
-            _controlChannel.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, 0.seconds);
+            _controlChannel.readTimeout = 0.seconds;
         }
         auto b = new ubyte[_bufferSize];
         while ( buffer.length < bufferLimit ) {

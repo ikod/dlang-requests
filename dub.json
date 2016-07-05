@@ -1,13 +1,24 @@
 {
-	"name": "requests",
-	"description": "http client library, inspired by python-requests",
-	"copyright": "Copyright © 2016, igor",
-	"authors": ["ikod"],
+    "name": "requests",
+    "description": "http client library, inspired by python-requests",
+    "copyright": "Copyright © 2016, igor",
+    "authors": ["ikod"],
     "license": "BSL-1.0",
-    "libs-posix": ["ssl", "crypto"],
-    "libs-windows": ["libssl32", "libeay32"],
-	"dependencies": {
-	},
+    "configurations": [
+        {
+            "name": "std",
+            "versions": ["sslLibs"],
+            "libs-posix": ["ssl", "crypto"],
+            "libs-windows": ["libssl32", "libeay32"]
+        },
+        {
+            "name": "vibed",
+            "versions": ["vibeD"],
+            "dependencies": {
+                "vibe-d": "~>0.7.29"
+            },
+        }
+    ],
     "buildTypes": {
         "docs": {
             "buildOptions": ["syntaxOnly"],

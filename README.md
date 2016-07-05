@@ -10,6 +10,19 @@ HTTP requests library with goals:
 
 API docs: [Wiki](https://github.com/ikod/dlang-requests/wiki)
 
+###Library configurations###
+
+This library can either use the standard std.socket library or [vibe.d](http://vibed.org) for network IO. By default this library uses the standard std.socket configuration called *std*. To use vibe.d use the *vibed* configuration:
+
+```json
+"dependencies": {
+    "requests": "~>0.1.9"
+},
+"subConfigurations": {
+    "requests": "vibed"
+}
+```
+
 ###Make a simple Request###
 
 Making http/https/ftp request with dlang-requests is very simple. First of all install and import *requests* module:

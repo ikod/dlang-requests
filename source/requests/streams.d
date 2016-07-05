@@ -634,106 +634,119 @@ public unittest {
     assert(c.length == c_length);
 }
 
-extern(C) {
-    int SSL_library_init();
-    void OpenSSL_add_all_ciphers();
-    void OpenSSL_add_all_digests();
-    void SSL_load_error_strings();
-    
-    struct SSL {}
-    struct SSL_CTX {}
-    struct SSL_METHOD {}
-    
-    SSL_CTX* SSL_CTX_new(const SSL_METHOD* method);
-    SSL* SSL_new(SSL_CTX*);
-    int SSL_set_fd(SSL*, int);
-    int SSL_connect(SSL*);
-    int SSL_write(SSL*, const void*, int);
-    int SSL_read(SSL*, void*, int);
-    int SSL_shutdown(SSL*) @trusted @nogc nothrow;
-    void SSL_free(SSL*);
-    void SSL_CTX_free(SSL_CTX*);
-    
-    long    SSL_CTX_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg);
-    
-    long SSL_CTX_set_mode(SSL_CTX *ctx, long mode);
-    long SSL_set_mode(SSL *ssl, long mode);
-    
-    long SSL_CTX_get_mode(SSL_CTX *ctx);
-    long SSL_get_mode(SSL *ssl);
-    
-    SSL_METHOD* SSLv3_client_method();
-    SSL_METHOD* TLSv1_2_client_method();
-    SSL_METHOD* TLSv1_client_method();
-}
+version (sslLibs) {
+    extern(C) {
+        int SSL_library_init();
+        void OpenSSL_add_all_ciphers();
+        void OpenSSL_add_all_digests();
+        void SSL_load_error_strings();
 
-//pragma(lib, "crypto");
-//pragma(lib, "ssl");
+        struct SSL {}
+        struct SSL_CTX {}
+        struct SSL_METHOD {}
 
-shared static this() {
-    SSL_library_init();
-    OpenSSL_add_all_ciphers();
-    OpenSSL_add_all_digests();
-    SSL_load_error_strings();
-}
+        SSL_CTX* SSL_CTX_new(const SSL_METHOD* method);
+        SSL* SSL_new(SSL_CTX*);
+        int SSL_set_fd(SSL*, int);
+        int SSL_connect(SSL*);
+        int SSL_write(SSL*, const void*, int);
+        int SSL_read(SSL*, void*, int);
+        int SSL_shutdown(SSL*) @trusted @nogc nothrow;
+        void SSL_free(SSL*);
+        void SSL_CTX_free(SSL_CTX*);
 
-public class OpenSslSocket : Socket {
-    enum SSL_MODE_RELEASE_BUFFERS = 0x00000010L;
-    private SSL* ssl;
-    private SSL_CTX* ctx;
-    private void initSsl() {
-        //ctx = SSL_CTX_new(SSLv3_client_method());
-        ctx = SSL_CTX_new(TLSv1_client_method());
-        assert(ctx !is null);
-        
-        //SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
-        //SSL_CTX_ctrl(ctx, 33, SSL_MODE_RELEASE_BUFFERS, null);
-        ssl = SSL_new(ctx);
-        SSL_set_fd(ssl, this.handle);
+        long    SSL_CTX_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg);
+
+        long SSL_CTX_set_mode(SSL_CTX *ctx, long mode);
+        long SSL_set_mode(SSL *ssl, long mode);
+
+        long SSL_CTX_get_mode(SSL_CTX *ctx);
+        long SSL_get_mode(SSL *ssl);
+
+        SSL_METHOD* SSLv3_client_method();
+        SSL_METHOD* TLSv1_2_client_method();
+        SSL_METHOD* TLSv1_client_method();
     }
-    
-    @trusted
-    override void connect(Address to) {
-        super.connect(to);
-        if(SSL_connect(ssl) == -1)
-            throw new Exception("ssl connect failed");
+
+    //pragma(lib, "crypto");
+    //pragma(lib, "ssl");
+
+    shared static this() {
+        SSL_library_init();
+        OpenSSL_add_all_ciphers();
+        OpenSSL_add_all_digests();
+        SSL_load_error_strings();
     }
-    
-    @trusted
-    override ptrdiff_t send(const(void)[] buf, SocketFlags flags) {
-        return SSL_write(ssl, buf.ptr, cast(uint) buf.length);
+
+    public class OpenSslSocket : Socket {
+        enum SSL_MODE_RELEASE_BUFFERS = 0x00000010L;
+        private SSL* ssl;
+        private SSL_CTX* ctx;
+        private void initSsl() {
+            //ctx = SSL_CTX_new(SSLv3_client_method());
+            ctx = SSL_CTX_new(TLSv1_client_method());
+            assert(ctx !is null);
+
+            //SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
+            //SSL_CTX_ctrl(ctx, 33, SSL_MODE_RELEASE_BUFFERS, null);
+            ssl = SSL_new(ctx);
+            SSL_set_fd(ssl, this.handle);
+        }
+
+        @trusted
+        override void connect(Address to) {
+            super.connect(to);
+            if(SSL_connect(ssl) == -1)
+                throw new Exception("ssl connect failed");
+        }
+
+        @trusted
+        override ptrdiff_t send(const(void)[] buf, SocketFlags flags) {
+            return SSL_write(ssl, buf.ptr, cast(uint) buf.length);
+        }
+        override ptrdiff_t send(const(void)[] buf) {
+            return send(buf, SocketFlags.NONE);
+        }
+        @trusted
+        override ptrdiff_t receive(void[] buf, SocketFlags flags) {
+            return SSL_read(ssl, buf.ptr, cast(int)buf.length);
+        }
+        override ptrdiff_t receive(void[] buf) {
+            return receive(buf, SocketFlags.NONE);
+        }
+        this(AddressFamily af, SocketType type = SocketType.STREAM) {
+            super(af, type);
+            initSsl();
+        }
+
+        this(socket_t sock, AddressFamily af) {
+            super(sock, af);
+            initSsl();
+        }
+        override void close() {
+            //SSL_shutdown(ssl);
+            super.close();
+        }
+        ~this() {
+            SSL_free(ssl);
+            SSL_CTX_free(ctx);
+        }
     }
-    override ptrdiff_t send(const(void)[] buf) {
-        return send(buf, SocketFlags.NONE);
-    }
-    @trusted
-    override ptrdiff_t receive(void[] buf, SocketFlags flags) {
-        return SSL_read(ssl, buf.ptr, cast(int)buf.length);
-    }
-    override ptrdiff_t receive(void[] buf) {
-        return receive(buf, SocketFlags.NONE);
-    }
-    this(AddressFamily af, SocketType type = SocketType.STREAM) {
-        super(af, type);
-        initSsl();
-    }
-    
-    this(socket_t sock, AddressFamily af) {
-        super(sock, af);
-        initSsl();
-    }
-    override void close() {
-        //SSL_shutdown(ssl);
-        super.close();
-    }
-    ~this() {
-        SSL_free(ssl);
-        SSL_CTX_free(ctx);
+
+    public class SSLSocketStream: SocketStream {
+        override void open(AddressFamily fa) {
+            if ( s !is null ) {
+                s.close();
+            }
+            s = new OpenSslSocket(fa);
+            assert(s !is null, "Can't create socket");
+            __isOpen = true;
+        }
     }
 }
 
 public interface NetworkStream {
-    @property bool isConnected() @safe @nogc pure const;
+    @property bool isConnected() const;
     void close() @trusted;
 
     ///
@@ -741,15 +754,13 @@ public interface NetworkStream {
     ///
     NetworkStream connect(string host, ushort port, Duration timeout = 10.seconds);
 
-    ptrdiff_t send(const(void)[] buff) @safe;
-    ptrdiff_t receive(void[] buff) @safe;
+    ptrdiff_t send(const(void)[] buff);
+    ptrdiff_t receive(void[] buff);
 
     ///
     /// Set timeout for receive calls. 0 means no timeout.
     ///
-    @property void readTimeout(Duration timeout) @safe;
-
-    @property string lastError() @safe const;
+    @property void readTimeout(Duration timeout);
 }
 
 public abstract class SocketStream : NetworkStream {
@@ -849,18 +860,6 @@ public abstract class SocketStream : NetworkStream {
     @property void readTimeout(Duration timeout) @safe {
         s.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
     }
-
-}
-
-public class SSLSocketStream: SocketStream {
-    override void open(AddressFamily fa) {
-        if ( s !is null ) {
-            s.close();
-        }
-        s = new OpenSslSocket(fa);
-        assert(s !is null, "Can't create socket");
-        __isOpen = true;
-    }
 }
 
 public class TCPSocketStream : SocketStream {
@@ -871,6 +870,118 @@ public class TCPSocketStream : SocketStream {
         s = new Socket(fa, SocketType.STREAM, ProtocolType.TCP);
         assert(s !is null, "Can't create socket");
         __isOpen = true;
+    }
+}
+
+version (vibeD) {
+    import vibe.core.net, vibe.stream.tls;
+
+    public class TCPVibeStream : NetworkStream {
+    private:
+        TCPConnection _conn;
+        Duration _readTimeout = Duration.max;
+
+    public:
+        @property bool isConnected() const {
+            return _conn.connected;
+        }
+
+        void close() @trusted {
+            _conn.close();
+        }
+
+        NetworkStream connect(string host, ushort port, Duration timeout = 10.seconds) {
+            // FIXME: timeout not supported in vibe.d
+            try {
+                _conn = connectTCP(host, port);
+            }
+            catch (Exception e)
+                throw new ConnectError("Can't connect to %s:%d".format(host, port), __FILE__, __LINE__, e);
+
+            return this;
+        }
+
+        ptrdiff_t send(const(void)[] buff) {
+            _conn.write(cast(const(ubyte)[])buff);
+            return buff.length;
+        }
+
+        ptrdiff_t receive(void[] buff) {
+            if (!_conn.waitForData(_readTimeout)) {
+                if (!_conn.connected) {
+                    return 0;
+                }
+                throw new TimeoutException("Timeout receiving data");
+            }
+
+            if(_conn.empty) {
+                return 0;
+            }
+
+            auto chunk = min(_conn.leastSize, buff.length);
+            assert(chunk != 0);
+            _conn.read(cast(ubyte[])buff[0 .. chunk]);
+            return chunk;
+        }
+
+        @property void readTimeout(Duration timeout) {
+            if (timeout == 0.seconds) {
+                _readTimeout = Duration.max;
+            }
+            else {
+                _readTimeout = timeout;
+            }
+        }
+    }
+
+    public class SSLVibeStream : TCPVibeStream {
+    private:
+        Stream _sslStream;
+
+    public:
+        override NetworkStream connect(string host, ushort port, Duration timeout = 10.seconds) {
+            try {
+                _conn = connectTCP(host, port);
+                auto sslctx = createTLSContext(TLSContextKind.client);
+                sslctx.peerValidationMode = TLSPeerValidationMode.none;
+                _sslStream = createTLSStream(_conn, sslctx);
+            }
+            catch (Exception e) {
+                throw new ConnectError("Can't connect to %s:%d".format(host, port), __FILE__, __LINE__, e);
+            }
+
+            return this;
+        }
+
+        override ptrdiff_t send(const(void)[] buff) {
+            _sslStream.write(cast(const(ubyte)[])buff);
+            return buff.length;
+        }
+
+        override ptrdiff_t receive(void[] buff) {
+            if (!_sslStream.dataAvailableForRead) {
+                if (!_conn.waitForData(_readTimeout)) {
+                    if (!_conn.connected) {
+                        return 0;
+                    }
+                    throw new TimeoutException("Timeout receiving data");
+                }
+            }
+
+            if(_sslStream.empty) {
+                return 0;
+            }
+
+            auto chunk = min(_sslStream.leastSize, buff.length);
+            assert(chunk != 0);
+            _sslStream.read(cast(ubyte[])buff[0 .. chunk]);
+            return chunk;
+        }
+
+        override void close() @trusted {
+            _sslStream.finalize();
+            _conn.close();
+        }
     }
 }
 

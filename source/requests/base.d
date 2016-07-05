@@ -5,8 +5,8 @@ import requests.utils;
 import requests.uri;
 
 public class RequestException: Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super(msg, file, line);
+    this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
+        super(msg, file, line, next);
     }
 }
 

@@ -44,15 +44,9 @@ package unittest {
     assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
 }
 
-public class TimeoutException: Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super(msg, file, line);
-    }
-}
-
 public class MaxRedirectsException: Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super(msg, file, line);
+    this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
+        super(message, file, line, next);
     }
 }
 

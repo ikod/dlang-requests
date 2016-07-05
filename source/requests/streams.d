@@ -19,16 +19,23 @@ import std.socket;
 alias InDataHandler = DataPipeIface!ubyte;
 
 public class ConnectError: Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super(msg, file, line);
+    this(string message, string file =__FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
+        super(message, file, line, next);
     }
 }
 
 class DecodingExceptioin: Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super(msg, file, line);
+    this(string message, string file =__FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
+        super(message, file, line, next);
     }
 }
+
+public class TimeoutException: Exception {
+    this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
+        super(message, file, line, next);
+    }
+}
+
 /**
  * DataPipeIface can accept some data, process, and return processed data.
  */

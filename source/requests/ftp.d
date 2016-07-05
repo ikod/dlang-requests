@@ -21,8 +21,8 @@ import requests.streams;
 import requests.base;
 
 public class FTPServerResponseError: Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super(msg, file, line);
+    this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
+        super(message, file, line, next);
     }
 }
 

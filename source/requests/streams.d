@@ -874,3 +874,11 @@ public class TCPSocketStream : SocketStream {
     }
 }
 
+version (vibeD) {
+    public alias TCPStream = TCPVibeStream;
+    public alias SSLStream = SSLVibeStream;
+}
+else {
+    public alias TCPStream = TCPSocketStream;
+    public alias SSLStream = SSLSocketStream;
+}

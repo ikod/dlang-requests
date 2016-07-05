@@ -701,10 +701,10 @@ public struct HTTPRequest {
             }
             final switch (uri.scheme) {
                 case "http":
-                    _stream = new TCPSocketStream().connect(uri.host, uri.port, _timeout);
+                    _stream = new TCPStream().connect(uri.host, uri.port, _timeout);
                     break;
                 case "https":
-                    _stream = new SSLSocketStream().connect(uri.host, uri.port, _timeout);
+                    _stream = new SSLStream().connect(uri.host, uri.port, _timeout);
                     break;
             }
         } else {

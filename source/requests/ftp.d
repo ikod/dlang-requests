@@ -151,7 +151,7 @@ public struct FTPRequest {
         _response.finalURI = _uri;
 
         if ( !_controlChannel ) {
-            _controlChannel = new TCPSocketStream();
+            _controlChannel = new TCPStream();
             _controlChannel.connect(_uri.host, _uri.port, _timeout);
             response = serverResponse();
             _responseHistory ~= response;
@@ -210,7 +210,7 @@ public struct FTPRequest {
             return _response;
         }
 
-        auto dataStream = new TCPSocketStream();
+        auto dataStream = new TCPStream();
         scope (exit ) {
             if ( dataStream !is null ) {
                 dataStream.close();
@@ -267,7 +267,7 @@ public struct FTPRequest {
         _response.finalURI = _uri;
 
         if ( !_controlChannel ) {
-            _controlChannel = new TCPSocketStream();
+            _controlChannel = new TCPStream();
             _controlChannel.connect(_uri.host, _uri.port, _timeout);
             response = serverResponse();
             _responseHistory ~= response;
@@ -350,7 +350,7 @@ public struct FTPRequest {
             return _response;
         }
         
-        auto dataStream = new TCPSocketStream();
+        auto dataStream = new TCPStream();
         scope (exit ) {
             if ( dataStream !is null && !_response._receiveAsRange.activated ) {
                 dataStream.close();

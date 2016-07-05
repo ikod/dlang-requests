@@ -15,6 +15,7 @@ import std.traits;
 import std.zlib;
 import std.datetime;
 import std.socket;
+import core.stdc.errno;
 
 alias InDataHandler = DataPipeIface!ubyte;
 
@@ -811,24 +812,44 @@ public abstract class SocketStream : NetworkStream {
     ptrdiff_t send(const(void)[] buff) @safe
     in {assert(isConnected);}
     body {
-        return s.send(buff);
+        auto rc = s.send(buff);
+        if (rc < 0) {
+            throw new ErrnoException("sending data");
+        }
+        return rc;
     }
     
     ptrdiff_t receive(void[] buff) @safe {
-        auto r = s.receive(buff);
-        if ( r > 0 ) {
-            buff.length = r;
+        while (true) {
+            auto r = s.receive(buff);
+            if (r < 0) {
+                version(Windows) {
+                    if ( errno == 0 ) {
+                        throw new TimeoutException("Timeout receiving data");
+                    }
+                }
+                version(Posix) {
+                    if ( errno == EINTR ) {
+                        continue;
+                    }
+                    if ( errno == EAGAIN ) {
+                        throw new TimeoutException("Timeout receiving data");
+                    }
+                    throw new ErrnoException("receiving data");
+                }
+            }
+            else {
+                buff.length = r;
+            }
+            return r;
         }
-        return r;
+        assert(false);
     }
 
     @property void readTimeout(Duration timeout) @safe {
         s.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
     }
 
-    @property string lastError() @safe const {
-        return lastSocketError();
-    }
 }
 
 public class SSLSocketStream: SocketStream {

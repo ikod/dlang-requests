@@ -14,7 +14,6 @@ import std.traits;
 import std.typecons;
 import std.experimental.logger;
 import core.thread;
-import core.stdc.errno;
 
 import requests.streams;
 import requests.uri;
@@ -742,22 +741,6 @@ public struct HTTPRequest {
             read = _stream.receive(b);
 
             debug tracef("read: %d", read);
-            if ( read < 0 ) {
-                version(Windows) {
-                    if ( errno == 0 ) {
-                        throw new TimeoutException("Timeout receiving headers");
-                    }
-                }
-                version(Posix) {
-                    if ( errno == EINTR ) {
-                        continue;
-                    }
-                    if ( errno == EAGAIN ) {
-                        throw new TimeoutException("Timeout receiving headers");
-                    }
-                    throw new ErrnoException("receiving Headers");
-                }
-            }
             if ( read == 0 ) {
                 break;
             }
@@ -818,16 +801,13 @@ public struct HTTPRequest {
                         }
                         // have to continue
                         auto b = new ubyte[_bufferSize];
-                        read = _stream.receive(b);
-                        debug tracef("streaming_in received %d bytes", read);
-                        if ( read < 0 ) {
-                            version(Posix) {
-                                if ( errno == EINTR ) {
-                                    continue;
-                                }
-                            }
-                            throw new RequestException("streaming_in error reading from socket");
+                        try {
+                            read = _stream.receive(b);
                         }
+                        catch (Exception e) {
+                            throw new RequestException("streaming_in error reading from socket", __FILE__, __LINE__, e);
+                        }
+                        debug tracef("streaming_in received %d bytes", read);
 
                         if ( read == 0 ) {
                             debug tracef("streaming_in: server closed connection");
@@ -872,17 +852,6 @@ public struct HTTPRequest {
             auto b = new ubyte[_bufferSize];
             read = _stream.receive(b);
 
-            if ( read < 0 ) {
-                version(Posix) {
-                    if ( errno == EINTR ) {
-                        continue;
-                    }
-                }
-                if ( errno == EAGAIN ) {
-                    throw new TimeoutException("Timeout receiving body");
-                }
-                throw new ErrnoException("receiving body");
-            }
             if ( read == 0 ) {
                 debug trace("read done");
                 break;
@@ -992,10 +961,12 @@ public struct HTTPRequest {
         if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
-        
-        auto rc = _stream.send(req.data());
-        if ( rc == -1 ) {
-            errorf("Error sending request: ", _stream.lastError);
+
+        try {
+            auto rc = _stream.send(req.data());
+        }
+        catch (Exception e) {
+            errorf("Error sending request: ", e.msg);
             return _response;
         }
         foreach(ref source; sources._sources) {
@@ -1125,9 +1096,11 @@ public struct HTTPRequest {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
 
-        auto rc = _stream.send(req.data());
-        if ( rc == -1 ) {
-            errorf("Error sending request: ", _stream.lastError);
+        try {
+            auto rc = _stream.send(req.data());
+        }
+        catch (Exception e) {
+            errorf("Error sending request: ", e.msg);
             return _response;
         }
 
@@ -1250,9 +1223,11 @@ public struct HTTPRequest {
         if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
-        auto rc = _stream.send(req.data());
-        if ( rc == -1 ) {
-            errorf("Error sending request: ", _stream.lastError);
+        try {
+            auto rc = _stream.send(req.data());
+        }
+        catch (Exception e) {
+            errorf("Error sending request: ", e.msg);
             return _response;
         }
         _response._requestSentAt = Clock.currTime;

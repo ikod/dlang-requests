@@ -13,8 +13,6 @@ import std.experimental.logger;
 import std.stdio;
 import std.path;
 
-import core.stdc.errno;
-
 import requests.uri;
 import requests.utils;
 import requests.streams;
@@ -106,16 +104,18 @@ public struct FTPRequest {
         auto b = new ubyte[_bufferSize];
         while ( buffer.length < bufferLimit ) {
             trace("Wait on control channel");
-            auto rc = _controlChannel.receive(b);
-            version(Posix) {
-                if ( rc < 0 && errno == EINTR ) {
-                    continue;
-                }
+            ptrdiff_t rc;
+            try {
+                rc = _controlChannel.receive(b);
+            }
+            catch (Exception e) {
+                error("Failed to read response from server");
+                throw new FTPServerResponseError("Failed to read server responce over control channel", __FILE__, __LINE__, e);
             }
             tracef("Got %d bytes from control socket", rc);
-            if ( rc <= 0 ) {
+            if ( rc == 0 ) {
                 error("Failed to read response from server");
-                throw new FTPServerResponseError("Failed to read server responce over control channel: rc=%d, errno: %d".format(rc, errno()));
+                throw new FTPServerResponseError("Failed to read server responce over control channel", __FILE__, __LINE__);
             }
             if ( _verbosity >= 1 ) {
                 (cast(string)b[0..rc]).
@@ -393,20 +393,18 @@ public struct FTPRequest {
                         }
                         // have to continue
                         auto b = new ubyte[_bufferSize];
-                        auto read = dataStream.receive(b);
+                        ptrdiff_t read;
+                        try {
+                            read = dataStream.receive(b);
+                        }
+                        catch (Exception e) {
+                            throw new RequestException("streaming_in error reading from socket", __FILE__, __LINE__, e);
+                        }
 
                         if ( read > 0 ) {
                             _contentReceived += read;
                             result.putNoCopy(b[0..read]);
                             return result.data;
-                        }
-                        if ( read < 0 ) {
-                            version(Posix) {
-                                if ( errno == EINTR ) {
-                                    continue;
-                                }
-                            }
-                            throw new RequestException("streaming_in error reading from socket");
                         }
                         if ( read == 0 ) {
                             debug tracef("streaming_in: server closed connection");

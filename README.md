@@ -12,7 +12,7 @@ API docs: [Wiki](https://github.com/ikod/dlang-requests/wiki)
 
 ###Library configurations###
 
-This library can either use the standard std.socket library or [vibe.d](http://vibed.org) for network IO. By default this library uses the standard std.socket configuration called *std*. To use vibe.d use the *vibed* configuration:
+This library can either use the standard std.socket library or [vibe.d](http://vibed.org) for network IO. By default this library uses the standard std.socket configuration called *std*. To use vibe.d use the *vibed* configuration (see code example below):
 
 ```json
 "dependencies": {
@@ -424,6 +424,40 @@ void main() {
     }
     assert(lines == 287);
 }
+```
+
+Also you can safely use *requests* with vibe.d. When *requests* compiled with support for vibe.d sockets, each call to *requests* API can block only current fiber, not thread:
+```
+import requests, vibe.d;
+
+shared static this()
+{
+    void taskMain()
+    {
+        logInfo("Task created");
+        auto r1 = getContent("http://httpbin.org/delay/3");
+        logInfo("Delay request finished");
+        auto r2 = getContent("http://google.com");
+        logInfo("Google request finished");
+    }
+
+    setLogFormat(FileLogger.Format.threadTime, FileLogger.Format.threadTime);
+    for(size_t i = 0; i < 3; i++)
+        runTask(&taskMain);
+}
+
+output:
+
+[F7EC2FAB:F7ECD7AB 2016.07.05 16:55:54.115 INF] Task created
+[F7EC2FAB:F7ECD3AB 2016.07.05 16:55:54.116 INF] Task created
+[F7EC2FAB:F7ED6FAB 2016.07.05 16:55:54.116 INF] Task created
+[F7EC2FAB:F7ECD7AB 2016.07.05 16:55:57.451 INF] Delay request finished
+[F7EC2FAB:F7ECD3AB 2016.07.05 16:55:57.464 INF] Delay request finished
+[F7EC2FAB:F7ED6FAB 2016.07.05 16:55:57.474 INF] Delay request finished
+[F7EC2FAB:F7ECD7AB 2016.07.05 16:55:57.827 INF] Google request finished
+[F7EC2FAB:F7ECD3AB 2016.07.05 16:55:57.836 INF] Google request finished
+[F7EC2FAB:F7ED6FAB 2016.07.05 16:55:57.856 INF] Google request finished
+
 ```
 
 ### Response() structure ###

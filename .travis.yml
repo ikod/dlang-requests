@@ -5,3 +5,7 @@ d:
     - ldc
 os:
     - linux
+
+script:
+    - dub test --config=std
+    - dub test --config=vibed

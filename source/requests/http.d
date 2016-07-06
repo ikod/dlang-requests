@@ -9,13 +9,11 @@ import std.exception;
 import std.format;
 import std.stdio;
 import std.range;
-import std.socket;
 import std.string;
 import std.traits;
 import std.typecons;
 import std.experimental.logger;
 import core.thread;
-import core.stdc.errno;
 
 import requests.streams;
 import requests.uri;
@@ -45,15 +43,9 @@ package unittest {
     assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
 }
 
-public class TimeoutException: Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super(msg, file, line);
-    }
-}
-
 public class MaxRedirectsException: Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super(msg, file, line);
+    this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
+        super(message, file, line, next);
     }
 }
 
@@ -354,7 +346,7 @@ public struct HTTPRequest {
         size_t         _bufferSize = defaultBufferSize; // 16k
         bool           _useStreaming; // return iterator instead of completed request
 
-        SocketStream   _stream;
+        NetworkStream   _stream;
         HTTPResponse[] _history; // redirects history
         DataPipe!ubyte _bodyDecoder;
         DecodeChunked  _unChunker;
@@ -709,10 +701,10 @@ public struct HTTPRequest {
             }
             final switch (uri.scheme) {
                 case "http":
-                    _stream = new TCPSocketStream().connect(uri.host, uri.port, _timeout);
+                    _stream = new TCPStream().connect(uri.host, uri.port, _timeout);
                     break;
                 case "https":
-                    _stream = new SSLSocketStream().connect(uri.host, uri.port, _timeout);
+                    _stream = new SSLStream().connect(uri.host, uri.port, _timeout);
                     break;
             }
         } else {
@@ -725,9 +717,9 @@ public struct HTTPRequest {
     /// 
     private void receiveResponse() {
 
-        _stream.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
+        _stream.readTimeout = timeout;
         scope(exit) {
-            _stream.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, 0.seconds);
+            _stream.readTimeout = 0.seconds;
         }
 
         _bodyDecoder = new DataPipe!ubyte();
@@ -749,22 +741,6 @@ public struct HTTPRequest {
             read = _stream.receive(b);
 
             debug tracef("read: %d", read);
-            if ( read < 0 ) {
-                version(Windows) {
-                    if ( errno == 0 ) {
-                        throw new TimeoutException("Timeout receiving headers");
-                    }
-                }
-                version(Posix) {
-                    if ( errno == EINTR ) {
-                        continue;
-                    }
-                    if ( errno == EAGAIN ) {
-                        throw new TimeoutException("Timeout receiving headers");
-                    }
-                    throw new ErrnoException("receiving Headers");
-                }
-            }
             if ( read == 0 ) {
                 break;
             }
@@ -816,7 +792,7 @@ public struct HTTPRequest {
                     while(true) {
                         // check if we received everything we need
                         if ( ( _unChunker && _unChunker.done )
-                            || !_stream.isOpen() 
+                            || !_stream.isConnected()
                             || (_contentLength > 0 && _contentReceived >= _contentLength) ) 
                         {
                             trace("streaming_in receive completed");
@@ -825,16 +801,13 @@ public struct HTTPRequest {
                         }
                         // have to continue
                         auto b = new ubyte[_bufferSize];
-                        read = _stream.receive(b);
-                        debug tracef("streaming_in received %d bytes", read);
-                        if ( read < 0 ) {
-                            version(Posix) {
-                                if ( errno == EINTR ) {
-                                    continue;
-                                }
-                            }
-                            throw new RequestException("streaming_in error reading from socket");
+                        try {
+                            read = _stream.receive(b);
                         }
+                        catch (Exception e) {
+                            throw new RequestException("streaming_in error reading from socket", __FILE__, __LINE__, e);
+                        }
+                        debug tracef("streaming_in received %d bytes", read);
 
                         if ( read == 0 ) {
                             debug tracef("streaming_in: server closed connection");
@@ -879,17 +852,6 @@ public struct HTTPRequest {
             auto b = new ubyte[_bufferSize];
             read = _stream.receive(b);
 
-            if ( read < 0 ) {
-                version(Posix) {
-                    if ( errno == EINTR ) {
-                        continue;
-                    }
-                }
-                if ( errno == EAGAIN ) {
-                    throw new TimeoutException("Timeout receiving body");
-                }
-                throw new ErrnoException("receiving body");
-            }
             if ( read == 0 ) {
                 debug trace("read done");
                 break;
@@ -999,10 +961,12 @@ public struct HTTPRequest {
         if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
-        
-        auto rc = _stream.send(req.data());
-        if ( rc == -1 ) {
-            errorf("Error sending request: ", lastSocketError);
+
+        try {
+            auto rc = _stream.send(req.data());
+        }
+        catch (Exception e) {
+            errorf("Error sending request: ", e.msg);
             return _response;
         }
         foreach(ref source; sources._sources) {
@@ -1132,9 +1096,11 @@ public struct HTTPRequest {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
 
-        auto rc = _stream.send(req.data());
-        if ( rc == -1 ) {
-            errorf("Error sending request: ", lastSocketError);
+        try {
+            auto rc = _stream.send(req.data());
+        }
+        catch (Exception e) {
+            errorf("Error sending request: ", e.msg);
             return _response;
         }
 
@@ -1257,9 +1223,11 @@ public struct HTTPRequest {
         if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
-        auto rc = _stream.send(req.data());
-        if ( rc == -1 ) {
-            errorf("Error sending request: ", lastSocketError);
+        try {
+            auto rc = _stream.send(req.data());
+        }
+        catch (Exception e) {
+            errorf("Error sending request: ", e.msg);
             return _response;
         }
         _response._requestSentAt = Clock.currTime;

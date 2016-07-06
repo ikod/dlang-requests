@@ -6,7 +6,6 @@ import std.algorithm;
 import std.conv;
 import std.datetime;
 import std.format;
-import std.socket;
 import std.exception;
 import std.string;
 import std.range;
@@ -14,16 +13,14 @@ import std.experimental.logger;
 import std.stdio;
 import std.path;
 
-import core.stdc.errno;
-
 import requests.uri;
 import requests.utils;
 import requests.streams;
 import requests.base;
 
 public class FTPServerResponseError: Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super(msg, file, line);
+    this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
+        super(message, file, line, next);
     }
 }
 
@@ -41,7 +38,7 @@ public struct FTPRequest {
         long          _maxContentLength = 5*1024*1024*1024;
         long          _contentLength = -1;
         long          _contentReceived;
-        SocketStream  _controlChannel;
+        NetworkStream _controlChannel;
         string[]      _responseHistory;
         FTPResponse   _response;
         bool          _useStreaming;
@@ -100,23 +97,25 @@ public struct FTPRequest {
     string serverResponse() {
         string res, buffer;
         immutable bufferLimit = 16*1024;
-        _controlChannel.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, _timeout);
+        _controlChannel.readTimeout = _timeout;
         scope(exit) {
-            _controlChannel.so.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, 0.seconds);
+            _controlChannel.readTimeout = 0.seconds;
         }
         auto b = new ubyte[_bufferSize];
         while ( buffer.length < bufferLimit ) {
             trace("Wait on control channel");
-            auto rc = _controlChannel.receive(b);
-            version(Posix) {
-                if ( rc < 0 && errno == EINTR ) {
-                    continue;
-                }
+            ptrdiff_t rc;
+            try {
+                rc = _controlChannel.receive(b);
+            }
+            catch (Exception e) {
+                error("Failed to read response from server");
+                throw new FTPServerResponseError("Failed to read server responce over control channel", __FILE__, __LINE__, e);
             }
             tracef("Got %d bytes from control socket", rc);
-            if ( rc <= 0 ) {
+            if ( rc == 0 ) {
                 error("Failed to read response from server");
-                throw new FTPServerResponseError("Failed to read server responce over control channel: rc=%d, errno: %d".format(rc, errno()));
+                throw new FTPServerResponseError("Failed to read server responce over control channel", __FILE__, __LINE__);
             }
             if ( _verbosity >= 1 ) {
                 (cast(string)b[0..rc]).
@@ -152,7 +151,7 @@ public struct FTPRequest {
         _response.finalURI = _uri;
 
         if ( !_controlChannel ) {
-            _controlChannel = new TCPSocketStream();
+            _controlChannel = new TCPStream();
             _controlChannel.connect(_uri.host, _uri.port, _timeout);
             response = serverResponse();
             _responseHistory ~= response;
@@ -211,7 +210,7 @@ public struct FTPRequest {
             return _response;
         }
 
-        auto dataStream = new TCPSocketStream();
+        auto dataStream = new TCPStream();
         scope (exit ) {
             if ( dataStream !is null ) {
                 dataStream.close();
@@ -268,7 +267,7 @@ public struct FTPRequest {
         _response.finalURI = _uri;
 
         if ( !_controlChannel ) {
-            _controlChannel = new TCPSocketStream();
+            _controlChannel = new TCPStream();
             _controlChannel.connect(_uri.host, _uri.port, _timeout);
             response = serverResponse();
             _responseHistory ~= response;
@@ -351,7 +350,7 @@ public struct FTPRequest {
             return _response;
         }
         
-        auto dataStream = new TCPSocketStream();
+        auto dataStream = new TCPStream();
         scope (exit ) {
             if ( dataStream !is null && !_response._receiveAsRange.activated ) {
                 dataStream.close();
@@ -394,20 +393,18 @@ public struct FTPRequest {
                         }
                         // have to continue
                         auto b = new ubyte[_bufferSize];
-                        auto read = dataStream.receive(b);
+                        ptrdiff_t read;
+                        try {
+                            read = dataStream.receive(b);
+                        }
+                        catch (Exception e) {
+                            throw new RequestException("streaming_in error reading from socket", __FILE__, __LINE__, e);
+                        }
 
                         if ( read > 0 ) {
                             _contentReceived += read;
                             result.putNoCopy(b[0..read]);
                             return result.data;
-                        }
-                        if ( read < 0 ) {
-                            version(Posix) {
-                                if ( errno == EINTR ) {
-                                    continue;
-                                }
-                            }
-                            throw new RequestException("streaming_in error reading from socket");
                         }
                         if ( read == 0 ) {
                             debug tracef("streaming_in: server closed connection");

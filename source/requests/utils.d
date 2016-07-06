@@ -2,8 +2,8 @@ module requests.utils;
 
 import std.range;
 
-static immutable short[string] standard_ports;
-static this() {
+__gshared immutable short[string] standard_ports;
+shared static this() {
     standard_ports["http"] = 80;
     standard_ports["https"] = 443;
     standard_ports["ftp"] = 21;

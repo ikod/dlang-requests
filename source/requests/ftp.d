@@ -69,7 +69,7 @@ public struct FTPRequest {
     }
 
     ushort sendCmdGetResponse(string cmd) {
-        tracef("cmd to server: %s", cmd.strip);
+        debug(requests) tracef("cmd to server: %s", cmd.strip);
         if ( _verbosity >=1 ) {
             writefln("> %s", cmd.strip);
         }
@@ -103,7 +103,7 @@ public struct FTPRequest {
         }
         auto b = new ubyte[_bufferSize];
         while ( buffer.length < bufferLimit ) {
-            trace("Wait on control channel");
+            debug(requests) trace("Wait on control channel");
             ptrdiff_t rc;
             try {
                 rc = _controlChannel.receive(b);
@@ -112,7 +112,7 @@ public struct FTPRequest {
                 error("Failed to read response from server");
                 throw new FTPServerResponseError("Failed to read server responce over control channel", __FILE__, __LINE__, e);
             }
-            tracef("Got %d bytes from control socket", rc);
+            debug(requests) tracef("Got %d bytes from control socket", rc);
             if ( rc == 0 ) {
                 error("Failed to read response from server");
                 throw new FTPServerResponseError("Failed to read server responce over control channel", __FILE__, __LINE__);
@@ -157,7 +157,7 @@ public struct FTPRequest {
             _responseHistory ~= response;
             
             code = responseToCode(response);
-            tracef("Server initial response: %s", response);
+            debug(requests) tracef("Server initial response: %s", response);
             if ( code/100 > 2 ) {
                 _response.code = code;
                 return _response;
@@ -165,7 +165,7 @@ public struct FTPRequest {
             // Log in
             string user = _uri.username.length ? _uri.username : "anonymous";
             string pass = _uri.password.length ? _uri.password : "requests@";
-            tracef("Use %s:%s%s as username:password", user, pass[0], replicate("-", pass.length-1));
+            debug(requests) tracef("Use %s:%s%s as username:password", user, pass[0], replicate("-", pass.length-1));
             
             code = sendCmdGetResponse("USER " ~ user ~ "\r\n");
             if ( code/100 > 3 ) {
@@ -235,10 +235,10 @@ public struct FTPRequest {
             auto chunk = data.take(_bufferSize).array;
             auto rc = dataStream.send(chunk);
             if ( rc <= 0 ) {
-                trace("done");
+                debug(requests) trace("done");
                 break;
             }
-            tracef("sent %d bytes to data channel", rc);
+            debug(requests) tracef("sent %d bytes to data channel", rc);
             pos += rc;
         }
         dataStream.close();
@@ -246,7 +246,7 @@ public struct FTPRequest {
         response = serverResponse();
         code = responseToCode(response);
         if ( code/100 == 2 ) {
-            tracef("Successfully uploaded %d bytes", _response._responseBody.length);
+            debug(requests) tracef("Successfully uploaded %d bytes", _response._responseBody.length);
         }
         _response.code = code;
         return _response;
@@ -273,7 +273,7 @@ public struct FTPRequest {
             _responseHistory ~= response;
             
             code = responseToCode(response);
-            tracef("Server initial response: %s", response);
+            debug(requests) tracef("Server initial response: %s", response);
             if ( code/100 > 2 ) {
                 _response.code = code;
                 return _response;
@@ -281,7 +281,7 @@ public struct FTPRequest {
             // Log in
             string user = _uri.username.length ? _uri.username : "anonymous";
             string pass = _uri.password.length ? _uri.password : "requests@";
-            tracef("Use %s:%s%s as username:password", user, pass[0], replicate("-", pass.length-1));
+            debug(requests) tracef("Use %s:%s%s as username:password", user, pass[0], replicate("-", pass.length-1));
             
             code = sendCmdGetResponse("USER " ~ user ~ "\r\n");
             if ( code/100 > 3 ) {
@@ -319,7 +319,7 @@ public struct FTPRequest {
                 try {
                     _contentLength = to!long(s[1]);
                 } catch (ConvException) {
-                    trace("Failed to convert string %s to file size".format(s[1]));
+                    debug(requests) trace("Failed to convert string %s to file size".format(s[1]));
                 }
             }
         }
@@ -368,10 +368,10 @@ public struct FTPRequest {
             auto b = new ubyte[_bufferSize];
             auto rc = dataStream.receive(b);
             if ( rc <= 0 ) {
-                trace("done");
+                debug(requests) trace("done");
                 break;
             }
-            tracef("got %d bytes from data channel", rc);
+            debug(requests) tracef("got %d bytes from data channel", rc);
 
             _contentReceived += rc;
             _response._responseBody.putNoCopy(b[0..rc]);
@@ -407,11 +407,11 @@ public struct FTPRequest {
                             return result.data;
                         }
                         if ( read == 0 ) {
-                            debug tracef("streaming_in: server closed connection");
+                            debug(requests) tracef("streaming_in: server closed connection");
                             dataStream.close();
                             code = responseToCode(serverResponse());
                             if ( code/100 == 2 ) {
-                                tracef("Successfully received %d bytes", _response._responseBody.length);
+                                debug(requests) tracef("Successfully received %d bytes", _response._responseBody.length);
                             }
                             _response.code = code;
                             break;
@@ -426,7 +426,7 @@ public struct FTPRequest {
         response = serverResponse();
         code = responseToCode(response);
         if ( code/100 == 2 ) {
-            tracef("Successfully received %d bytes", _response._responseBody.length);
+            debug(requests) tracef("Successfully received %d bytes", _response._responseBody.length);
         }
         _response.code = code;
         return _response;
@@ -434,7 +434,7 @@ public struct FTPRequest {
 }
 
 package unittest {
-    globalLogLevel(LogLevel.info );
+    globalLogLevel(LogLevel.info);
     info("testing ftp");
     auto rq = FTPRequest();
     info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");

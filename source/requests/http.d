@@ -20,28 +20,11 @@ import requests.uri;
 import requests.utils;
 import requests.base;
 
-static this() {
-    globalLogLevel(LogLevel.error);
-}
-
 public alias Cookie     = Tuple!(string, "path", string, "domain", string, "attr", string, "value");
 public alias QueryParam = Tuple!(string, "key", string, "value");
 
 static immutable ushort[] redirectCodes = [301, 302, 303];
 static immutable uint     defaultBufferSize = 12*1024;
-
-static string urlEncoded(string p) pure @safe {
-    immutable string[dchar] translationTable = [
-        ' ':  "%20", '!': "%21", '*': "%2A", '\'': "%27", '(': "%28", ')': "%29",
-        ';':  "%3B", ':': "%3A", '@': "%40", '&':  "%26", '=': "%3D", '+': "%2B",
-        '$':  "%24", ',': "%2C", '/': "%2F", '?':  "%3F", '#': "%23", '[': "%5B",
-        ']':  "%5D", '%': "%25",
-    ];
-    return p.translate(translationTable);
-}
-package unittest {
-    assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
-}
 
 public class MaxRedirectsException: Exception {
     this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
@@ -496,7 +479,7 @@ public struct HTTPRequest {
         }
         auto transferEncoding = "transfer-encoding" in headers;
         if ( transferEncoding ) {
-            tracef("transferEncoding: %s", *transferEncoding);
+            debug(requests) tracef("transferEncoding: %s", *transferEncoding);
             if ( *transferEncoding == "chunked") {
                 _unChunker = new DecodeChunked();
                 _bodyDecoder.insert(_unChunker);
@@ -520,12 +503,13 @@ public struct HTTPRequest {
     /// 3. unfold headers if needed
     /// 4. store headers
     /// 
-    private void parseResponseHeaders(ref Buffer!ubyte buffer) {
+    private void parseResponseHeaders(in ubyte[] input) {
         string lastHeader;
-
-        foreach(line; buffer.data!(string).split("\n").map!(l => l.stripRight)) {
+        auto buffer = cast(string)input;
+ 
+        foreach(line; buffer.split("\n").map!(l => l.stripRight)) {
             if ( ! _response.status_line.length ) {
-                tracef("statusLine: %s", line);
+                debug (requests) tracef("statusLine: %s", line);
                 _response.status_line = line;
                 if ( _verbosity >= 1 ) {
                     writefln("< %s", line);
@@ -538,8 +522,7 @@ public struct HTTPRequest {
             }
             if ( line[0] == ' ' || line[0] == '\t' ) {
                 // unfolding https://tools.ietf.org/html/rfc822#section-3.1
-                auto stored = lastHeader in _response._responseHeaders;
-                if ( stored ) {
+                if ( auto stored = lastHeader in _response._responseHeaders) {
                     *stored ~= line;
                 }
                 continue;
@@ -553,7 +536,7 @@ public struct HTTPRequest {
             }
 
             lastHeader = header;
-            tracef("Header %s = %s", header, value);
+            debug (requests) tracef("Header %s = %s", header, value);
 
             if ( header != "set-cookie" ) {
                 auto stored = _response.responseHeaders.get(header, null);
@@ -563,9 +546,10 @@ public struct HTTPRequest {
                 _response._responseHeaders[header] = value;
                 continue;
             }
-           _cookie ~= processCookie(value);
+            _cookie ~= processCookie(value);
         }
     }
+
     ///
     /// Process Set-Cookie header from server response
     /// 
@@ -641,7 +625,7 @@ public struct HTTPRequest {
         _history ~= _response;
         auto connection = "connection" in _response._responseHeaders;
         if ( !connection || *connection == "close" ) {
-            tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
+            debug(requests) tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             _stream.close();
         }
         URI oldURI = _uri;
@@ -649,7 +633,7 @@ public struct HTTPRequest {
         try {
             newURI = URI(*location);
         } catch (UriException e) {
-            trace("Can't parse Location:, try relative uri");
+            debug(requests) trace("Can't parse Location:, try relative uri");
             newURI.path = *location;
             newURI.uri = newURI.recalc_uri;
         }
@@ -690,7 +674,7 @@ public struct HTTPRequest {
     /// 
     private void setupConnection() {
         if ( !_stream || !_stream.isConnected ) {
-            tracef("Set up new connection");
+            debug(requests) tracef("Set up new connection");
             URI   uri;
             if ( _proxy ) {
                 // use proxy uri to connect
@@ -708,7 +692,7 @@ public struct HTTPRequest {
                     break;
             }
         } else {
-            tracef("Use old connection");
+            debug(requests) tracef("Use old connection");
         }
     }
     ///
@@ -719,7 +703,9 @@ public struct HTTPRequest {
 
         _stream.readTimeout = timeout;
         scope(exit) {
-            _stream.readTimeout = 0.seconds;
+            if ( _stream && _stream.isOpen ) {
+                _stream.readTimeout = 0.seconds;
+            }
         }
 
         _bodyDecoder = new DataPipe!ubyte();
@@ -731,7 +717,7 @@ public struct HTTPRequest {
         }
 
         auto buffer = Buffer!ubyte();
-        Buffer!ubyte ResponseHeaders, partialBody;
+        Buffer!ubyte partialBody;
         ptrdiff_t read;
         string separator;
         
@@ -754,8 +740,8 @@ public struct HTTPRequest {
                 throw new RequestException("Headers length > maxHeadersLength (%d > %d)".format(buffer.length, maxHeadersLength));
             }
             if ( headersHaveBeenReceived(data, buffer, separator) ) {
-                auto s = buffer.data!(ubyte[]).findSplit(separator);
-                ResponseHeaders = Buffer!ubyte(s[0]);
+                auto s = buffer.data.findSplit(separator);
+                auto ResponseHeaders = s[0];
                 partialBody = Buffer!ubyte(s[2]);
                 _contentReceived += partialBody.length;
                 parseResponseHeaders(ResponseHeaders);
@@ -778,14 +764,14 @@ public struct HTTPRequest {
 
         while( true ) {
             if ( _contentLength >= 0 && _contentReceived >= _contentLength ) {
-                debug trace("Body received.");
+                debug(requests) trace("Body received.");
                 break;
             }
             if ( _unChunker && _unChunker.done ) {
                 break;
             }
             if ( _useStreaming && _response._responseBody.length && !redirectCodes.canFind(_response.code) ) {
-                debug trace("streaming requested");
+                debug(requests) trace("streaming requested");
                 _response.receiveAsRange.activated = true;
                 _response.receiveAsRange.data = _response._responseBody.data;
                 _response.receiveAsRange.read = delegate ubyte[] () {
@@ -795,7 +781,7 @@ public struct HTTPRequest {
                             || !_stream.isConnected()
                             || (_contentLength > 0 && _contentReceived >= _contentLength) ) 
                         {
-                            trace("streaming_in receive completed");
+                            debug(requests) trace("streaming_in receive completed");
                             _bodyDecoder.flush();
                             return _bodyDecoder.get();
                         }
@@ -807,10 +793,10 @@ public struct HTTPRequest {
                         catch (Exception e) {
                             throw new RequestException("streaming_in error reading from socket", __FILE__, __LINE__, e);
                         }
-                        debug tracef("streaming_in received %d bytes", read);
+                        debug(requests) tracef("streaming_in received %d bytes", read);
 
                         if ( read == 0 ) {
-                            debug tracef("streaming_in: server closed connection");
+                            debug(requests) tracef("streaming_in: server closed connection");
                             _bodyDecoder.flush();
                             return _bodyDecoder.get();
                         }
@@ -853,7 +839,7 @@ public struct HTTPRequest {
             read = _stream.receive(b);
 
             if ( read == 0 ) {
-                debug trace("read done");
+                debug(requests) trace("read done");
                 break;
             }
             if ( _verbosity >= 2 ) {
@@ -864,7 +850,7 @@ public struct HTTPRequest {
                 writeln(b[0..read].dump.join("\n"));
             }
 
-            debug tracef("read: %d", read);
+            debug(requests) tracef("read: %d", read);
             _contentReceived += read;
             if ( _maxContentLength && _contentReceived > _maxContentLength ) {
                 throw new RequestException("ContentLength > maxContentLength (%d>%d)".
@@ -876,7 +862,7 @@ public struct HTTPRequest {
             _bodyDecoder.getNoCopy.             // fetch result and place to body
                 each!(b => _response._responseBody.putNoCopy(b));
 
-            debug tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", _contentReceived, _contentLength, _response._responseBody.length);
+            debug(requests) tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", _contentReceived, _contentLength, _response._responseBody.length);
 
         }
         _bodyDecoder.flush();
@@ -957,7 +943,7 @@ public struct HTTPRequest {
                 each!(h => req.put(h));
         req.put("\r\n");
         
-        trace(req.data);
+        debug(requests) trace(req.data);
         if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
@@ -972,7 +958,7 @@ public struct HTTPRequest {
         foreach(ref source; sources._sources) {
             auto hdr = partHeaders.front;
             partHeaders.popFront;
-            tracef("sending part headers <%s>", hdr);
+            debug(requests) tracef("sending part headers <%s>", hdr);
             _stream.send(hdr);
             while (true) {
                 auto chunk = source.input.read();
@@ -990,7 +976,7 @@ public struct HTTPRequest {
         
         if ( _useStreaming ) {
             if ( _response._receiveAsRange.activated ) {
-                trace("streaming_in activated");
+                debug(requests) trace("streaming_in activated");
                 return _response;
             } else {
                 _response._receiveAsRange.data = _response.responseBody.data;
@@ -1001,7 +987,7 @@ public struct HTTPRequest {
             && !restartedRequest
             && isIdempotent(_method)
             ) {
-            tracef("Server closed keepalive connection");
+            debug(requests) tracef("Server closed keepalive connection");
             _stream.close();
             restartedRequest = true;
             goto connect;
@@ -1011,7 +997,7 @@ public struct HTTPRequest {
         ///
         auto connection = "connection" in _response._responseHeaders;
         if ( !connection || *connection == "close" ) {
-            tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
+            debug(requests) tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             _stream.close();
         }
         if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
@@ -1091,7 +1077,7 @@ public struct HTTPRequest {
             each!(h => req.put(h));
         req.put("\r\n");
 
-        debug trace(req.data);
+        debug(requests) trace(req.data);
         if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
         }
@@ -1110,13 +1096,13 @@ public struct HTTPRequest {
             while ( !content.empty ) {
                 auto chunk = content.front;
                 auto chunkHeader = "%x\r\n".format(chunk.length);
-                debug tracef("sending %s%s", chunkHeader, chunk);
+                debug(requests) tracef("sending %s%s", chunkHeader, chunk);
                 _stream.send(chunkHeader);
                 _stream.send(chunk);
                 _stream.send("\r\n");
                 content.popFront;
             }
-            tracef("sent");
+            debug(requests) tracef("sent");
             _stream.send("0\r\n\r\n");
         }
         _response._requestSentAt = Clock.currTime;
@@ -1125,7 +1111,7 @@ public struct HTTPRequest {
 
         if ( _useStreaming ) {
             if ( _response._receiveAsRange.activated ) {
-                debug trace("streaming_in activated");
+                debug(requests) trace("streaming_in activated");
                 return _response;
             } else {
                 _response._receiveAsRange.data = _response.responseBody.data;
@@ -1136,7 +1122,7 @@ public struct HTTPRequest {
             && !restartedRequest
             && isIdempotent(_method)
         ) {
-            debug tracef("Server closed keepalive connection");
+            debug(requests) tracef("Server closed keepalive connection");
             _stream.close();
             restartedRequest = true;
             goto connect;
@@ -1147,7 +1133,7 @@ public struct HTTPRequest {
         ///
         auto connection = "connection" in _response._responseHeaders;
         if ( !connection || *connection == "close" ) {
-            tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
+            debug(requests) tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             _stream.close();
         }
         if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
@@ -1218,7 +1204,7 @@ public struct HTTPRequest {
             req.put(encoded);
         }
 
-        trace(req.data);
+        debug(requests) trace(req.data);
 
         if ( _verbosity >= 1 ) {
             req.data.splitLines.each!(a => writeln("> " ~ a));
@@ -1236,7 +1222,7 @@ public struct HTTPRequest {
 
         if ( _useStreaming ) {
             if ( _response._receiveAsRange.activated ) {
-                trace("streaming_in activated");
+                debug(requests) trace("streaming_in activated");
                 return _response;
             } else {
                 _response._receiveAsRange.data = _response.responseBody.data;
@@ -1246,7 +1232,7 @@ public struct HTTPRequest {
             && !restartedRequest
             && isIdempotent(_method)
         ) {
-            tracef("Server closed keepalive connection");
+            debug(requests) tracef("Server closed keepalive connection");
             _stream.close();
             restartedRequest = true;
             goto connect;
@@ -1257,7 +1243,7 @@ public struct HTTPRequest {
         ///
         auto connection = "connection" in _response._responseHeaders;
         if ( !connection || *connection == "close" ) {
-            tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
+            debug(requests) tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
             _stream.close();
         }
         if ( _verbosity >= 1 ) {
@@ -1345,7 +1331,7 @@ public struct HTTPRequest {
 package unittest {
     import std.json;
     globalLogLevel(LogLevel.info);
-    tracef("http tests - start");
+    info("http tests - start");
 
     auto rq = HTTPRequest();
     auto rs = rq.get("https://httpbin.org/");
@@ -1535,9 +1521,9 @@ package unittest {
     rq = HTTPRequest();
     rq.timeout = 1.seconds;
     assertThrown!TimeoutException(rq.get("http://httpbin.org/delay/3"));
-//    assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
-//    assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
-    //assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
+    assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
+    assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
+    assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
 
     globalLogLevel(LogLevel.info);
     info("Check limits");

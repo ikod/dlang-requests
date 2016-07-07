@@ -26,7 +26,8 @@
         },
         "unittest": {
             "buildOptions": ["unittests", "debugMode", "debugInfo"],
-            "dflags": ["-debug=requests"]
+            "dflags-dmd": ["-debug=requests"],
+            "dflags-ldc": ["-d-debug=requests"]
         },
         "localtest": {
             "buildOptions": ["unittests", "debugMode", "debugInfo"],

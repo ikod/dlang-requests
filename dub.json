@@ -24,6 +24,10 @@
             "buildOptions": ["syntaxOnly"],
             "dflags" : ["-c", "-Dddocs", "source/requests/viola.ddoc"]
         },
+        "unittest": {
+            "buildOptions": ["unittests", "debugMode", "debugInfo"],
+            "dflags": ["-debug=requests"]
+        },
         "localtest": {
             "buildOptions": ["unittests", "debugMode", "debugInfo"],
             "versions": ["localtest"]

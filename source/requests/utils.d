@@ -1,6 +1,8 @@
 module requests.utils;
 
 import std.range;
+import std.string;
+
 
 __gshared immutable short[string] standard_ports;
 shared static this() {
@@ -146,3 +148,17 @@ string[] dump(in ubyte[] data) {
     }
     return res;
 }
+
+static string urlEncoded(string p) pure @safe {
+    immutable string[dchar] translationTable = [
+        ' ':  "%20", '!': "%21", '*': "%2A", '\'': "%27", '(': "%28", ')': "%29",
+        ';':  "%3B", ':': "%3A", '@': "%40", '&':  "%26", '=': "%3D", '+': "%2B",
+        '$':  "%24", ',': "%2C", '/': "%2F", '?':  "%3F", '#': "%23", '[': "%5B",
+        ']':  "%5D", '%': "%25",
+    ];
+    return p.translate(translationTable);
+}
+package unittest {
+    assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
+}
+

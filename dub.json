@@ -7,7 +7,6 @@
     "configurations": [
         {
             "name": "std",
-            "versions": ["sslLibs"],
             "libs-posix": ["ssl", "crypto"],
             "libs-windows": ["libssl32", "libeay32"]
         },

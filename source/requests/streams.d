@@ -25,7 +25,7 @@ public class ConnectError: Exception {
     }
 }
 
-class DecodingExceptioin: Exception {
+class DecodingException: Exception {
     this(string message, string file =__FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
         super(message, file, line, next);
     }
@@ -81,11 +81,16 @@ public class DataPipe(E) : DataPipeIface!E {
             buffer.putNoCopy(data);
             return;
         }
-        auto t = process(pipe.front, [data]);
-        foreach(ref p; pipe[1..$]) {
-            t = process(p, t);
+        try {
+            auto t = process(pipe.front, [data]);
+            foreach(ref p; pipe[1..$]) {
+                t = process(p, t);
+            }
+            t.each!(b => buffer.putNoCopy(b));
         }
-        t.each!(b => buffer.putNoCopy(b));
+        catch (Exception e) {
+            throw new DecodingException(e.msg);
+        }
     }
     /// Get what was collected in internal buffer and clear it. 
     /// Returns:
@@ -240,7 +245,7 @@ public class DecodeChunked : DataPipeIface!ubyte {
                 }
                 linebuff ~= digits[0..i];
                 if ( linebuff.length >= 80 ) {
-                    throw new DecodingExceptioin("Can't find chunk size in the body");
+                    throw new DecodingException("Can't find chunk size in the body");
                 }
                 data = data[i..$];
 
@@ -743,6 +748,18 @@ else {
             assert(s !is null, "Can't create socket");
             __isOpen = true;
         }
+        override SSLSocketStream accept() {
+            auto newso = s.accept();
+            if ( s is null ) {
+                return null;
+            }
+            auto newstream = new SSLSocketStream();
+            auto sslSocket = new OpenSslSocket(newso.handle, s.addressFamily);
+            newstream.s = sslSocket;
+            newstream.__isOpen = true;
+            newstream.__isConnected = true;
+            return newstream;
+        }
     }
 }
 
@@ -759,6 +776,11 @@ public interface NetworkStream {
 
     ptrdiff_t send(const(void)[] buff);
     ptrdiff_t receive(void[] buff);
+
+    NetworkStream accept();
+    @property void reuseAddr(bool);
+    void bind(Address);
+    void listen(int);
 
     ///
     /// Set timeout for receive calls. 0 means no timeout.
@@ -867,6 +889,23 @@ public abstract class SocketStream : NetworkStream {
     @property void readTimeout(Duration timeout) @safe {
         s.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
     }
+    override SocketStream accept() {
+        assert(false, "Implement before use");
+    }
+    @property override void reuseAddr(bool yes){
+        if (yes) {
+            s.setOption(SocketOptionLevel.SOCKET, SocketOption.REUSEADDR, 1);
+        }
+        else {
+            s.setOption(SocketOptionLevel.SOCKET, SocketOption.REUSEADDR, 0);
+        }
+    }
+    override void bind(Address addr){
+        s.bind(addr);
+    }
+    override void listen(int n) {
+        s.listen(n);
+    };
 }
 
 public class TCPSocketStream : SocketStream {
@@ -877,6 +916,17 @@ public class TCPSocketStream : SocketStream {
         s = new Socket(fa, SocketType.STREAM, ProtocolType.TCP);
         assert(s !is null, "Can't create socket");
         __isOpen = true;
+    }
+    override TCPSocketStream accept() {
+        auto newso = s.accept();
+        if ( s is null ) {
+            return null;
+        }
+        auto newstream = new TCPSocketStream();
+        newstream.s = newso;
+        newstream.__isOpen = true;
+        newstream.__isConnected = true;
+        return newstream;
     }
 }
 
@@ -943,6 +993,18 @@ version (vibeD) {
                 _readTimeout = timeout;
             }
         }
+        override TCPVibeStream accept() {
+            assert(false, "Must be implemented");
+        }
+        override @property void reuseAddr(bool){
+            assert(false, "Not Implemented");
+        }
+        override void bind(Address){
+            assert(false, "Not Implemented");
+        }
+        override void listen(int){
+            assert(false, "Not Implemented");
+        }
     }
 
     public class SSLVibeStream : TCPVibeStream {
@@ -996,6 +1058,18 @@ version (vibeD) {
         }
         @property override bool isOpen() const {
             return _conn && _isOpen;
+        }
+        override SSLVibeStream accept() {
+            assert(false, "Must be implemented");
+        }
+        override @property void reuseAddr(bool){
+            assert(false, "Not Implemented");
+        }
+        override void bind(Address){
+            assert(false, "Not Implemented");
+        }
+        override void listen(int){
+            assert(false, "Not Implemented");
         }
     }
 }

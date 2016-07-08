@@ -633,117 +633,118 @@ public unittest {
     assert(equal(findSplit(c, "\n\n")[2], "body"));
     assert(c.length == c_length);
 }
-
-//version (sslLibs) {
-extern(C) {
-    int SSL_library_init();
-    void OpenSSL_add_all_ciphers();
-    void OpenSSL_add_all_digests();
-    void SSL_load_error_strings();
-
-    struct SSL {}
-    struct SSL_CTX {}
-    struct SSL_METHOD {}
-
-    SSL_CTX* SSL_CTX_new(const SSL_METHOD* method);
-    SSL* SSL_new(SSL_CTX*);
-    int SSL_set_fd(SSL*, int);
-    int SSL_connect(SSL*);
-    int SSL_write(SSL*, const void*, int);
-    int SSL_read(SSL*, void*, int);
-    int SSL_shutdown(SSL*) @trusted @nogc nothrow;
-    void SSL_free(SSL*);
-    void SSL_CTX_free(SSL_CTX*);
-
-    long    SSL_CTX_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg);
-
-    long SSL_CTX_set_mode(SSL_CTX *ctx, long mode);
-    long SSL_set_mode(SSL *ssl, long mode);
-
-    long SSL_CTX_get_mode(SSL_CTX *ctx);
-    long SSL_get_mode(SSL *ssl);
-
-    SSL_METHOD* SSLv3_client_method();
-    SSL_METHOD* TLSv1_2_client_method();
-    SSL_METHOD* TLSv1_client_method();
+version(vibeD) {
 }
+else {
+    extern(C) {
+        int SSL_library_init();
+        void OpenSSL_add_all_ciphers();
+        void OpenSSL_add_all_digests();
+        void SSL_load_error_strings();
 
-//pragma(lib, "crypto");
-//pragma(lib, "ssl");
+        struct SSL {}
+        struct SSL_CTX {}
+        struct SSL_METHOD {}
 
-shared static this() {
-    SSL_library_init();
-    OpenSSL_add_all_ciphers();
-    OpenSSL_add_all_digests();
-    SSL_load_error_strings();
-}
+        SSL_CTX* SSL_CTX_new(const SSL_METHOD* method);
+        SSL* SSL_new(SSL_CTX*);
+        int SSL_set_fd(SSL*, int);
+        int SSL_connect(SSL*);
+        int SSL_write(SSL*, const void*, int);
+        int SSL_read(SSL*, void*, int);
+        int SSL_shutdown(SSL*) @trusted @nogc nothrow;
+        void SSL_free(SSL*);
+        void SSL_CTX_free(SSL_CTX*);
 
-public class OpenSslSocket : Socket {
-    enum SSL_MODE_RELEASE_BUFFERS = 0x00000010L;
-    private SSL* ssl;
-    private SSL_CTX* ctx;
-    private void initSsl() {
-        //ctx = SSL_CTX_new(SSLv3_client_method());
-        ctx = SSL_CTX_new(TLSv1_client_method());
-        assert(ctx !is null);
+        long    SSL_CTX_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg);
 
-        //SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
-        //SSL_CTX_ctrl(ctx, 33, SSL_MODE_RELEASE_BUFFERS, null);
-        ssl = SSL_new(ctx);
-        SSL_set_fd(ssl, this.handle);
-    }
+        long SSL_CTX_set_mode(SSL_CTX *ctx, long mode);
+        long SSL_set_mode(SSL *ssl, long mode);
 
-    @trusted
-    override void connect(Address to) {
-        super.connect(to);
-        if(SSL_connect(ssl) == -1)
-            throw new Exception("ssl connect failed");
-    }
+        long SSL_CTX_get_mode(SSL_CTX *ctx);
+        long SSL_get_mode(SSL *ssl);
 
-    @trusted
-    override ptrdiff_t send(const(void)[] buf, SocketFlags flags) {
-        return SSL_write(ssl, buf.ptr, cast(uint) buf.length);
-    }
-    override ptrdiff_t send(const(void)[] buf) {
-        return send(buf, SocketFlags.NONE);
-    }
-    @trusted
-    override ptrdiff_t receive(void[] buf, SocketFlags flags) {
-        return SSL_read(ssl, buf.ptr, cast(int)buf.length);
-    }
-    override ptrdiff_t receive(void[] buf) {
-        return receive(buf, SocketFlags.NONE);
-    }
-    this(AddressFamily af, SocketType type = SocketType.STREAM) {
-        super(af, type);
-        initSsl();
+        SSL_METHOD* SSLv3_client_method();
+        SSL_METHOD* TLSv1_2_client_method();
+        SSL_METHOD* TLSv1_client_method();
     }
 
-    this(socket_t sock, AddressFamily af) {
-        super(sock, af);
-        initSsl();
-    }
-    override void close() {
-        //SSL_shutdown(ssl);
-        super.close();
-    }
-    ~this() {
-        SSL_free(ssl);
-        SSL_CTX_free(ctx);
-    }
-}
+    //pragma(lib, "crypto");
+    //pragma(lib, "ssl");
 
-public class SSLSocketStream: SocketStream {
-    override void open(AddressFamily fa) {
-        if ( s !is null ) {
-            s.close();
+    shared static this() {
+        SSL_library_init();
+        OpenSSL_add_all_ciphers();
+        OpenSSL_add_all_digests();
+        SSL_load_error_strings();
+    }
+
+    public class OpenSslSocket : Socket {
+        enum SSL_MODE_RELEASE_BUFFERS = 0x00000010L;
+        private SSL* ssl;
+        private SSL_CTX* ctx;
+        private void initSsl() {
+            //ctx = SSL_CTX_new(SSLv3_client_method());
+            ctx = SSL_CTX_new(TLSv1_client_method());
+            assert(ctx !is null);
+
+            //SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
+            //SSL_CTX_ctrl(ctx, 33, SSL_MODE_RELEASE_BUFFERS, null);
+            ssl = SSL_new(ctx);
+            SSL_set_fd(ssl, this.handle);
         }
-        s = new OpenSslSocket(fa);
-        assert(s !is null, "Can't create socket");
-        __isOpen = true;
+
+        @trusted
+        override void connect(Address to) {
+            super.connect(to);
+            if(SSL_connect(ssl) == -1)
+                throw new Exception("ssl connect failed");
+        }
+
+        @trusted
+        override ptrdiff_t send(const(void)[] buf, SocketFlags flags) {
+            return SSL_write(ssl, buf.ptr, cast(uint) buf.length);
+        }
+        override ptrdiff_t send(const(void)[] buf) {
+            return send(buf, SocketFlags.NONE);
+        }
+        @trusted
+        override ptrdiff_t receive(void[] buf, SocketFlags flags) {
+            return SSL_read(ssl, buf.ptr, cast(int)buf.length);
+        }
+        override ptrdiff_t receive(void[] buf) {
+            return receive(buf, SocketFlags.NONE);
+        }
+        this(AddressFamily af, SocketType type = SocketType.STREAM) {
+            super(af, type);
+            initSsl();
+        }
+
+        this(socket_t sock, AddressFamily af) {
+            super(sock, af);
+            initSsl();
+        }
+        override void close() {
+            //SSL_shutdown(ssl);
+            super.close();
+        }
+        ~this() {
+            SSL_free(ssl);
+            SSL_CTX_free(ctx);
+        }
+    }
+
+    public class SSLSocketStream: SocketStream {
+        override void open(AddressFamily fa) {
+            if ( s !is null ) {
+                s.close();
+            }
+            s = new OpenSslSocket(fa);
+            assert(s !is null, "Can't create socket");
+            __isOpen = true;
+        }
     }
 }
-//}
 
 public interface NetworkStream {
     @property bool isConnected() const;

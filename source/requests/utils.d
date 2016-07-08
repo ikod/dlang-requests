@@ -162,3 +162,39 @@ package unittest {
     assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
 }
 
+private static immutable char[string] hex2chr;
+static this() {
+    foreach(c; 0..255) {
+        hex2chr["%02X".format(c)] = cast(char)c;
+    }
+}
+
+string urlDecode(string p) {
+    import std.string;
+    import std.algorithm;
+    import core.exception;
+
+    if ( !p.canFind("%") ) {
+        return p.replace("+", " ");
+    }
+    string[] res;
+    auto parts = p.replace("+", " ").split("%");
+    res ~= parts[0];
+    foreach(part; parts[1..$]) {
+        if ( part.length<2 ) {
+            res ~= "%" ~ part;
+            continue;
+        }
+        try {
+            res ~= hex2chr[part[0..2]] ~ part[2..$];
+        } catch (RangeError e) {
+            res ~= "%" ~ part;
+        }
+    }
+    return res.join();
+}
+
+package unittest {
+    assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
+    assert(urlDecode("a+bc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D") == `a bc !#$&'()*+,/:;=?@[]`);
+}

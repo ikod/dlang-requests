@@ -133,7 +133,7 @@ version (unittest) {
 			return rs;
 		}
 		server.addRoute(exactRoute(r"/",             &root)).
-			addRoute(exactRoute(r"/get",         &get)).
+				addRoute(exactRoute(r"/get",         &get)).
 				addRoute(exactRoute(r"/post",        &post)).
 				addRoute(exactRoute(r"/delete",      &del)).
 				addRoute(exactRoute(r"/cookies",     &cookies)).
@@ -145,7 +145,6 @@ version (unittest) {
 				addRoute(regexRoute(r"/absolute-redirect/(?P<redirects>\d+)", &abs_redir)).
 				addRoute(regexRoute(r"/basic-auth/(?P<user>[^/]+)/(?P<password>[^/]+)", &basicAuth));
 
-		server.addRoute(exactRoute(r"/", &root));
 		return server;
 	}
 }

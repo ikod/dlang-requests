@@ -1305,7 +1305,7 @@ package unittest {
             server.stop();
         }
 
-        httpbinUrl = "http://localhost:8081/";
+        httpbinUrl = "http://0.0.0.0:8081/";
 
         string fromJsonArrayToStr(JSONValue v) {
             return cast(string)(v.array.map!"cast(ubyte)a.integer".array);

@@ -4,6 +4,8 @@
     "copyright": "Copyright © 2016, igor",
     "authors": ["ikod"],
     "license": "BSL-1.0",
+    "sourcePaths": ["tests", "source"],
+    "importPaths": ["tests", "source"],
     "configurations": [
         {
             "name": "std",

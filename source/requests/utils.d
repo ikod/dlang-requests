@@ -198,3 +198,8 @@ package unittest {
     assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
     assert(urlDecode("a+bc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D") == `a bc !#$&'()*+,/:;=?@[]`);
 }
+
+import std.typecons;
+
+public alias Cookie     = Tuple!(string, "path", string, "domain", string, "attr", string, "value");
+public alias QueryParam = Tuple!(string, "key", string, "value");

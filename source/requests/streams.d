@@ -229,6 +229,7 @@ public class DecodeChunked : DataPipeIface!ubyte {
     void putNoCopy(eType[] data) {
         while ( data.length ) {
             if ( state == States.trailer ) {
+                to_receive = to_receive - min(to_receive, data.length);
                 return;
             }
             if ( state == States.huntingSize ) {
@@ -248,7 +249,6 @@ public class DecodeChunked : DataPipeIface!ubyte {
                     throw new DecodingException("Can't find chunk size in the body");
                 }
                 data = data[i..$];
-
                 if (!linebuff.canFind(CRLF)) {
                     continue;
                 }
@@ -256,6 +256,7 @@ public class DecodeChunked : DataPipeIface!ubyte {
                 state = States.receiving;
                 to_receive = chunk_size;
                 if ( chunk_size == 0 ) {
+                    to_receive = 2-min(2, data.length); // trailing \r\n
                     state = States.trailer;
                     return;
                 }
@@ -300,7 +301,7 @@ public class DecodeChunked : DataPipeIface!ubyte {
         return buff.empty;
     }
     bool done() {
-        return state==States.trailer;
+        return state==States.trailer && to_receive==0;
     }
 }
 
@@ -340,7 +341,7 @@ unittest {
     dpu.flush();
     assert(equal(dpu.get(), "abcdefgh"));
     info("Test unchunker properties");
-    ubyte[] twoChunks = "2\r\n12\r\n2\r\n34\r\n0\r\n".dup.representation;
+    ubyte[] twoChunks = "2\r\n12\r\n2\r\n34\r\n0\r\n\r\n".dup.representation;
     ubyte[][] result;
     auto uc = new DecodeChunked();
     uc.putNoCopy(twoChunks);

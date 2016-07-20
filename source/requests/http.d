@@ -20,9 +20,6 @@ import requests.uri;
 import requests.utils;
 import requests.base;
 
-public alias Cookie     = Tuple!(string, "path", string, "domain", string, "attr", string, "value");
-public alias QueryParam = Tuple!(string, "key", string, "value");
-
 static immutable ushort[] redirectCodes = [301, 302, 303];
 static immutable uint     defaultBufferSize = 12*1024;
 
@@ -252,45 +249,6 @@ public struct MultipartForm {
     }
 }
 ///
-package unittest {
-    /// This is example on usage files with MultipartForm data.
-    /// For this example we have to create files which will be sent.
-    import std.file;
-    import std.path;
-    globalLogLevel(LogLevel.info);
-    info("Check POST files");
-    /// preapare files
-    auto tmpd = tempDir();
-    auto tmpfname1 = tmpd ~ dirSeparator ~ "request_test1.txt";
-    auto f = File(tmpfname1, "wb");
-    f.rawWrite("file1 content\n");
-    f.close();
-    auto tmpfname2 = tmpd ~ dirSeparator ~ "request_test2.txt";
-    f = File(tmpfname2, "wb");
-    f.rawWrite("file2 content\n");
-    f.close();
-    ///
-    /// Ok, files ready.
-    /// Now we will prepare Form data
-    /// 
-    File f1 = File(tmpfname1, "rb");
-    File f2 = File(tmpfname2, "rb");
-    scope(exit) {
-        f1.close();
-        f2.close();
-    }
-    ///
-    /// for each part we have to set field name, source (ubyte array or opened file) and optional filename and content-type
-    /// 
-    MultipartForm form = MultipartForm().
-        add(formData("Field1", cast(ubyte[])"form field from memory")).
-        add(formData("Field2", cast(ubyte[])"file field from memory", ["filename":"data2"])).
-        add(formData("File1", f1, ["filename":"file1", "Content-Type": "application/octet-stream"])).
-        add(formData("File2", f2, ["filename":"file2", "Content-Type": "application/octet-stream"]));
-    /// everything ready, send request
-    auto rq = HTTPRequest();
-    auto rs = rq.post("http://httpbin.org/post", form);
-}
 
 ///
 /// Request.
@@ -726,7 +684,7 @@ public struct HTTPRequest {
             auto b = new ubyte[_bufferSize];
             read = _stream.receive(b);
 
-            debug tracef("read: %d", read);
+            debug(requests) tracef("read: %d", read);
             if ( read == 0 ) {
                 break;
             }
@@ -915,7 +873,7 @@ public struct HTTPRequest {
         
         foreach(ref part; sources._sources) {
             string h = "--" ~ boundary ~ "\r\n";
-            string disposition = "form-data; name=%s".format(part.name);
+            string disposition = `form-data; name="%s"`.format(part.name);
             string optionals = part.
                 parameters.byKeyValue().
                 filter!(p => p.key!="Content-Type").
@@ -1035,7 +993,7 @@ public struct HTTPRequest {
     ///      auto f = File("tests/test.txt", "rb");
     ///      rs = rq.exec!"POST"("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
     ///  --------------------------------------------------------------------------------------------------------
-    HTTPResponse exec(string method="POST", R)(string url, R content, string contentType="text/html")
+    HTTPResponse exec(string method="POST", R)(string url, R content, string contentType="application/octet-stream")
         if ( (rank!R == 1)
             || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front)))) 
             || (rank!R == 2 && (is(Unqual!(typeof(content.front.front)) == ubyte)))
@@ -1066,7 +1024,9 @@ public struct HTTPRequest {
         req.put(requestString());
 
         auto h = requestHeaders;
-        h["Content-Type"] = contentType;
+        if ( contentType ) {
+            h["Content-Type"] = contentType;
+        }
         static if ( rank!R == 1 ) {
             h["Content-Length"] = to!string(content.length);
         } else {
@@ -1327,34 +1287,46 @@ public struct HTTPRequest {
     }
 }
 
-///
 package unittest {
     import std.json;
-    globalLogLevel(LogLevel.info);
-    info("http tests - start");
+    import std.array;
+    string httpbinUrl;
+    version(vibeD) {
+        httpbinUrl = "http://httpbin.org/";
+        string fromJsonArrayToStr(JSONValue v) {
+            return v.str;
+        }
+    }
+    else {
+        import httpbin;
+        auto server = httpbinApp();
+        server.start();
+        scope(exit) {
+            server.stop();
+        }
 
-    auto rq = HTTPRequest();
-    auto rs = rq.get("https://httpbin.org/");
+        httpbinUrl = "http://localhost:8081/";
+
+        string fromJsonArrayToStr(JSONValue v) {
+            return cast(string)(v.array.map!"cast(ubyte)a.integer".array);
+        }
+    }
+    HTTPRequest  rq;
+    HTTPResponse rs;
+    info("Check GET");
+    rs = rq.get(httpbinUrl);
     assert(rs.code==200);
     assert(rs.responseBody.length > 0);
-    rs = HTTPRequest().get("http://httpbin.org/get", ["c":" d", "a":"b"]);
-    assert(rs.code == 200);
-    auto json = parseJSON(rs.responseBody.data).object["args"].object;
-    assert(json["c"].str == " d");
-    assert(json["a"].str == "b");
 
-    globalLogLevel(LogLevel.info);
-    rq = HTTPRequest();
-    rq.keepAlive = true;
-    // handmade json
-    info("Check POST json");
-    rs = rq.post("http://httpbin.org/post?b=x", `{"a":"☺ ", "c":[1,2,3]}`, "application/json");
-    assert(rs.code==200);
-    json = parseJSON(rs.responseBody.data).object["args"].object;
-    assert(json["b"].str == "x");
-    json = parseJSON(rs.responseBody.data).object["json"].object;
-    assert(json["a"].str == "☺ ");
-    assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
+    info("Check GET with AA params");
+    {
+        rs = HTTPRequest().get(httpbinUrl ~ "get", ["c":" d", "a":"b"]);
+        assert(rs.code == 200);
+        auto json = parseJSON(rs.responseBody.data).object["args"].object;
+        assert(json["c"].str == " d");
+        assert(json["a"].str == "b");
+    }
+    info("Check POST files");
     {
         import std.file;
         import std.path;
@@ -1365,82 +1337,200 @@ package unittest {
         f.close();
         // files
         globalLogLevel(LogLevel.info);
-        info("Check POST files");
         PostFile[] files = [
-                        {fileName: tmpfname, fieldName:"abc", contentType:"application/octet-stream"}, 
-                        {fileName: tmpfname}
-                    ];
-        rs = rq.post("http://httpbin.org/post", files);
+            {fileName: tmpfname, fieldName:"abc", contentType:"application/octet-stream"}, 
+            {fileName: tmpfname}
+        ];
+        rs = rq.post(httpbinUrl ~ "post", files);
         assert(rs.code==200);
-        info("Check POST chunked from file.byChunk");
+    }
+    info("Check POST chunked from file.byChunk");
+    {
+        import std.file;
+        import std.path;
+        auto tmpd = tempDir();
+        auto tmpfname = tmpd ~ dirSeparator ~ "request_test.txt";
+        auto f = File(tmpfname, "wb");
+        f.rawWrite("abcdefgh\n12345678\n");
+        f.close();
         f = File(tmpfname, "rb");
-        rs = rq.post("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
+        rs = rq.post(httpbinUrl ~ "post", f.byChunk(3), "application/octet-stream");
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["data"].str;
+        auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
         assert(data=="abcdefgh\n12345678\n");
         f.close();
     }
+    info("Check POST chunked from lineSplitter");
     {
-        // string
-        info("Check POST utf8 string");
-        rs = rq.post("http://httpbin.org/post", "привiт, свiт!", "application/octet-stream");
-        assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["data"].str;
-        assert(data=="привiт, свiт!");
-    }
-    // ranges
-    {
-        info("Check POST chunked from lineSplitter");
         auto s = lineSplitter("one,\ntwo,\nthree.");
-        rs = rq.exec!"POST"("http://httpbin.org/post", s, "application/octet-stream");
+        rs = rq.exec!"POST"(httpbinUrl ~ "post", s, "application/octet-stream");
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.toString).object["data"].str;
+        auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
         assert(data=="one,two,three.");
     }
+    info("Check POST chunked from array");
     {
-        info("Check POST chunked from array");
         auto s = ["one,", "two,", "three."];
-        rs = rq.post("http://httpbin.org/post", s, "application/octet-stream");
+        rs = rq.post(httpbinUrl ~ "post", s, "application/octet-stream");
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["data"].str;
+        auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
         assert(data=="one,two,three.");
     }
+    info("Check POST chunked using std.range.chunks()");
     {
-        info("Check POST chunked using std.range.chunks()");
         auto s = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        rs = rq.post("http://httpbin.org/post", s.representation.chunks(10), "application/octet-stream");
+        rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["data"].str;
+        auto data = fromJsonArrayToStr(parseJSON(rs.responseBody.data).object["data"]);
         assert(data==s);
     }
+    info("Check POST from QueryParams");
     {
-        info("Check POST from AA");
-        rs = rq.post("http://httpbin.org/post", ["a":"b", "c":"d"]);
+        rs = rq.post(httpbinUrl ~ "post", queryParams("name[]", "first", "name[]", 2));
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["form"].object;
-        assert(data["a"].str == "b");
-        assert(data["c"].str == "d");
+        auto data = parseJSON(rs.responseBody).object["form"].object;
+        string[] a;
+        try {
+            a = to!(string[])(data["name[]"].str);
+        }
+        catch (JSONException e) {
+            a = data["name[]"].array.map!"a.str".array;
+        }
+        assert(equal(["first", "2"], a));
     }
+    info("Check POST from AA");
     {
-        info("Check POST from QueryParams");
-        rs = rq.post("http://httpbin.org/post", queryParams("name[]", "first", "name[]", 2));
+        rs = rq.post(httpbinUrl ~ "post", ["a":"b ", "c":"d"]);
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["form"].object;
-        assert((data["name[]"].array[0].str == "first"));
-        assert((data["name[]"].array[1].str == "2"));
+        auto form = parseJSON(rs.responseBody.data).object["form"].object;
+        assert(form["a"].str == "b ");
+        assert(form["c"].str == "d");
     }
-    // associative array
-    rs = rq.post("http://httpbin.org/post", ["a":"b ", "c":"d"]);
-    assert(rs.code==200);
-    auto form = parseJSON(rs.responseBody.data).object["form"].object;
-    assert(form["a"].str == "b ");
-    assert(form["c"].str == "d");
+    info("Check POST json");
+    {
+        rs = rq.post(httpbinUrl ~ "post?b=x", `{"a":"a b", "c":[1,2,3]}`, "application/json");
+        assert(rs.code==200);
+        auto json = parseJSON(rs.responseBody).object["args"].object;
+        assert(json["b"].str == "x");
+        json = parseJSON(rs.responseBody).object["json"].object;
+        assert(json["a"].str == "a b");
+        assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
+    }
     info("Check HEAD");
-    rs = rq.exec!"HEAD"("http://httpbin.org/");
+    rs = rq.exec!"HEAD"(httpbinUrl);
     assert(rs.code==200);
     info("Check DELETE");
-    rs = rq.exec!"DELETE"("http://httpbin.org/delete");
+    rs = rq.exec!"DELETE"(httpbinUrl ~ "delete");
     assert(rs.code==200);
+    info("Check compressed content");
+    rs = rq.get(httpbinUrl ~ "gzip");
+    assert(rs.code==200);
+    bool gzipped = parseJSON(rs.responseBody).object["gzipped"].type == JSON_TYPE.TRUE;
+    assert(gzipped);
+    info("gzip - ok");
+    rs = rq.get(httpbinUrl ~ "deflate");
+    assert(rs.code==200);
+    bool deflated = parseJSON(rs.responseBody).object["deflated"].type == JSON_TYPE.TRUE;
+    assert(deflated);
+    info("deflate - ok");
+
+    info("Check redirects");
+    rs = rq.get(httpbinUrl ~ "relative-redirect/2");
+    assert(rs.history.length == 2);
+    assert(rs.code==200);
+    rs = rq.get(httpbinUrl ~ "absolute-redirect/2");
+    assert(rs.history.length == 2);
+    assert(rs.code==200);
+
+    rq.maxRedirects = 2;
+    assertThrown!MaxRedirectsException(rq.get(httpbinUrl ~ "absolute-redirect/3"));
+
+    info("Check cookie");
+    {
+        rs = rq.get(httpbinUrl ~ "cookies/set?A=abcd&b=cdef");
+        assert(rs.code == 200);
+        auto json = parseJSON(rs.responseBody.data).object["cookies"].object;
+        assert(json["A"].str == "abcd");
+        assert(json["b"].str == "cdef");
+        foreach(c; rq.cookie) {
+            final switch(c.attr) {
+                case "A":
+                    assert(c.value == "abcd");
+                    break;
+                case "b":
+                    assert(c.value == "cdef");
+                    break;
+            }
+        }
+    }
+    info("Check chunked content");
+    rs = rq.get(httpbinUrl ~ "range/1024");
+    assert(rs.code==200);
+    assert(rs.responseBody.length==1024);
+
+    info("Check basic auth");
+    rq.authenticator = new BasicAuthentication("user", "passwd");
+    rs = rq.get(httpbinUrl ~ "basic-auth/user/passwd");
+    assert(rs.code==200);
+
+    info("Check limits");
+    rq = HTTPRequest();
+    rq.maxContentLength = 1;
+    assertThrown!RequestException(rq.get(httpbinUrl));
+    rq = HTTPRequest();
+    rq.maxHeadersLength = 1;
+    assertThrown!RequestException(rq.get(httpbinUrl));
+    rq = HTTPRequest();
+    info("Check POST multiPartForm");
+    {
+        /// This is example on usage files with MultipartForm data.
+        /// For this example we have to create files which will be sent.
+        import std.file;
+        import std.path;
+        /// preapare files
+        auto tmpd = tempDir();
+        auto tmpfname1 = tmpd ~ dirSeparator ~ "request_test1.txt";
+        auto f = File(tmpfname1, "wb");
+        f.rawWrite("file1 content\n");
+        f.close();
+        auto tmpfname2 = tmpd ~ dirSeparator ~ "request_test2.txt";
+        f = File(tmpfname2, "wb");
+        f.rawWrite("file2 content\n");
+        f.close();
+        ///
+        /// Ok, files ready.
+        /// Now we will prepare Form data
+        /// 
+        File f1 = File(tmpfname1, "rb");
+        File f2 = File(tmpfname2, "rb");
+        scope(exit) {
+            f1.close();
+            f2.close();
+        }
+        ///
+        /// for each part we have to set field name, source (ubyte array or opened file) and optional filename and content-type
+        /// 
+        MultipartForm mForm = MultipartForm().
+            add(formData("Field1", cast(ubyte[])"form field from memory")).
+                add(formData("Field2", cast(ubyte[])"file field from memory", ["filename":"data2"])).
+                add(formData("File1", f1, ["filename":"file1", "Content-Type": "application/octet-stream"])).
+                add(formData("File2", f2, ["filename":"file2", "Content-Type": "application/octet-stream"]));
+        /// everything ready, send request
+        rs = rq.post(httpbinUrl ~ "post", mForm);
+    }
+}
+///
+package unittest {
+    import std.json;
+    globalLogLevel(LogLevel.info);
+    info("http tests - start");
+
+    auto rq = HTTPRequest();
+    HTTPResponse rs;
+
+    globalLogLevel(LogLevel.info);
+    rq = HTTPRequest();
+    rq.keepAlive = true;
     info("Check PUT");
     rs = rq.exec!"PUT"("http://httpbin.org/put",  `{"a":"b", "c":[1,2,3]}`, "application/json");
     assert(rs.code==200);
@@ -1448,74 +1538,6 @@ package unittest {
     rs = rq.exec!"PATCH"("http://httpbin.org/patch", "привiт, свiт!", "application/octet-stream");
     assert(rs.code==200);
 
-    info("Check compressed content");
-    globalLogLevel(LogLevel.info);
-    rq = HTTPRequest();
-    rq.keepAlive = true;
-    rs = rq.get("http://httpbin.org/gzip");
-    assert(rs.code==200);
-    info("gzip - ok");
-    rs = rq.get("http://httpbin.org/deflate");
-    assert(rs.code==200);
-    info("deflate - ok");
-
-    info("Check redirects");
-    globalLogLevel(LogLevel.info);
-    rq = HTTPRequest();
-    //rq.verbosity = 3;
-    rq.keepAlive = true;
-    rs = rq.get("http://httpbin.org/relative-redirect/2");
-    assert(rs.history.length == 2);
-    assert(rs.code==200);
-//    rq = Request();
-//    rq.keepAlive = true;
-//    rq.proxy = "http://localhost:8888/";
-    rs = rq.get("http://httpbin.org/absolute-redirect/2");
-    assert(rs.history.length == 2);
-    assert(rs.code==200);
-//    rq = Request();
-    rq.maxRedirects = 2;
-    rq.keepAlive = false;
-    assertThrown!MaxRedirectsException(rq.get("https://httpbin.org/absolute-redirect/3"));
-    info("Check utf8 content");
-    globalLogLevel(LogLevel.info);
-    rq = HTTPRequest();
-    rs = rq.get("http://httpbin.org/encoding/utf8");
-    assert(rs.code==200);
-
-    info("Check cookie");
-    rs = HTTPRequest().get("http://httpbin.org/cookies/set?A=abcd&b=cdef");
-    assert(rs.code == 200);
-    json = parseJSON(rs.responseBody.data).object["cookies"].object;
-    assert(json["A"].str == "abcd");
-    assert(json["b"].str == "cdef");
-    auto cookie = rq.cookie();
-    foreach(c; rq.cookie) {
-        final switch(c.attr) {
-            case "A":
-                assert(c.value == "abcd");
-                break;
-            case "b":
-                assert(c.value == "cdef");
-                break;
-        }
-    }
-
-    info("Check chunked content");
-    globalLogLevel(LogLevel.info);
-    rq = HTTPRequest();
-    rq.keepAlive = true;
-    rs = rq.get("http://httpbin.org/range/1024");
-    assert(rs.code==200);
-    assert(rs.responseBody.length==1024);
-
-    info("Check basic auth");
-    globalLogLevel(LogLevel.info);
-    rq = HTTPRequest();
-    rq.authenticator = new BasicAuthentication("user", "passwd");
-    rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
-    assert(rs.code==200);
- 
     globalLogLevel(LogLevel.info);
     info("Check exception handling, error messages are OK");
     rq = HTTPRequest();
@@ -1525,13 +1547,5 @@ package unittest {
     assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
     assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
 
-    globalLogLevel(LogLevel.info);
-    info("Check limits");
-    rq = HTTPRequest();
-    rq.maxContentLength = 1;
-    assertThrown!RequestException(rq.get("http://httpbin.org/"));
-    rq = HTTPRequest();
-    rq.maxHeadersLength = 1;
-    assertThrown!RequestException(rq.get("http://httpbin.org/"));
     tracef("http tests - ok");
 }

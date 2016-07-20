@@ -95,7 +95,7 @@ struct URI {
         }
         r ~= _path;
         if ( _query ) {
-            r ~= "?" ~ _query;
+            r ~= _query;
         }
         return r;
     }
@@ -105,8 +105,15 @@ struct URI {
     mixin(Getter_Setter!string("password"));
     mixin(Getter_Setter!ushort("port"));
     mixin(Getter_Setter!string("path"));
-    mixin(Getter_Setter!string("query"));
-    
+    mixin(Getter!string("query"));
+    @property void query(string s) {
+        if ( s[0]=='?' ) {
+            _query = s;
+        }
+        else {
+            _query = "?" ~ s;
+        }
+    }
 //    mixin(setter("scheme"));
 //    mixin(setter("host"));
 //    mixin(setter("username"));

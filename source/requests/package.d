@@ -9,7 +9,7 @@ public import requests.uri;
 import std.datetime;
 import std.conv;
 import std.experimental.logger;
-import requests.uri;
+import requests.utils;
 
 /***********************************
  * This is simplest interface to both http and ftp protocols.

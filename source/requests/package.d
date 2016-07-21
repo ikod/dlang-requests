@@ -160,32 +160,44 @@ package unittest {
     import std.string;
     import std.exception;
 
+    string httpbinUrl = httpTestServer();
+
+    version(vibeD) {
+    }
+    else {
+        import httpbin;
+        auto server = httpbinApp();
+        server.start();
+        scope(exit) {
+            server.stop();
+        }
+    }
+
     globalLogLevel(LogLevel.info);
 
     infof("testing Request");
     Request rq;
     Response rs;
     //
-    rs = rq.get("https://httpbin.org/");
+    rs = rq.get(httpbinUrl);
     assert(rs.code==200);
     assert(rs.responseBody.length > 0);
-    rs = rq.get("http://httpbin.org/get", ["c":" d", "a":"b"]);
+    rs = rq.get(httpbinUrl ~ "get", ["c":" d", "a":"b"]);
     assert(rs.code == 200);
     auto json = parseJSON(rs.responseBody.data).object["args"].object;
     assert(json["c"].str == " d");
     assert(json["a"].str == "b");
     
-    globalLogLevel(LogLevel.info);
     rq = Request();
     rq.keepAlive = true;
     // handmade json
     info("Check POST json");
-    rs = rq.post("http://httpbin.org/post?b=x", `{"a":"☺ ", "c":[1,2,3]}`, "application/json");
+    rs = rq.post(httpbinUrl ~ "post?b=x", `{"a":"b ", "c":[1,2,3]}`, "application/json");
     assert(rs.code==200);
     json = parseJSON(rs.responseBody.data).object["args"].object;
     assert(json["b"].str == "x");
     json = parseJSON(rs.responseBody.data).object["json"].object;
-    assert(json["a"].str == "☺ ");
+    assert(json["a"].str == "b ");
     assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
     {
         import std.file;
@@ -199,79 +211,71 @@ package unittest {
         globalLogLevel(LogLevel.info);
         info("Check POST files");
         PostFile[] files = [
-        {fileName: tmpfname, fieldName:"abc", contentType:"application/octet-stream"}, 
-        {fileName: tmpfname}
+            {fileName: tmpfname, fieldName:"abc", contentType:"application/octet-stream"}, 
+            {fileName: tmpfname}
         ];
-        rs = rq.post("http://httpbin.org/post", files);
+        rs = rq.post(httpbinUrl ~ "post", files);
         assert(rs.code==200);
         info("Check POST chunked from file.byChunk");
         f = File(tmpfname, "rb");
-        rs = rq.post("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
+        rs = rq.post(httpbinUrl ~ "post", f.byChunk(3), "application/octet-stream");
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["data"].str;
+        auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
         assert(data=="abcdefgh\n12345678\n");
         f.close();
-    }
-    {
-        // string
-        info("Check POST utf8 string");
-        rs = rq.post("http://httpbin.org/post", "привiт, свiт!", "application/octet-stream");
-        assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["data"].str;
-        assert(data=="привiт, свiт!");
     }
     // ranges
     {
         info("Check POST chunked from lineSplitter");
         auto s = lineSplitter("one,\ntwo,\nthree.");
-        rs = rq.exec!"POST"("http://httpbin.org/post", s, "application/octet-stream");
+        rs = rq.exec!"POST"(httpbinUrl ~ "post", s, "application/octet-stream");
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.toString).object["data"].str;
+        auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
         assert(data=="one,two,three.");
     }
     {
         info("Check POST chunked from array");
         auto s = ["one,", "two,", "three."];
-        rs = rq.post("http://httpbin.org/post", s, "application/octet-stream");
+        rs = rq.post(httpbinUrl ~ "post", s, "application/octet-stream");
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["data"].str;
+        auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
         assert(data=="one,two,three.");
     }
     {
         info("Check POST chunked using std.range.chunks()");
         auto s = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        rs = rq.post("http://httpbin.org/post", s.representation.chunks(10), "application/octet-stream");
+        rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody.data).object["data"].str;
+        auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
         assert(data==s);
     }
     // associative array
-    rs = rq.post("http://httpbin.org/post", ["a":"b ", "c":"d"]);
+    rs = rq.post(httpbinUrl ~ "post", ["a":"b ", "c":"d"]);
     assert(rs.code==200);
     auto form = parseJSON(rs.responseBody.data).object["form"].object;
     assert(form["a"].str == "b ");
     assert(form["c"].str == "d");
     info("Check HEAD");
-    rs = rq.exec!"HEAD"("http://httpbin.org/");
+    rs = rq.exec!"HEAD"(httpbinUrl);
     assert(rs.code==200);
     info("Check DELETE");
-    rs = rq.exec!"DELETE"("http://httpbin.org/delete");
+    rs = rq.exec!"DELETE"(httpbinUrl ~ "delete");
     assert(rs.code==200);
     info("Check PUT");
-    rs = rq.exec!"PUT"("http://httpbin.org/put",  `{"a":"b", "c":[1,2,3]}`, "application/json");
+    rs = rq.exec!"PUT"(httpbinUrl ~ "put",  `{"a":"b", "c":[1,2,3]}`, "application/json");
     assert(rs.code==200);
     info("Check PATCH");
-    rs = rq.exec!"PATCH"("http://httpbin.org/patch", "привiт, свiт!", "application/octet-stream");
+    rs = rq.exec!"PATCH"(httpbinUrl ~ "patch", "привiт, свiт!", "application/octet-stream");
     assert(rs.code==200);
     
     info("Check compressed content");
     globalLogLevel(LogLevel.info);
     rq = Request();
     rq.keepAlive = true;
-    rs = rq.get("http://httpbin.org/gzip");
+    rs = rq.get(httpbinUrl ~ "gzip");
     assert(rs.code==200);
     info("gzip - ok");
-    rs = rq.get("http://httpbin.org/deflate");
+    rs = rq.get(httpbinUrl ~ "deflate");
     assert(rs.code==200);
     info("deflate - ok");
     
@@ -279,13 +283,13 @@ package unittest {
     globalLogLevel(LogLevel.info);
     rq = Request();
     rq.keepAlive = true;
-    rs = rq.get("http://httpbin.org/relative-redirect/2");
+    rs = rq.get(httpbinUrl ~ "relative-redirect/2");
     assert((cast(HTTPResponse)rs).history.length == 2);
     assert((cast(HTTPResponse)rs).code==200);
 
     info("Check cookie");
     rq = Request();
-    rs = rq.get("http://httpbin.org/cookies/set?A=abcd&b=cdef");
+    rs = rq.get(httpbinUrl ~ "cookies/set?A=abcd&b=cdef");
     assert(rs.code == 200);
     json = parseJSON(rs.responseBody.data).object["cookies"].object;
     assert(json["A"].str == "abcd");
@@ -301,62 +305,124 @@ package unittest {
                 break;
         }
     }
-    rs = rq.get("http://httpbin.org/absolute-redirect/2");
+    rs = rq.get(httpbinUrl ~ "absolute-redirect/2");
     assert((cast(HTTPResponse)rs).history.length == 2);
     assert((cast(HTTPResponse)rs).code==200);
     //    rq = Request();
     rq.maxRedirects = 2;
     rq.keepAlive = false;
-    assertThrown!MaxRedirectsException(rq.get("https://httpbin.org/absolute-redirect/3"));
+    assertThrown!MaxRedirectsException(rq.get(httpbinUrl ~ "absolute-redirect/3"));
 
-    info("Check utf8 content");
-    globalLogLevel(LogLevel.info);
-    rq = Request();
-    rs = rq.get("http://httpbin.org/encoding/utf8");
-    assert(rs.code==200);
-    
     info("Check chunked content");
-    globalLogLevel(LogLevel.info);
     rq = Request();
     rq.keepAlive = true;
     rq.bufferSize = 16*1024;
-    rs = rq.get("http://httpbin.org/range/1024");
+    rs = rq.get(httpbinUrl ~ "range/1024");
     assert(rs.code==200);
     assert(rs.responseBody.length==1024);
     
     info("Check basic auth");
-    globalLogLevel(LogLevel.info);
     rq = Request();
     rq.authenticator = new BasicAuthentication("user", "passwd");
-    rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
+    rs = rq.get(httpbinUrl ~ "basic-auth/user/passwd");
     assert(rs.code==200);
     
-    globalLogLevel(LogLevel.info);
     info("Check limits");
     rq = Request();
     rq.maxContentLength = 1;
-    assertThrown!RequestException(rq.get("http://httpbin.org/"));
+    assertThrown!RequestException(rq.get(httpbinUrl));
     rq = Request();
     rq.maxHeadersLength = 1;
-    assertThrown!RequestException(rq.get("http://httpbin.org/"));
-    //
-    info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
-    rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
-    assert(rs.code == 226);
-    info("ftp get  ", "ftp://speedtest.tele2.net/nonexistent", ", in same session.");
-    rs = rq.get("ftp://speedtest.tele2.net/nonexistent");
-    assert(rs.code != 226);
-    info("ftp get  ", "ftp://speedtest.tele2.net/1KB.zip", ", in same session.");
-    rs = rq.get("ftp://speedtest.tele2.net/1KB.zip");
-    assert(rs.code == 226);
-    assert(rs.responseBody.length == 1024);
-    info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
-    rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "another test, ignore please\n".representation);
-    assert(rs.code == 226);
-    info("ftp get  ", "ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
-    rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
-    assert(rs.code == 226);
-    info("testing ftp - done.");
+    assertThrown!RequestException(rq.get(httpbinUrl));
+
+    info("Test getContent");
+    auto r = getContent(httpbinUrl ~ "stream/20");
+    assert(r.splitter('\n').filter!("a.length>0").count == 20);
+    r = getContent(httpbinUrl ~ "get", ["a":"b", "c":"d"]);
+    string name = "user", sex = "male";
+    int    age = 42;
+    r = getContent(httpbinUrl ~ "get", "name", name, "age", age, "sex", sex);
+
+    info("Test receiveAsRange with GET");
+    rq = Request();
+    rq.useStreaming = true;
+    rq.bufferSize = 16;
+    rs = rq.get(httpbinUrl ~ "stream/20");
+    auto stream = rs.receiveAsRange();
+    ubyte[] streamedContent;
+    while( !stream.empty() ) {
+        streamedContent ~= stream.front;
+        stream.popFront();
+    }
+    rq = Request();
+    rs = rq.get(httpbinUrl ~ "stream/20");
+    assert(streamedContent == rs.responseBody.data);
+    info("Test postContent");
+    r = postContent(httpbinUrl ~ "post", `{"a":"b", "c":1}`, "application/json");
+    assert(parseJSON(r).object["json"].object["c"].integer == 1);
+
+    /// Posting to forms (for small data)
+    ///
+    /// posting query parameters using "application/x-www-form-urlencoded"
+    info("Test postContent using query params");
+    postContent(httpbinUrl ~ "post", queryParams("first", "a", "second", 2));
+    
+    /// posting using multipart/form-data (large data and files). See docs fot HTTPRequest
+    info("Test postContent form");
+    MultipartForm mpform;
+    mpform.add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
+    postContent(httpbinUrl ~ "post", mpform);
+    
+    /// you can do this using Request struct to access response details
+    info("Test postContent form via Request()");
+    rq = Request();
+    mpform = MultipartForm().add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
+    rs = rq.post(httpbinUrl ~ "post", mpform);
+    assert(rs.code == 200);
+    
+    info("Test receiveAsRange with POST");
+    streamedContent.length = 0;
+    rq = Request();
+    rq.useStreaming = true;
+    rq.bufferSize = 16;
+    string s = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
+    stream = rs.receiveAsRange();
+    while( !stream.empty() ) {
+        streamedContent ~= stream.front;
+        stream.popFront();
+    }
+    rq = Request();
+    rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
+    assert(streamedContent == rs.responseBody.data);
+    info("Test get in parallel");
+    {
+        import std.stdio;
+        import std.parallelism;
+        import std.algorithm;
+        import std.string;
+        import core.atomic;
+        
+        immutable auto urls = [
+            "stream/10",
+            "stream/20",
+            "stream/30",
+            "stream/40",
+            "stream/50",
+            "stream/60",
+            "stream/70",
+        ].map!(a => httpbinUrl ~ a).array.idup;
+        
+        defaultPoolThreads(4);
+        
+        shared short lines;
+        
+        foreach(url; parallel(urls)) {
+            atomicOp!"+="(lines, getContent(url).splitter("\n").count);
+        }
+        assert(lines == 287);
+        
+    }
 }
 
 auto queryParams(A...)(A args) pure @safe nothrow {
@@ -413,73 +479,6 @@ public auto ref getContent(A...)(string url, A args) if (args.length > 1 && args
 
 ///
 package unittest {
-    import std.algorithm;
-    import std.stdio;
-    import std.json;
-    globalLogLevel(LogLevel.info);
-    info("Test getContent");
-    auto r = getContent("https://httpbin.org/stream/20");
-    assert(r.splitter('\n').filter!("a.length>0").count == 20);
-    r = getContent("ftp://speedtest.tele2.net/1KB.zip");
-    assert(r.length == 1024);
-    r = getContent("https://httpbin.org/get", ["a":"b", "c":"d"]);
-
-    string name = "user", sex = "male";
-    int    age = 42;
-    r = getContent("https://httpbin.org/get", "name", name, "age", age, "sex", sex);
-
-    info("Test receiveAsRange with GET");
-    auto rq = Request();
-    rq.useStreaming = true;
-    rq.bufferSize = 16;
-    auto rs = rq.get("http://httpbin.org/stream/20");
-    auto stream = rs.receiveAsRange();
-    ubyte[] streamedContent;
-    while( !stream.empty() ) {
-        streamedContent ~= stream.front;
-        stream.popFront();
-    }
-    rq = Request();
-    rs = rq.get("http://httpbin.org/stream/20");
-    assert(streamedContent == rs.responseBody.data);
-    rq.useStreaming = true;
-    streamedContent.length = 0;
-    rs = rq.get("ftp://speedtest.tele2.net/1KB.zip");
-    stream = rs.receiveAsRange;
-    while( !stream.empty() ) {
-        streamedContent ~= stream.front;
-        stream.popFront();
-    }
-    assert(streamedContent.length == 1024);
-}
-///
-package unittest {
-    globalLogLevel(LogLevel.info);
-    info("Test get in parallel");
-    import std.stdio;
-    import std.parallelism;
-    import std.algorithm;
-    import std.string;
-    import core.atomic;
-    
-    immutable auto urls = [
-        "http://httpbin.org/stream/10",
-        "https://httpbin.org/stream/20",
-        "http://httpbin.org/stream/30",
-        "https://httpbin.org/stream/40",
-        "http://httpbin.org/stream/50",
-        "https://httpbin.org/stream/60",
-        "http://httpbin.org/stream/70",
-    ];
-    
-    defaultPoolThreads(3);
-    
-    shared short lines;
-    
-    foreach(url; parallel(urls)) {
-        atomicOp!"+="(lines, getContent(url).splitter("\n").count);
-    }
-    assert(lines == 287);
 }
 
 /**
@@ -499,49 +498,46 @@ package unittest {
     import std.range;
 
     globalLogLevel(LogLevel.info);
-    info("Test postContent");
-    auto r = postContent("http://httpbin.org/post", `{"a":"b", "c":1}`, "application/json");
-    assert(parseJSON(r.data).object["json"].object["c"].integer == 1);
 
     /// ftp upload from range
     info("Test postContent ftp");
-    r = postContent("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
+    auto r = postContent("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
     assert(r.length == 0);
 
-    /// Posting to forms (for small data)
-    ///
-    /// posting query parameters using "application/x-www-form-urlencoded"
-    info("Test postContent using query params");
-    postContent("http://httpbin.org/post", queryParams("first", "a", "second", 2));
-
-    /// posting using multipart/form-data (large data and files). See docs fot HTTPRequest
-    info("Test postContent form");
-    MultipartForm form;
-    form.add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
-    postContent("http://httpbin.org/post", form);
-
-    /// you can do this using Request struct to access response details
-    info("Test postContent form via Request()");
-    auto rq = Request();
-    form = MultipartForm().add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
-    auto rs = rq.post("http://httpbin.org/post", form);
-    assert(rs.code == 200);
-
-    info("Test receiveAsRange with POST");
-    rq = Request();
-    rq.useStreaming = true;
-    rq.bufferSize = 16;
-    string s = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    rs = rq.post("http://httpbin.org/post", s.representation.chunks(10), "application/octet-stream");
-    auto stream = rs.receiveAsRange();
+    info("Test getContent(ftp)");
+    r = getContent("ftp://speedtest.tele2.net/1KB.zip");
+    assert(r.length == 1024);
+    
+    info("Test receiveAsRange with GET(ftp)");
     ubyte[] streamedContent;
+    auto rq = Request();
+    rq.useStreaming = true;
+    streamedContent.length = 0;
+    auto rs = rq.get("ftp://speedtest.tele2.net/1KB.zip");
+    auto stream = rs.receiveAsRange;
     while( !stream.empty() ) {
         streamedContent ~= stream.front;
         stream.popFront();
     }
-    rq = Request();
-    rs = rq.post("http://httpbin.org/post", s.representation.chunks(10), "application/octet-stream");
-    assert(streamedContent == rs.responseBody.data);
-
+    assert(streamedContent.length == 1024);
+    //
+    info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
+    rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
+    assert(rs.code == 226);
+    info("ftp get  ", "ftp://speedtest.tele2.net/nonexistent", ", in same session.");
+    rs = rq.get("ftp://speedtest.tele2.net/nonexistent");
+    assert(rs.code != 226);
+    rq.useStreaming = false;
+    info("ftp get  ", "ftp://speedtest.tele2.net/1KB.zip", ", in same session.");
+    rs = rq.get("ftp://speedtest.tele2.net/1KB.zip");
+    assert(rs.code == 226);
+    assert(rs.responseBody.length == 1024);
+    info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
+    rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "another test, ignore please\n".representation);
+    assert(rs.code == 226);
+    info("ftp get  ", "ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
+    rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
+    assert(rs.code == 226);
+    info("testing ftp - done.");
 }
 

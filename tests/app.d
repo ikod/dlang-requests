@@ -1,10 +1,12 @@
 import httpbin;
 import requests;
+import std.experimental.logger;
 
 version(vibeD) {
 }
 else {
     unittest {
+        globalLogLevel(LogLevel.info);
         auto s = httpbinApp();
         scope (exit) {
             s.stop();

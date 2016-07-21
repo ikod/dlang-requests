@@ -924,7 +924,7 @@ else {
         return rq;
     }
 
-    void processor(in App app, ref HTTPD httpd, NetworkStream stream) {
+    void processor(in App app, HTTPD httpd, NetworkStream stream) {
         stream.readTimeout = app.timeout;
         HTTPD_Request  rq;
         _Response      rs;
@@ -1006,7 +1006,7 @@ else {
         }
     }
 
-    struct HTTPD
+    class HTTPD
     {
         private {
             TaskPool              _server;
@@ -1030,12 +1030,7 @@ else {
             auto tcpStream = app.useSSL?
                                 new SSLStream():
                                 new TCPStream();
-            version(vibeD) {
-
-            }
-            else {
-                tcpStream.open(addresses[0].addressFamily);
-            }
+            tcpStream.open(addresses[0].addressFamily);
             return tcpStream;
         }
         static void run(in App app, HTTPD httpd) {
@@ -1336,7 +1331,7 @@ Content-Length: 1
         httpbin.port = 8081;
         httpbin.host = "0.0.0.0"; 
         httpbin.timeout = 10.seconds;
-        HTTPD server;
+        HTTPD server = new HTTPD();
 
         server.addRoute(exactRoute(r"/", &root)).
                 addRoute(exactRoute(r"/get", &get)).

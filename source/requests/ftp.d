@@ -258,6 +258,7 @@ public struct FTPRequest {
         ushort code;
 
         _response = new FTPResponse;
+        _contentReceived = 0;
 
         if ( uri ) {
             handleChangeURI(uri);
@@ -380,7 +381,9 @@ public struct FTPRequest {
                 throw new RequestException("maxContentLength exceeded for ftp data");
             }
             if ( _useStreaming ) {
+                debug(requests) trace("ftp uses streaming");
                 _response.receiveAsRange.activated = true;
+                _response.receiveAsRange.data.length = 0;
                 _response.receiveAsRange.data = _response._responseBody.data;
                 _response.receiveAsRange.read = delegate ubyte[] () {
                     Buffer!ubyte result;

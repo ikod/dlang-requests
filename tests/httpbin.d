@@ -10,8 +10,10 @@ version (unittest) {
 	import std.conv;
 	import std.range;
 	import std.string;
+	import core.thread;
 
 	auto buildReply(ref HTTPD_Request rq) {
+		auto method  = JSONValue(rq.method);
 		auto args    = JSONValue(rq.query);
 		auto headers = JSONValue(rq.requestHeaders);
 		auto url     = JSONValue(rq.uri.uri);
@@ -19,14 +21,23 @@ version (unittest) {
 		auto data    = JSONValue(rq.data);
 		auto form    = JSONValue(rq.form);
 		auto files   = JSONValue(rq.files);
-		auto reply   = JSONValue(["args":args, "headers": headers, "json": json, "url": url, "data": data, "form": form, "files": files]);
+		auto reply   = JSONValue([
+				"method": method,
+				"headers": headers, 
+				"args":args,
+				"json": json, 
+				"url": url, 
+				"data": data, 
+				"form": form, 
+				"files": files
+			]);
 		return reply.toString();
 	}
 
 	HTTPD httpbinApp() {
 	    pragma(msg, "Compiling httpbin server");
 
-		HTTPD server;
+		HTTPD server = new HTTPD();
 		App httpbin = App("httpbin");
 		
 		httpbin.port = 8081;
@@ -48,6 +59,26 @@ version (unittest) {
 		}
 		auto del(in App app, ref HTTPD_Request rq, Route ro) {
 			if ( rq.method != "DELETE") {
+				auto rs = response(rq, "Illegal method %s".format(rq.method), 405);
+				return rs;
+			}
+			else {
+				auto rs = response(rq, buildReply(rq));
+				return rs;
+			}
+		}
+		auto put(in App app, ref HTTPD_Request rq, Route ro) {
+			if ( rq.method != "PUT") {
+				auto rs = response(rq, "Illegal method %s".format(rq.method), 405);
+				return rs;
+			}
+			else {
+				auto rs = response(rq, buildReply(rq));
+				return rs;
+			}
+		}
+		auto patch(in App app, ref HTTPD_Request rq, Route ro) {
+			if ( rq.method != "PATCH") {
 				auto rs = response(rq, "Illegal method %s".format(rq.method), 405);
 				return rs;
 			}
@@ -132,15 +163,32 @@ version (unittest) {
 			rs.headers["Content-Type"] = "application/json";
 			return rs;
 		}
+		auto delay(in App app, ref HTTPD_Request rq, Route ro) {
+			auto delay = dur!"seconds"(to!long(ro.captures["delay"]));
+			Thread.sleep(delay);
+			auto rs = response(rq, buildReply(rq));
+			rs.headers["Content-Type"] = "application/json";
+			return rs;
+		}
+		auto stream(in App app, ref HTTPD_Request rq, Route ro) {
+			auto lines = to!long(ro.captures["lines"]);
+			auto rs = response(rq, (buildReply(rq) ~ "\n").repeat(lines));
+			rs.headers["Content-Type"] = "application/json";
+			return rs;
+		}
 		server.addRoute(exactRoute(r"/",             &root)).
 				addRoute(exactRoute(r"/get",         &get)).
 				addRoute(exactRoute(r"/post",        &post)).
 				addRoute(exactRoute(r"/delete",      &del)).
+				addRoute(exactRoute(r"/put",         &put)).
+				addRoute(exactRoute(r"/patch",       &patch)).
 				addRoute(exactRoute(r"/cookies",     &cookies)).
 				addRoute(exactRoute(r"/cookies/set", &cookiesSet)).
 				addRoute(exactRoute(r"/gzip",        &gzip)).
 				addRoute(exactRoute(r"/deflate",     &deflate)).
-				addRoute(regexRoute(r"/range/(?P<size>\d+)", &range)).
+				addRoute(regexRoute(r"/delay/(?P<delay>\d+)",  &delay)).
+				addRoute(regexRoute(r"/stream/(?P<lines>\d+)", &stream)).
+				addRoute(regexRoute(r"/range/(?P<size>\d+)",   &range)).
 				addRoute(regexRoute(r"/relative-redirect/(?P<redirects>\d+)", &rel_redir)).
 				addRoute(regexRoute(r"/absolute-redirect/(?P<redirects>\d+)", &abs_redir)).
 				addRoute(regexRoute(r"/basic-auth/(?P<user>[^/]+)/(?P<password>[^/]+)", &basicAuth));

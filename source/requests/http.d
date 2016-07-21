@@ -1287,15 +1287,34 @@ public struct HTTPRequest {
     }
 }
 
+version(vibeD) {
+    import std.json;
+    package string httpTestServer() {
+        return "http://httpbin.org/";
+    }
+    package string fromJsonArrayToStr(JSONValue v) {
+        return v.str;
+    }
+}
+else {
+    import std.json;
+    package string httpTestServer() {
+        return "http://0.0.0.0:8081/";
+    }
+    package string fromJsonArrayToStr(JSONValue v) {
+        return cast(string)(v.array.map!"cast(ubyte)a.integer".array);
+    }
+}
+
+
 package unittest {
     import std.json;
     import std.array;
-    string httpbinUrl;
+
+    globalLogLevel(LogLevel.info);
+
+    string httpbinUrl = httpTestServer();
     version(vibeD) {
-        httpbinUrl = "http://httpbin.org/";
-        string fromJsonArrayToStr(JSONValue v) {
-            return v.str;
-        }
     }
     else {
         import httpbin;
@@ -1303,12 +1322,6 @@ package unittest {
         server.start();
         scope(exit) {
             server.stop();
-        }
-
-        httpbinUrl = "http://0.0.0.0:8081/";
-
-        string fromJsonArrayToStr(JSONValue v) {
-            return cast(string)(v.array.map!"cast(ubyte)a.integer".array);
         }
     }
     HTTPRequest  rq;
@@ -1336,7 +1349,6 @@ package unittest {
         f.rawWrite("abcdefgh\n12345678\n");
         f.close();
         // files
-        globalLogLevel(LogLevel.info);
         PostFile[] files = [
             {fileName: tmpfname, fieldName:"abc", contentType:"application/octet-stream"}, 
             {fileName: tmpfname}
@@ -1421,6 +1433,13 @@ package unittest {
     assert(rs.code==200);
     info("Check DELETE");
     rs = rq.exec!"DELETE"(httpbinUrl ~ "delete");
+    assert(rs.code==200);
+    info("Check PUT");
+    rs = rq.exec!"PUT"(httpbinUrl ~ "put",  `{"a":"b", "c":[1,2,3]}`, "application/json");
+    assert(rs.code==200);
+    assert(parseJSON(rs.responseBody).object["json"].object["a"].str=="b");
+    info("Check PATCH");
+    rs = rq.exec!"PATCH"(httpbinUrl ~ "patch", "привiт, свiт!", "application/octet-stream");
     assert(rs.code==200);
     info("Check compressed content");
     rs = rq.get(httpbinUrl ~ "gzip");
@@ -1518,34 +1537,10 @@ package unittest {
         /// everything ready, send request
         rs = rq.post(httpbinUrl ~ "post", mForm);
     }
-}
-///
-package unittest {
-    import std.json;
-    globalLogLevel(LogLevel.info);
-    info("http tests - start");
-
-    auto rq = HTTPRequest();
-    HTTPResponse rs;
-
-    globalLogLevel(LogLevel.info);
-    rq = HTTPRequest();
-    rq.keepAlive = true;
-    info("Check PUT");
-    rs = rq.exec!"PUT"("http://httpbin.org/put",  `{"a":"b", "c":[1,2,3]}`, "application/json");
-    assert(rs.code==200);
-    info("Check PATCH");
-    rs = rq.exec!"PATCH"("http://httpbin.org/patch", "привiт, свiт!", "application/octet-stream");
-    assert(rs.code==200);
-
-    globalLogLevel(LogLevel.info);
-    info("Check exception handling, error messages are OK");
-    rq = HTTPRequest();
+    info("Check exception handling, error messages and timeous are OK");
     rq.timeout = 1.seconds;
-    assertThrown!TimeoutException(rq.get("http://httpbin.org/delay/3"));
-    assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
-    assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
-    assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
-
-    tracef("http tests - ok");
+    assertThrown!TimeoutException(rq.get(httpbinUrl ~ "delay/3"));
+//    assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
+//    assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
+//    assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
 }

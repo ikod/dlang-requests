@@ -208,7 +208,6 @@ package unittest {
         f.rawWrite("abcdefgh\n12345678\n");
         f.close();
         // files
-        globalLogLevel(LogLevel.info);
         info("Check POST files");
         PostFile[] files = [
             {fileName: tmpfname, fieldName:"abc", contentType:"application/octet-stream"}, 
@@ -269,7 +268,6 @@ package unittest {
     assert(rs.code==200);
     
     info("Check compressed content");
-    globalLogLevel(LogLevel.info);
     rq = Request();
     rq.keepAlive = true;
     rs = rq.get(httpbinUrl ~ "gzip");
@@ -280,7 +278,6 @@ package unittest {
     info("deflate - ok");
     
     info("Check redirects");
-    globalLogLevel(LogLevel.info);
     rq = Request();
     rq.keepAlive = true;
     rs = rq.get(httpbinUrl ~ "relative-redirect/2");

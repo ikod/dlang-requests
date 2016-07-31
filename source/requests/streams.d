@@ -917,6 +917,7 @@ public class TCPSocketStream : SocketStream {
         s = new Socket(fa, SocketType.STREAM, ProtocolType.TCP);
         assert(s !is null, "Can't create socket");
         __isOpen = true;
+        s.setOption(SocketOptionLevel.TCP, SocketOption.TCP_NODELAY, 1);
     }
     override TCPSocketStream accept() {
         auto newso = s.accept();
@@ -927,6 +928,7 @@ public class TCPSocketStream : SocketStream {
         newstream.s = newso;
         newstream.__isOpen = true;
         newstream.__isConnected = true;
+        newstream.s.setOption(SocketOptionLevel.TCP, SocketOption.TCP_NODELAY, 1);
         return newstream;
     }
 }

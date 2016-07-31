@@ -25,9 +25,9 @@ version(vibeD){
 }
 else {
     /*
-    ** This is small http server to run something like httpbin(http://httpbin.org) internally
-    ** for Requests unittest's.
-    */
+     ** This is small http server to run something like httpbin(http://httpbin.org) internally
+     ** for Requests unittest's.
+     */
 
     enum    DSBUFFSIZE = 16*1024;
 
@@ -394,28 +394,28 @@ else {
             _DataSource _ds;
             Part        _part;
             /*
-                    --8a60ded0-ee76-4b6a-a1a0-dccaf93b92e7
-                    Content-Disposition: form-data; name=Field1;
+             --8a60ded0-ee76-4b6a-a1a0-dccaf93b92e7
+             Content-Disposition: form-data; name=Field1;
 
-                    form field from memory
-                    --8a60ded0-ee76-4b6a-a1a0-dccaf93b92e7
-                    Content-Disposition: form-data; name=Field2; filename=data2
+             form field from memory
+             --8a60ded0-ee76-4b6a-a1a0-dccaf93b92e7
+             Content-Disposition: form-data; name=Field2; filename=data2
 
-                    file field from memory
-                    --8a60ded0-ee76-4b6a-a1a0-dccaf93b92e7
-                    Content-Disposition: form-data; name=File1; filename=file1
-                    Content-Type: application/octet-stream
+             file field from memory
+             --8a60ded0-ee76-4b6a-a1a0-dccaf93b92e7
+             Content-Disposition: form-data; name=File1; filename=file1
+             Content-Type: application/octet-stream
 
-                    file1 content
+             file1 content
 
-                    --8a60ded0-ee76-4b6a-a1a0-dccaf93b92e7
-                    Content-Disposition: form-data; name=File2; filename=file2
-                    Content-Type: application/octet-stream
+             --8a60ded0-ee76-4b6a-a1a0-dccaf93b92e7
+             Content-Disposition: form-data; name=File2; filename=file2
+             Content-Type: application/octet-stream
 
-                    file2 content
+             file2 content
 
-                    --8a60ded0-ee76-4b6a-a1a0-dccaf93b92e7--
-                 */
+             --8a60ded0-ee76-4b6a-a1a0-dccaf93b92e7--
+             */
             int opApply(int delegate(Part p) dg) {
                 int result = 0;
                 while(!_ds.empty) {
@@ -704,76 +704,103 @@ else {
         }
     }
 
-    alias Handler = _Response delegate(in App app, ref HTTPD_Request, Route);
+    alias Handler = _Response delegate(in App app, ref HTTPD_Request, RequestArgs);
 
-    auto exactRoute(string s, Handler h) {
+    struct RequestArgs {
+        private {
+            Captures!string _captures = void;
+            string          _string;
+        }
+        this(Captures!string c) @nogc @safe pure nothrow {
+            _captures = c;
+        }
+        this(string s) @nogc @safe pure nothrow {
+            _string = s;
+        }
+        bool empty() @nogc @safe pure nothrow {
+            return _captures.empty && _string is null;
+        }
+        string opIndex(string s) @safe pure {
+            return _captures[s];
+        }
+        string opIndex(size_t i) @safe pure {
+            if ( _string && i==0 ) {
+                return _string;
+            }
+            return _captures[i];
+        }
+    }
+
+    auto exactRoute(string s, Handler h) @safe pure nothrow {
         return new ExactRoute(s, h);
     }
 
-    auto regexRoute(string s, Handler h) {
+    auto regexRoute(string s, Handler h) @safe {
         return new RegexRoute(s, h);
     }
 
     class Route {
         Handler _handler;
         string  _origin;
-        RegexMatch!string _m;
 
-        bool match(string) {
-            return false;
+        abstract RequestArgs match(string) {
+            return RequestArgs();
         };
-        string origin();
         final Handler handler() {
             return _handler;
         }
         final string origin() {
             return _origin;
         }
-        final auto ref captures() {
-            return _m.captures;
-        }
     }
 
     class ExactRoute: Route {
 
-        this(string s, Handler h) {
+        this(string s, Handler h) @safe pure nothrow {
             _origin = s;
             _handler = h;
         }
-        final override bool match(string input) {
-            bool r = (input == _origin);
-            debug(httpd) if ( r ) {tracef("%s matches %s", input, _origin);}
-            return r;
+        final override RequestArgs match(string input) {
+            if ( input == _origin ) {
+                debug(httpd) tracef("%s matches %s", input, _origin);
+                return RequestArgs(input);
+            }
+            return RequestArgs();
         }
     }
     class RegexRoute: Route {
         Regex!char        _re;
 
-        this(string r, Handler h) {
+        this(string r, Handler h) @safe {
             _origin = r;
             _handler = h;
             _re = regex(r);
         }
-        final override bool match(string input) {
-            _m = matchAll(input, _re);
-            debug(httpd) if (!_m.empty) {tracef("%s matches %s", input, _origin);}
-            return !_m.empty();
+        final override RequestArgs match(string input) {
+            auto m = matchFirst(input, _re);
+            debug(httpd) if (!m.empty) {tracef("%s matches %s", input, _origin);}
+            return RequestArgs(m);
         }
     }
 
     struct Router {
+        alias RouteMatch = Tuple!(Handler, "handler", RequestArgs, "args");
         private Route[] _routes;
 
         void addRoute(Route r) {
             _routes ~= r;
         }
         auto getRoute(string path) {
+            RouteMatch match;
             foreach(r; _routes) {
-                if (r.match(path)) {
-                    return r;
+                auto args = r.match(path);
+                if (!args.empty) {
+                    match.handler = r.handler;
+                    match.args = args;
+                    break;
                 }
             }
-            return null;
+            return match;
         }
     }
 
@@ -799,9 +826,9 @@ else {
         }
         string[][] parsed = query.splitter("&").
             map!(s => s.split("=")).
-            filter!"a.length==2".
-            map!(p => [urlDecode(p[0]), urlDecode(p[1])]).
-            array;
+                filter!"a.length==2".
+                map!(p => [urlDecode(p[0]), urlDecode(p[1])]).
+                array;
 
         auto grouped = sort!"a[0]<b[0]"(parsed).assumeSorted!"a[0]<b[0]".groupBy();
         foreach(g; grouped) {
@@ -862,8 +889,8 @@ else {
         debug (httpd) tracef("rqLine %s", rq.requestLine);
         rq.method = rqlFields[0];
         auto scheme = app.useSSL?
-                        "https://":
-                        "http://";
+            "https://":
+                "http://";
         if ( "host" in rq.requestHeaders ) {
             rq.uri = URI(scheme ~ rq.requestHeaders["host"] ~ rqlFields[1]);
         } else {
@@ -884,8 +911,8 @@ else {
         if ( cookies ) {
             (*cookies).split(';').
                 map!"strip(a).split('=')".
-                filter!(kv => kv.length==2).
-                each!(kv => rq._cookies[kv[0]] = kv[1]);
+                    filter!(kv => kv.length==2).
+                    each!(kv => rq._cookies[kv[0]] = kv[1]);
         }
     }
 
@@ -940,21 +967,21 @@ else {
                 if ( !httpd._running || !rq.requestLine.length ) {
                     return;
                 }
-                auto route = httpd._router.getRoute(rq.path);
-                if ( !route ) {
+                auto match = httpd._router.getRoute(rq.path);
+                if ( !match.handler ) {
                     // return 404;
                     debug (httpd) tracef("Route not found for %s", rq.path);
                     rs = response(rq, "Requested path %s not found".format(rq.path), 404);
                     break;
                 }
-                auto handler = route.handler;
-                rs = handler(app, rq, route);
+                auto handler = match.handler;
+                rs = handler(app, rq, match.args);
                 if ( !stream.isOpen ) {
                     debug(httpd) tracef("Request handler closed connection");
                     return;
                 }
                 if ( rq.keepAlive && rqLimit > 1 ) {
-                    rs.headers["connection"] = "keep-Alive";
+                    rs.headers["Connection"] = "Keep-Alive";
                 }
                 if ( rq._dataSource._requestHasBody && !rq._dataSource._requestBodyReceived ) {
                     // for some reason some part of the request body still not received, and it will
@@ -1028,8 +1055,8 @@ else {
                 throw new ConnectError("Can't resolve name when connect to %s:%d: %s".format(host, port, e.msg));
             }
             auto tcpStream = app.useSSL?
-                                new SSLStream():
-                                new TCPStream();
+                new SSLStream():
+                new TCPStream();
             tcpStream.open(addresses[0].addressFamily);
             return tcpStream;
         }
@@ -1058,35 +1085,35 @@ else {
                 }
             }
         }
-		void app(App a) {
-			_app = a;
-		}
-		void start() {
-			defaultPoolThreads(64);
-			_server = taskPool();
-			auto t = task!run(_app, this);
-			_server.put(t);
-			Thread.sleep(500.msecs);
-		}
-		void start(App app) {
+        void app(App a) {
+            _app = a;
+        }
+        void start() {
             defaultPoolThreads(64);
-			_app = app;
-			_server = taskPool();
+            _server = taskPool();
+            auto t = task!run(_app, this);
+            _server.put(t);
+            Thread.sleep(500.msecs);
+        }
+        void start(App app) {
+            defaultPoolThreads(64);
+            _app = app;
+            _server = taskPool();
             auto t = task!run(_app, this);
             _server.put(t);
             Thread.sleep(500.msecs);
         }
         void stop() {
-			if ( !_running ) {
-				return;
-			}
+            if ( !_running ) {
+                return;
+            }
             _running = false;
             try {
                 auto s = openStream(_app);
                 s.connect(_app.host, _app.port);
             } catch (Exception e) {
             }
-    //        _server.stop();
+            //        _server.stop();
         }
     }
 
@@ -1115,7 +1142,7 @@ else {
         }
     }
 
-
+    
     private unittest {
         import std.json;
         import std.conv;
@@ -1138,15 +1165,15 @@ else {
         router.addRoute(exactRoute(r"/get", null));
         router.addRoute(regexRoute(r"/get/(?P<param>\d+)", null));
         auto r = router.getRoute(r"/get");
-        assert(r !is null);
+        assert(!r.args.empty);
         r = router.getRoute(r"/post");
-        assert(r is null);
+        assert(r.args.empty);
 
         r = router.getRoute(r"/get/333");
-        assert(r !is null);
-        assert(r.captures["param"]=="333");
+        assert(!r.args.empty);
+        assert(r.args["param"]=="333");
         r = router.getRoute(r"/get/aaa");
-        assert(r is null);
+        assert(r.args.empty);
 
         HTTPD_Request rq;
         string headers = """GET /get?a=b&list[]=1&c=d&list[]=2 HTTP/1.1
@@ -1162,27 +1189,22 @@ Content-Length: 1
         assert(rq.query["a"] == "b");
         assert(rq.query["c"] == "d");
         assert(rq.query["list[]"] == `["1", "2"]`);
-        auto root(in App app, ref HTTPD_Request rq, Route ro) {
+        auto root(in App app, ref HTTPD_Request rq,  RequestArgs args) {
             debug (httpd) trace("handler / called");
-    //        rs.status = 200;
-    //        rs.content = buildReply(rq);
             auto rs = response(rq, buildReply(rq));
             rs.headers["Content-Type"] = "application/json";
             return rs;
         }
-        auto get(in App app, ref HTTPD_Request rq, Route ro) {
+        auto get(in App app, ref HTTPD_Request rq,  RequestArgs args) {
             debug (httpd) trace("handler /get called");
-    //        rs.content   = buildReply(rq);
-    //        rs.status    = 200;
-    //        return Status.OK;
             auto rs = response(rq, buildReply(rq));
             rs.headers["Content-Type"] = "application/json";
             return rs;
         }
-        auto basicAuth(in App app, ref HTTPD_Request rq, Route ro) {
+        auto basicAuth(in App app, ref HTTPD_Request rq, RequestArgs args) {
             import std.base64;
-            auto user    = ro.captures["user"];
-            auto password= ro.captures["password"];
+            auto user    = args["user"];
+            auto password= args["password"];
             auto auth    = cast(string)Base64.decode(rq.requestHeaders["authorization"].split()[1]);
             auto up      = auth.split(":");
             short status;
@@ -1195,9 +1217,9 @@ Content-Length: 1
             rs.headers["Content-Type"] = "application/json";
             return rs;
         }
-        auto rredir(in App app, ref HTTPD_Request rq, Route ro) {
+        auto rredir(in App app, ref HTTPD_Request rq,  RequestArgs args) {
             auto rs = response(rq, buildReply(rq));
-            auto redirects = to!long(ro.captures["redirects"]);
+            auto redirects = to!long(args["redirects"]);
             if ( redirects > 1 ) {
                 rs.headers["Location"] = "/relative-redirect/%d".format(redirects-1);
             } else {
@@ -1206,42 +1228,42 @@ Content-Length: 1
             rs.status    = 302;
             return rs;
         }
-        auto aredir(in App app, ref HTTPD_Request rq, Route ro) {
+        auto aredir(in App app, ref HTTPD_Request rq,  RequestArgs args) {
             auto rs = response(rq, buildReply(rq));
-            auto redirects = to!long(ro.captures["redirects"]);
+            auto redirects = to!long(args["redirects"]);
             if ( redirects > 1 ) {
-                rs.headers["Location"] = "http://localhost:8081/absolute-redirect/%d".format(redirects-1);
+                rs.headers["Location"] = "http://0.0.0.0:8081/absolute-redirect/%d".format(redirects-1);
             } else {
-                rs.headers["Location"] = "http://localhost:8081/get";
+                rs.headers["Location"] = "http://0.0.0.0:8081/get";
             }
             rs.status    = 302;
             return rs;
         }
-        auto delay(in App app, ref HTTPD_Request rq, Route ro) {
-            auto delay = dur!"seconds"(to!long(ro.captures["delay"]));
+        auto delay(in App app, ref HTTPD_Request rq, RequestArgs args) {
+            auto delay = dur!"seconds"(to!long(args["delay"]));
             Thread.sleep(delay);
             auto rs = response(rq, buildReply(rq));
             rs.headers["Content-Type"] = "application/json";
             return rs;
         }
-        auto gzip(in App app, ref HTTPD_Request rq, Route ro) {
+        auto gzip(in App app, ref HTTPD_Request rq, RequestArgs args) {
             auto rs = response(rq, buildReply(rq));
             rs.compress(Compression.gzip);
             rs.headers["Content-Type"] = "application/json";
             return rs;
         }
-        auto deflate(in App app, ref HTTPD_Request rq, Route ro) {
+        auto deflate(in App app, ref HTTPD_Request rq, RequestArgs args) {
             auto rs = response(rq, buildReply(rq));
             rs.compress(Compression.deflate);
             return rs;
         }
-        auto range(in App app, ref HTTPD_Request rq, Route ro) {
-            auto size = to!long(ro.captures["size"]);
+        auto range(in App app, ref HTTPD_Request rq, RequestArgs args) {
+            auto size = to!long(args["size"]);
             auto rs = response(rq, new ubyte[size].chunks(16));
             rs.compress(Compression.yes);
             return rs;
         }
-        auto head(in App app, ref HTTPD_Request rq, Route ro) {
+        auto head(in App app, ref HTTPD_Request rq, RequestArgs args) {
             if ( rq.method != "HEAD") {
                 auto rs = response(rq, "Illegal method %s".format(rq.method), 405);
                 return rs;
@@ -1252,7 +1274,7 @@ Content-Length: 1
                 return rs;
             }
         }
-        auto del(in App app, ref HTTPD_Request rq, Route ro) {
+        auto del(in App app, ref HTTPD_Request rq, RequestArgs args) {
             if ( rq.method != "DELETE") {
                 auto rs = response(rq, "Illegal method %s".format(rq.method), 405);
                 return rs;
@@ -1262,11 +1284,11 @@ Content-Length: 1
                 return rs;
             }
         }
-        auto post(in App app, ref HTTPD_Request rq, Route ro) {
+        auto post(in App app, ref HTTPD_Request rq, RequestArgs args) {
             auto rs = response(rq, buildReply(rq));
             return rs;
         }
-        auto postIter(in App app, ref HTTPD_Request rq, Route ro) {
+        auto postIter(in App app, ref HTTPD_Request rq, RequestArgs args) {
             int  c;
 
             if ( rq.contentType == "multipart/form-data" ) {
@@ -1288,7 +1310,7 @@ Content-Length: 1
                 return rs;
             }
         }
-        auto read(in App app, ref HTTPD_Request rq, Route ro) {
+        auto read(in App app, ref HTTPD_Request rq, RequestArgs args) {
             auto r = rq.read();
             int  c;
             while ( !r.empty ) {
@@ -1298,7 +1320,7 @@ Content-Length: 1
             auto rs = response(rq, "%d".format(c));
             return rs;
         }
-        auto readf1(in App app, ref HTTPD_Request rq, Route ro) {
+        auto readf1(in App app, ref HTTPD_Request rq, RequestArgs args) {
             // now call to read must throw exception
             auto r = rq.read();
             int  c;
@@ -1310,7 +1332,7 @@ Content-Length: 1
             auto rs = response(rq, "%d".format(c));
             return rs;
         }
-        auto cookiesSet(in App app, ref HTTPD_Request rq, Route ro) {
+        auto cookiesSet(in App app, ref HTTPD_Request rq, RequestArgs args) {
             Cookie[] cookies;
             foreach(p; rq.query.byKeyValue) {
                 cookies ~= Cookie("/cookies", rq.requestHeaders["host"], p.key, p.value);
@@ -1320,7 +1342,7 @@ Content-Length: 1
             rs.cookies = cookies;
             return rs;
         }
-        auto cookies(in App app, ref HTTPD_Request rq, Route ro) {
+        auto cookies(in App app, ref HTTPD_Request rq, RequestArgs args) {
             auto cookies = ["cookies": JSONValue(rq.cookies)];
             auto rs = response(rq, JSONValue(cookies).toString);
             return rs;
@@ -1362,89 +1384,89 @@ Content-Length: 1
         request.timeout = 5.seconds;
         request.keepAlive = true;
         info("httpd Check GET");
-        auto rs = request.get("http://localhost:8081/");
+        auto rs = request.get("http://0.0.0.0:8081/");
         assert(rs.code == 200);
         assert(rs.responseBody.length > 0);
         auto content = rs.responseBody.data!string;
         auto json = parseJSON(content);
-        assert(json.object["url"].str == "http://localhost:8081/");
+        assert(json.object["url"].str == "http://0.0.0.0:8081/");
 
         info("httpd Check GET with parameters");
-        rs = request.get("http://localhost:8081/get", ["c":" d", "a":"b"]);
+        rs = request.get("http://0.0.0.0:8081/get", ["c":" d", "a":"b"]);
         assert(rs.code == 200);
         json = parseJSON(rs.responseBody.data).object["args"].object;
         assert(json["a"].str == "b");
         assert(json["c"].str == " d");
 
         info("httpd Check relative redirect");
-        rs = request.get("http://localhost:8081/relative-redirect/2");
+        rs = request.get("http://0.0.0.0:8081/relative-redirect/2");
         assert(rs.history.length == 2);
         assert(rs.code==200);
 
         info("httpd Check absolute redirect");
-        rs = request.get("http://localhost:8081/absolute-redirect/2");
+        rs = request.get("http://0.0.0.0:8081/absolute-redirect/2");
         assert(rs.history.length == 2);
         assert(rs.code==200);
 
         info("httpd Check basic auth");
         request.authenticator = new BasicAuthentication("user", "password");
-        rs = request.get("http://localhost:8081/basic-auth/user/password");
+        rs = request.get("http://0.0.0.0:8081/basic-auth/user/password");
         assert(rs.code==200);
         request.authenticator = null;
 
         info("httpd Check timeout");
         request.timeout = 1.seconds;
-        assertThrown!TimeoutException(request.get("http://localhost:8081/delay/2"));
+        assertThrown!TimeoutException(request.get("http://0.0.0.0:8081/delay/2"));
         Thread.sleep(1.seconds);
         request.timeout = 30.seconds;
 
         info("httpd Check gzip");
-        rs = request.get("http://localhost:8081/gzip");
+        rs = request.get("http://0.0.0.0:8081/gzip");
         assert(rs.code==200);
         json = parseJSON(rs.responseBody);
-        assert(json.object["url"].str == "http://localhost:8081/gzip");
+        assert(json.object["url"].str == "http://0.0.0.0:8081/gzip");
 
         info("httpd Check deflate");
-        rs = request.get("http://localhost:8081/deflate");
+        rs = request.get("http://0.0.0.0:8081/deflate");
         assert(rs.code==200);
         json = parseJSON(rs.responseBody);
-        assert(json.object["url"].str == "http://localhost:8081/deflate");
+        assert(json.object["url"].str == "http://0.0.0.0:8081/deflate");
 
         info("httpd Check range");
-        rs = request.get("http://localhost:8081/range/1023");
+        rs = request.get("http://0.0.0.0:8081/range/1023");
         assert(rs.code==200);
         assert(rs.responseBody.length == 1023);
 
         info("httpd Check HEAD");
-        rs = request.exec!"HEAD"("http://localhost:8081/head");
+        rs = request.exec!"HEAD"("http://0.0.0.0:8081/head");
         assert(rs.code==200);
         assert(rs.responseBody.length == 0);
 
         info("httpd Check DELETE");
-        rs = request.exec!"DELETE"("http://localhost:8081/delete");
+        rs = request.exec!"DELETE"("http://0.0.0.0:8081/delete");
         assert(rs.code==200);
 
         info("httpd Check POST json");
-        rs = request.post("http://localhost:8081/post?b=x", `{"a":"b", "c":[1,2,3]}`, "application/json");
+        rs = request.post("http://0.0.0.0:8081/post?b=x", `{"a":"b", "c":[1,2,3]}`, "application/json");
         json = parseJSON(rs.responseBody);
         auto rqJson = parseJSON(json.object["json"].str);
         assert(rqJson.object["a"].str == "b");
         assert(equal([1,2,3], rqJson.object["c"].array.map!"a.integer"));
 
         info("httpd Check POST json/chunked body");
-        rs = request.post("http://localhost:8081/post?b=x", [`{"a":"b",`,` "c":[1,2,3]}`], "application/json");
+        rs = request.post("http://0.0.0.0:8081/post?b=x", [`{"a":"b",`,` "c":[1,2,3]}`], "application/json");
         json = parseJSON(rs.responseBody);
         assert(json.object["args"].object["b"].str == "x");
         rqJson = parseJSON(json.object["json"].str);
         assert(rqJson.object["a"].str == "b");
         assert(equal([1,2,3], rqJson.object["c"].array.map!"a.integer"));
         
-        rs = request.post("http://localhost:8081/post", "0123456789".repeat(32));
+        rs = request.post("http://0.0.0.0:8081/post", "0123456789".repeat(32));
         json = parseJSON(rs.responseBody);
         assert(equal(json.object["data"].array.map!"a.integer", "0123456789".repeat(32).join));
 
         info("httpd Check POST with params");
-        rs = request.post("http://localhost:8081/post", queryParams("b", 2, "a", "A"));
+        rs = request.post("http://0.0.0.0:8081/post", queryParams("b", 2, "a", "A"));
         assert(rs.code==200);
         auto data = parseJSON(rs.responseBody).object["form"].object;
         assert((data["a"].str == "A"));
@@ -1452,21 +1474,21 @@ Content-Length: 1
 
         // this is tests for httpd read() interface
         info("httpd Check POST/iterating over body");
-        rs = request.post("http://localhost:8081/read", "0123456789".repeat(1500));
+        rs = request.post("http://0.0.0.0:8081/read", "0123456789".repeat(1500));
         assert(equal(rs.responseBody, "15000"));
 
         {
             request.keepAlive = true;
             // this is test on how we can handle keepalive session when previous request leave unread data in socket
             try {
-                rs = request.post("http://localhost:8081/readf1", "0123456789".repeat(1500));
+                rs = request.post("http://0.0.0.0:8081/readf1", "0123456789".repeat(1500));
             }
             catch(Exception e) {
                 // as we will close socket prematurely on server side, there will be broken pipe error
                 // we will ignore it
             }
             // next request must succeed
-            rs = request.post("http://localhost:8081/read", "0123456789".repeat(1500));
+            rs = request.post("http://0.0.0.0:8081/read", "0123456789".repeat(1500));
             assert(equal(rs.responseBody, "15000"));
         }
         //
@@ -1497,57 +1519,57 @@ Content-Length: 1
             /// for each part we have to set field name, source (ubyte array or opened file) and optional filename and content-type
             /// 
             MultipartForm form = MultipartForm().
-                    add(formData("Field1", cast(ubyte[])"form field from memory")).
+                add(formData("Field1", cast(ubyte[])"form field from memory")).
                     add(formData("Field2", cast(ubyte[])"file field from memory", ["filename":"data2"])).
                     add(formData("Field3", cast(ubyte[])`{"a":"b"}`, ["Content-Type": "application/json"])).
                     add(formData("File1", f1, ["filename":"file1", "Content-Type": "application/octet-stream"])).
                     add(formData("File2", f2, ["filename":"file2", "Content-Type": "application/octet-stream"]));
             /// everything ready, send request
-            rs = request.post("http://localhost:8081/post?a=b", form);
+            rs = request.post("http://0.0.0.0:8081/post?a=b", form);
             /* expected:
-            {
-              "args": {
-                "a": "b"
-              },
-              "data": "",
-              "files": {
-                "Field2": "file field from memory",
-                "File1": "file1 content\n",
-                "File2": "file2 content\n"
-              },
-              "form": {
-                "Field1": "form field from memory",
-                "Field3": "{\"a\":\"b\"}"
-              },
-              "headers": {
-                "Accept-Encoding": "gzip, deflate",
-                "Content-Length": "730",
-                "Content-Type": "multipart/form-data; boundary=d79a383e-7912-4d36-a6db-a6774bf37133",
-                "Host": "httpbin.org",
-                "User-Agent": "dlang-requests"
-              },
-              "json": null,
-              "origin": "xxx.xxx.xxx.xxx",
-              "url": "http://httpbin.org/post?a=b"
-            }
-            */
+             {
+             "args": {
+             "a": "b"
+             },
+             "data": "",
+             "files": {
+             "Field2": "file field from memory",
+             "File1": "file1 content\n",
+             "File2": "file2 content\n"
+             },
+             "form": {
+             "Field1": "form field from memory",
+             "Field3": "{\"a\":\"b\"}"
+             },
+             "headers": {
+             "Accept-Encoding": "gzip, deflate",
+             "Content-Length": "730",
+             "Content-Type": "multipart/form-data; boundary=d79a383e-7912-4d36-a6db-a6774bf37133",
+             "Host": "httpbin.org",
+             "User-Agent": "dlang-requests"
+             },
+             "json": null,
+             "origin": "xxx.xxx.xxx.xxx",
+             "url": "http://httpbin.org/post?a=b"
+             }
+             */
             json = parseJSON(rs.responseBody);
             assert("file field from memory" == cast(string)(json.object["files"].object["Field2"].array.map!(a => cast(ubyte)a.integer).array));
             assert("file1 content\n" == cast(string)(json.object["files"].object["File1"].array.map!(a => cast(ubyte)a.integer).array));
 
             info("httpd Check POST/iterate over multipart form");
             form = MultipartForm().
-                    add(formData("Field1", cast(ubyte[])"form field from memory")).
+                add(formData("Field1", cast(ubyte[])"form field from memory")).
                     add(formData("Field2", cast(ubyte[])"file field from memory", ["filename":"data2"])).
                     add(formData("Field3", cast(ubyte[])`{"a":"b"}`, ["Content-Type": "application/json"]));
             /// everything ready, send request
-            rs = request.post("http://localhost:8081/postIter?a=b", form);
+            rs = request.post("http://0.0.0.0:8081/postIter?a=b", form);
             assert(equal(rs.responseBody, "53"));
-            rs = request.post("http://localhost:8081/postIter", "0123456789".repeat(1500));
+            rs = request.post("http://0.0.0.0:8081/postIter", "0123456789".repeat(1500));
             assert(equal(rs.responseBody, "15000"));
         }
         info("httpd Check cookies");
-        rs = request.get("http://localhost:8081/cookies/set?A=abcd&b=cdef");
+        rs = request.get("http://0.0.0.0:8081/cookies/set?A=abcd&b=cdef");
         json = parseJSON(rs.responseBody.data).object["cookies"].object;
         assert(json["A"].str == "abcd");
         assert(json["b"].str == "cdef");

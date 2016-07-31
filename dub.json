@@ -21,6 +21,12 @@
         }
     ],
     "buildTypes": {
+        "debug": {
+            "buildOptions": ["debugMode", "debugInfo"],
+            "dflags-dmd": ["-debug=requests", "-debug=httpd"],
+            "dflags-ldc": ["-d-debug=requests"],
+            "versions": ["httpbin"]
+        },
         "docs": {
             "buildOptions": ["syntaxOnly"],
             "dflags" : ["-c", "-Dddocs", "source/requests/viola.ddoc"]
@@ -28,7 +34,8 @@
         "unittest": {
             "buildOptions": ["unittests", "debugMode", "debugInfo"],
             "dflags-dmd": ["-debug=requests"],
-            "dflags-ldc": ["-d-debug=requests"]
+            "dflags-ldc": ["-d-debug=requests"],
+            "versions": ["httpbin"]
         },
         "localtest": {
             "buildOptions": ["unittests", "debugMode", "debugInfo"],

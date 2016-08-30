@@ -43,7 +43,7 @@ version (httpbin)
 		App httpbin = App("httpbin");
 		
 		httpbin.port = 8081;
-		httpbin.host = "0.0.0.0"; 
+		httpbin.host = "127.0.0.1"; 
 		httpbin.timeout = 10.seconds;
 		httpbin.rqLimit = 5;
 		server.app(httpbin);
@@ -122,9 +122,9 @@ version (httpbin)
 			auto rs = response(rq, buildReply(rq));
 			auto redirects = to!long(args["redirects"]);
 			if ( redirects > 1 ) {
-				rs.headers["Location"] = "http://0.0.0.0:8081/absolute-redirect/%d".format(redirects-1);
+				rs.headers["Location"] = "http://127.0.0.1:8081/absolute-redirect/%d".format(redirects-1);
 			} else {
-				rs.headers["Location"] = "http://0.0.0.0:8081/get";
+				rs.headers["Location"] = "http://127.0.0.1:8081/get";
 			}
 			rs.status    = 302;
 			return rs;
@@ -145,7 +145,7 @@ version (httpbin)
 			return rs;
 		}
 		auto range(in App app, ref HTTPD_Request rq, RequestArgs args) {
-			auto size = to!long(args["size"]);
+			auto size = to!size_t(args["size"]);
 			auto rs = response(rq, new ubyte[size].chunks(16));
 			rs.compress(Compression.yes);
 			return rs;
@@ -174,7 +174,7 @@ version (httpbin)
 			return rs;
 		}
 		auto stream(in App app, ref HTTPD_Request rq, RequestArgs args) {
-			auto lines = to!long(args["lines"]);
+			auto lines = to!size_t(args["lines"]);
 			import std.stdio;
 			auto rs = response(rq, (buildReply(rq) ~ "\n").repeat(lines));
 			rs.headers["Content-Type"] = "application/json";

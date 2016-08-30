@@ -872,7 +872,7 @@ public abstract class SocketStream : NetworkStream {
                     if ( errno == 0 ) {
                         throw new TimeoutException("Timeout receiving data");
                     }
-                    throw new NetworkException();
+                    throw new NetworkException("receiving data");
                 }
                 version(Posix) {
                     if ( errno == EINTR ) {

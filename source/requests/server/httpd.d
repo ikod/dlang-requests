@@ -218,8 +218,8 @@ else {
                         acc = s[1];
                         return s[0];
                     }
-                    ulong i;
-                    for(i=min(l.length, d.length); i>0; i--) {
+                    auto i = min(l.length, d.length);
+                    for(;i>0; i--) {
                         if ( l.endsWith(d[0..i]) ) {
                             acc = l[$-i..$];
                             this.popFront;
@@ -1232,9 +1232,9 @@ Content-Length: 1
             auto rs = response(rq, buildReply(rq));
             auto redirects = to!long(args["redirects"]);
             if ( redirects > 1 ) {
-                rs.headers["Location"] = "http://0.0.0.0:8081/absolute-redirect/%d".format(redirects-1);
+                rs.headers["Location"] = "http://127.0.0.1:8081/absolute-redirect/%d".format(redirects-1);
             } else {
-                rs.headers["Location"] = "http://0.0.0.0:8081/get";
+                rs.headers["Location"] = "http://127.0.0.1:8081/get";
             }
             rs.status    = 302;
             return rs;
@@ -1258,7 +1258,7 @@ Content-Length: 1
             return rs;
         }
         auto range(in App app, ref HTTPD_Request rq, RequestArgs args) {
-            auto size = to!long(args["size"]);
+            auto size = to!size_t(args["size"]);
             auto rs = response(rq, new ubyte[size].chunks(16));
             rs.compress(Compression.yes);
             return rs;
@@ -1351,7 +1351,8 @@ Content-Length: 1
         auto httpbin = App("httpbin");
 
         httpbin.port = 8081;
-        httpbin.host = "0.0.0.0"; 
+        httpbin.host = "127.0.0.1";
+
         httpbin.timeout = 10.seconds;
         HTTPD server = new HTTPD();
 
@@ -1380,93 +1381,93 @@ Content-Length: 1
         auto request = HTTPRequest();
 
         globalLogLevel(LogLevel.info);
-
+        auto httpbin_url = "http://%s:%d/".format(httpbin.host, httpbin.port);
         request.timeout = 5.seconds;
         request.keepAlive = true;
         info("httpd Check GET");
-        auto rs = request.get("http://0.0.0.0:8081/");
+        auto rs = request.get(httpbin_url);
         assert(rs.code == 200);
         assert(rs.responseBody.length > 0);
         auto content = rs.responseBody.data!string;
         auto json = parseJSON(content);
-        assert(json.object["url"].str == "http://0.0.0.0:8081/");
+        assert(json.object["url"].str == httpbin_url);
 
         info("httpd Check GET with parameters");
-        rs = request.get("http://0.0.0.0:8081/get", ["c":" d", "a":"b"]);
+        rs = request.get(httpbin_url ~ "get", ["c":" d", "a":"b"]);
         assert(rs.code == 200);
         json = parseJSON(rs.responseBody.data).object["args"].object;
         assert(json["a"].str == "b");
         assert(json["c"].str == " d");
 
         info("httpd Check relative redirect");
-        rs = request.get("http://0.0.0.0:8081/relative-redirect/2");
+        rs = request.get(httpbin_url ~ "relative-redirect/2");
         assert(rs.history.length == 2);
         assert(rs.code==200);
 
         info("httpd Check absolute redirect");
-        rs = request.get("http://0.0.0.0:8081/absolute-redirect/2");
+        rs = request.get(httpbin_url ~ "absolute-redirect/2");
         assert(rs.history.length == 2);
         assert(rs.code==200);
 
         info("httpd Check basic auth");
         request.authenticator = new BasicAuthentication("user", "password");
-        rs = request.get("http://0.0.0.0:8081/basic-auth/user/password");
+        rs = request.get(httpbin_url ~ "basic-auth/user/password");
         assert(rs.code==200);
         request.authenticator = null;
 
         info("httpd Check timeout");
         request.timeout = 1.seconds;
-        assertThrown!TimeoutException(request.get("http://0.0.0.0:8081/delay/2"));
+        assertThrown!TimeoutException(request.get(httpbin_url ~ "delay/2"));
         Thread.sleep(1.seconds);
         request.timeout = 30.seconds;
 
         info("httpd Check gzip");
-        rs = request.get("http://0.0.0.0:8081/gzip");
+        rs = request.get(httpbin_url ~ "gzip");
         assert(rs.code==200);
         json = parseJSON(rs.responseBody);
-        assert(json.object["url"].str == "http://0.0.0.0:8081/gzip");
+        assert(json.object["url"].str == httpbin_url ~ "gzip");
 
         info("httpd Check deflate");
-        rs = request.get("http://0.0.0.0:8081/deflate");
+        rs = request.get(httpbin_url ~ "deflate");
         assert(rs.code==200);
         json = parseJSON(rs.responseBody);
-        assert(json.object["url"].str == "http://0.0.0.0:8081/deflate");
+        assert(json.object["url"].str == httpbin_url ~ "deflate");
 
         info("httpd Check range");
-        rs = request.get("http://0.0.0.0:8081/range/1023");
+        rs = request.get(httpbin_url ~ "range/1023");
         assert(rs.code==200);
         assert(rs.responseBody.length == 1023);
 
         info("httpd Check HEAD");
-        rs = request.exec!"HEAD"("http://0.0.0.0:8081/head");
+        rs = request.exec!"HEAD"(httpbin_url ~ "head");
         assert(rs.code==200);
         assert(rs.responseBody.length == 0);
 
         info("httpd Check DELETE");
-        rs = request.exec!"DELETE"("http://0.0.0.0:8081/delete");
+        rs = request.exec!"DELETE"(httpbin_url ~ "delete");
         assert(rs.code==200);
 
         info("httpd Check POST json");
-        rs = request.post("http://0.0.0.0:8081/post?b=x", `{"a":"b", "c":[1,2,3]}`, "application/json");
+        rs = request.post(httpbin_url ~ "post?b=x", `{"a":"b", "c":[1,2,3]}`, "application/json");
         json = parseJSON(rs.responseBody);
         auto rqJson = parseJSON(json.object["json"].str);
         assert(rqJson.object["a"].str == "b");
         assert(equal([1,2,3], rqJson.object["c"].array.map!"a.integer"));
 
         info("httpd Check POST json/chunked body");
-        rs = request.post("http://0.0.0.0:8081/post?b=x", [`{"a":"b",`,` "c":[1,2,3]}`], "application/json");
+        rs = request.post(httpbin_url ~ "post?b=x", [`{"a":"b",`,` "c":[1,2,3]}`], "application/json");
         json = parseJSON(rs.responseBody);
         assert(json.object["args"].object["b"].str == "x");
         rqJson = parseJSON(json.object["json"].str);
         assert(rqJson.object["a"].str == "b");
         assert(equal([1,2,3], rqJson.object["c"].array.map!"a.integer"));
         
-        rs = request.post("http://0.0.0.0:8081/post", "0123456789".repeat(32));
+        rs = request.post(httpbin_url ~ "post", "0123456789".repeat(32));
         json = parseJSON(rs.responseBody);
         assert(equal(json.object["data"].array.map!"a.integer", "0123456789".repeat(32).join));
 
         info("httpd Check POST with params");
-        rs = request.post("http://0.0.0.0:8081/post", queryParams("b", 2, "a", "A"));
+        rs = request.post(httpbin_url ~ "post", queryParams("b", 2, "a", "A"));
         assert(rs.code==200);
         auto data = parseJSON(rs.responseBody).object["form"].object;
         assert((data["a"].str == "A"));
@@ -1474,20 +1475,20 @@ Content-Length: 1
 
         // this is tests for httpd read() interface
         info("httpd Check POST/iterating over body");
-        rs = request.post("http://0.0.0.0:8081/read", "0123456789".repeat(1500));
+        rs = request.post(httpbin_url ~ "read", "0123456789".repeat(1500));
         assert(equal(rs.responseBody, "15000"));
 
         {
             request.keepAlive = true;
             // this is test on how we can handle keepalive session when previous request leave unread data in socket
             try {
-                rs = request.post("http://0.0.0.0:8081/readf1", "0123456789".repeat(1500));
+                rs = request.post(httpbin_url ~ "readf1", "0123456789".repeat(1500));
             }
             catch (Exception e) {
                 // this can fail as httpd will close connection prematurely
             }
             // but next idempotent request must succeed
-            rs = request.get("http://0.0.0.0:8081/get");
+            rs = request.get(httpbin_url ~ "get");
             assert(rs.code == 200);
         }
         //
@@ -1524,7 +1525,7 @@ Content-Length: 1
                     add(formData("File1", f1, ["filename":"file1", "Content-Type": "application/octet-stream"])).
                     add(formData("File2", f2, ["filename":"file2", "Content-Type": "application/octet-stream"]));
             /// everything ready, send request
-            rs = request.post("http://0.0.0.0:8081/post?a=b", form);
+            rs = request.post(httpbin_url ~ "post?a=b", form);
             /* expected:
              {
              "args": {
@@ -1562,13 +1563,13 @@ Content-Length: 1
                     add(formData("Field2", cast(ubyte[])"file field from memory", ["filename":"data2"])).
                     add(formData("Field3", cast(ubyte[])`{"a":"b"}`, ["Content-Type": "application/json"]));
             /// everything ready, send request
-            rs = request.post("http://0.0.0.0:8081/postIter?a=b", form);
+            rs = request.post(httpbin_url ~ "postIter?a=b", form);
             assert(equal(rs.responseBody, "53"));
-            rs = request.post("http://0.0.0.0:8081/postIter", "0123456789".repeat(1500));
+            rs = request.post(httpbin_url ~ "postIter", "0123456789".repeat(1500));
             assert(equal(rs.responseBody, "15000"));
         }
         info("httpd Check cookies");
-        rs = request.get("http://0.0.0.0:8081/cookies/set?A=abcd&b=cdef");
+        rs = request.get(httpbin_url ~ "cookies/set?A=abcd&b=cdef");
         json = parseJSON(rs.responseBody.data).object["cookies"].object;
         assert(json["A"].str == "abcd");
         assert(json["b"].str == "cdef");

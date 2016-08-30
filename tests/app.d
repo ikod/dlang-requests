@@ -14,7 +14,7 @@ else {
         s.start();
         auto rq = Request();
         rq.keepAlive = false;
-        auto rs = rq.get("http://0.0.0.0:8081/get");
+        auto rs = rq.get("http://127.0.0.1:8081/get");
         assert(rs.code == 200);
     }
 }

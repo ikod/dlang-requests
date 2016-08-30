@@ -37,6 +37,12 @@ public class TimeoutException: Exception {
     }
 }
 
+public class NetworkException: Exception {
+    this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
+        super(message, file, line, next);
+    }
+}
+
 /**
  * DataPipeIface can accept some data, process, and return processed data.
  */
@@ -852,7 +858,7 @@ public abstract class SocketStream : NetworkStream {
         auto rc = s.send(buff);
         if (rc < 0) {
             close();
-            throw new ErrnoException("sending data");
+            throw new NetworkException("sending data");
         }
         return rc;
     }
@@ -866,7 +872,7 @@ public abstract class SocketStream : NetworkStream {
                     if ( errno == 0 ) {
                         throw new TimeoutException("Timeout receiving data");
                     }
-                    throw new ErrnoException();
+                    throw new NetworkException();
                 }
                 version(Posix) {
                     if ( errno == EINTR ) {
@@ -876,7 +882,7 @@ public abstract class SocketStream : NetworkStream {
                     if ( errno == EAGAIN ) {
                         throw new TimeoutException("Timeout receiving data");
                     }
-                    throw new ErrnoException("receiving data");
+                    throw new NetworkException("receiving data");
                 }
             }
             else {

@@ -1483,13 +1483,12 @@ Content-Length: 1
             try {
                 rs = request.post("http://0.0.0.0:8081/readf1", "0123456789".repeat(1500));
             }
-            catch(Exception e) {
-                // as we will close socket prematurely on server side, there will be broken pipe error
-                // we will ignore it
+            catch (Exception e) {
+                // this can fail as httpd will close connection prematurely
             }
-            // next request must succeed
-            rs = request.post("http://0.0.0.0:8081/read", "0123456789".repeat(1500));
-            assert(equal(rs.responseBody, "15000"));
+            // but next idempotent request must succeed
+            rs = request.get("http://0.0.0.0:8081/get");
+            assert(rs.code == 200);
         }
         //
         {

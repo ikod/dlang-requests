@@ -711,9 +711,7 @@ public struct HTTPRequest {
 
         _bodyDecoder.putNoCopy(partialBody.data);
 
-        if ( _verbosity >= 2 ) {
-            writefln("< %d bytes of body received", partialBody.length);
-        }
+        if ( _verbosity >= 2 ) writefln("< %d bytes of body received", partialBody.length);
 
         if ( _method == "HEAD" ) {
             // HEAD response have ContentLength, but have no body
@@ -902,36 +900,32 @@ public struct HTTPRequest {
         req.put("\r\n");
         
         debug(requests) trace(req.data);
-        if ( _verbosity >= 1 ) {
-            req.data.splitLines.each!(a => writeln("> " ~ a));
-        }
+        if ( _verbosity >= 1 ) req.data.splitLines.each!(a => writeln("> " ~ a));
 
         try {
-            auto rc = _stream.send(req.data());
+            _stream.send(req.data());
+            foreach(ref source; sources._sources) {
+                debug(requests) tracef("sending part headers <%s>", partHeaders.front);
+                _stream.send(partHeaders.front);
+                partHeaders.popFront;
+                while (true) {
+                    auto chunk = source.input.read();
+                    if ( chunk.length <= 0 ) {
+                        break;
+                    }
+                    _stream.send(chunk);
+                }
+                _stream.send("\r\n");
+            }
+            _stream.send("--" ~ boundary ~ "--\r\n");
+            _response._requestSentAt = Clock.currTime;
+            receiveResponse();
+            _response._finishedAt = Clock.currTime;
         }
-        catch (Exception e) {
+        catch (NetworkException e) {
             errorf("Error sending request: ", e.msg);
             return _response;
         }
-        foreach(ref source; sources._sources) {
-            auto hdr = partHeaders.front;
-            partHeaders.popFront;
-            debug(requests) tracef("sending part headers <%s>", hdr);
-            _stream.send(hdr);
-            while (true) {
-                auto chunk = source.input.read();
-                if ( chunk.length <= 0 ) {
-                    break;
-                }
-                _stream.send(chunk);
-            }
-            _stream.send("\r\n");
-        }
-        _stream.send("--" ~ boundary ~ "--\r\n");
-        _response._requestSentAt = Clock.currTime;
-        
-        receiveResponse();
-        
         if ( _useStreaming ) {
             if ( _response._receiveAsRange.activated ) {
                 debug(requests) trace("streaming_in activated");
@@ -940,19 +934,6 @@ public struct HTTPRequest {
                 _response._receiveAsRange.data = _response.responseBody.data;
             }
         }
-
-        if ( serverClosedKeepAliveConnection()
-            && !restartedRequest
-            && isIdempotent(_method)
-            ) {
-            debug(requests) tracef("Server closed keepalive connection");
-            _stream.close();
-            restartedRequest = true;
-            goto connect;
-        }
-        
-        _response._finishedAt = Clock.currTime;
-        ///
         auto connection = "connection" in _response._responseHeaders;
         if ( !connection || *connection == "close" ) {
             debug(requests) tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
@@ -1043,31 +1024,31 @@ public struct HTTPRequest {
         }
 
         try {
-            auto rc = _stream.send(req.data());
-        }
-        catch (Exception e) {
-            errorf("Error sending request: ", e.msg);
-            return _response;
-        }
-
-        static if ( rank!R == 1) {
-            _stream.send(content);
-        } else {
-            while ( !content.empty ) {
-                auto chunk = content.front;
-                auto chunkHeader = "%x\r\n".format(chunk.length);
-                debug(requests) tracef("sending %s%s", chunkHeader, chunk);
-                _stream.send(chunkHeader);
-                _stream.send(chunk);
-                _stream.send("\r\n");
-                content.popFront;
+            // send headers
+            _stream.send(req.data());
+            // send body
+            static if ( rank!R == 1) {
+                _stream.send(content);
+            } else {
+                while ( !content.empty ) {
+                    auto chunk = content.front;
+                    auto chunkHeader = "%x\r\n".format(chunk.length);
+                    debug(requests) tracef("sending %s%s", chunkHeader, chunk);
+                    _stream.send(chunkHeader);
+                    _stream.send(chunk);
+                    _stream.send("\r\n");
+                    content.popFront;
+                }
+                debug(requests) tracef("sent");
+                _stream.send("0\r\n\r\n");
             }
-            debug(requests) tracef("sent");
-            _stream.send("0\r\n\r\n");
+            _response._requestSentAt = Clock.currTime;
+            receiveResponse();
+            _response._finishedAt = Clock.currTime;
+        } catch (NetworkException e) {
+            _stream.close();
+            throw new RequestException("Network error during data exchange");
         }
-        _response._requestSentAt = Clock.currTime;
-
-        receiveResponse();
 
         if ( _useStreaming ) {
             if ( _response._receiveAsRange.activated ) {
@@ -1077,20 +1058,6 @@ public struct HTTPRequest {
                 _response._receiveAsRange.data = _response.responseBody.data;
             }
         }
-
-        if ( serverClosedKeepAliveConnection()
-            && !restartedRequest
-            && isIdempotent(_method)
-        ) {
-            debug(requests) tracef("Server closed keepalive connection");
-            _stream.close();
-            restartedRequest = true;
-            goto connect;
-        }
-
-        _response._finishedAt = Clock.currTime;
-
-        ///
         auto connection = "connection" in _response._responseHeaders;
         if ( !connection || *connection == "close" ) {
             debug(requests) tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
@@ -1166,41 +1133,54 @@ public struct HTTPRequest {
 
         debug(requests) trace(req.data);
 
-        if ( _verbosity >= 1 ) {
-            req.data.splitLines.each!(a => writeln("> " ~ a));
-        }
+        if ( _verbosity >= 1 ) req.data.splitLines.each!(a => writeln("> " ~ a));
+        //
+        // Now send request and receive response
+        //
         try {
-            auto rc = _stream.send(req.data());
+            _stream.send(req.data());
+            _response._requestSentAt = Clock.currTime;
+            receiveResponse();
+            _response._finishedAt = Clock.currTime;
         }
-        catch (Exception e) {
-            errorf("Error sending request: ", e.msg);
-            return _response;
-        }
-        _response._requestSentAt = Clock.currTime;
+        catch (NetworkException e) {
+            // On SEND this can means:
+            // we started to send request to the server, but it closed connection because of keepalive timeout.
+            // We have to restart request if possible.
 
-        receiveResponse();
-
-        if ( _useStreaming ) {
-            if ( _response._receiveAsRange.activated ) {
-                debug(requests) trace("streaming_in activated");
-                return _response;
-            } else {
-                _response._receiveAsRange.data = _response.responseBody.data;
+            // On RECEIVE - if we received something - then this exception is real and unexpected error.
+            // If we didn't receive anything - we can restart request again as it can be 
+            if ( _response._responseHeaders.length != 0 ) {
+                _stream.close();
+                throw new RequestException("Unexpected network error");
             }
         }
+
         if ( serverClosedKeepAliveConnection()
             && !restartedRequest
             && isIdempotent(_method)
-        ) {
+            ) {
+            ///
+            /// We didn't receive any data (keepalive connectioin closed?)
+            /// and we can restart this request.
+            /// Go ahead.
+            ///
             debug(requests) tracef("Server closed keepalive connection");
             _stream.close();
             restartedRequest = true;
             goto connect;
         }
+        
+        if ( _useStreaming ) {
+            if ( _response._receiveAsRange.activated ) {
+                debug(requests) trace("streaming_in activated");
+                return _response;
+            } else {
+                // this can happen if whole response body received together with headers
+                _response._receiveAsRange.data = _response.responseBody.data;
+            }
+        }
 
-        _response._finishedAt = Clock.currTime;
-
-        ///
         auto connection = "connection" in _response._responseHeaders;
         if ( !connection || *connection == "close" ) {
             debug(requests) tracef("Closing connection because of 'Connection: close' or no 'Connection' header");

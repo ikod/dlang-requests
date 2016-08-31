@@ -181,8 +181,26 @@ public struct FTPRequest {
             }
             
         }
+        code = sendCmdGetResponse("PWD\r\n");
+        string pwd;
+        if ( code/100 == 2 ) {
+            // like '257 "/home/testuser"'
+            auto a = _responseHistory[$-1].split();
+            if ( a.length > 1 ) {
+                pwd = a[1].chompPrefix(`"`).chomp(`"`);
+            }
+        }
+        scope (exit) {
+            if ( pwd && _controlChannel ) {
+                sendCmdGetResponse("CWD " ~ pwd ~ "\r\n");
+            }
+        }
 
-        code = sendCmdGetResponse("CWD " ~ dirName(_uri.path).chompPrefix(`/`) ~ "\r\n");
+        auto path = dirName(_uri.path);
+        if ( path != "/") {
+            path = path.chompPrefix("/");
+        }
+        code = sendCmdGetResponse("CWD " ~ path ~ "\r\n");
         if ( code == 550 ) {
             // try to create directory end enter it
             code = sendCmdGetResponse("MKD " ~ dirName(_uri.path).chompPrefix(`/`) ~ "\r\n");
@@ -311,7 +329,26 @@ public struct FTPRequest {
 
         }
 
-        code = sendCmdGetResponse("CWD " ~ dirName(_uri.path) ~ "\r\n");
+        code = sendCmdGetResponse("PWD\r\n");
+        string pwd;
+        if ( code/100 == 2 ) {
+            // like '257 "/home/testuser"'
+            auto a = _responseHistory[$-1].split();
+            if ( a.length > 1 ) {
+                pwd = a[1].chompPrefix(`"`).chomp(`"`);
+            }
+        }
+        scope (exit) {
+            if ( pwd && _controlChannel ) {
+                sendCmdGetResponse("CWD " ~ pwd ~ "\r\n");
+            }
+        }
+        
+        auto path = dirName(_uri.path);
+        if ( path != "/") {
+            path = path.chompPrefix("/");
+        }
+        code = sendCmdGetResponse("CWD " ~ path ~ "\r\n");
         if ( code/100 > 2 ) {
             _response.code = code;
             return _response;

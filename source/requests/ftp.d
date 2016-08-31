@@ -182,7 +182,19 @@ public struct FTPRequest {
             
         }
 
-        code = sendCmdGetResponse("CWD " ~ dirName(_uri.path) ~ "\r\n");
+        code = sendCmdGetResponse("CWD " ~ dirName(_uri.path).chompPrefix(`/`) ~ "\r\n");
+        if ( code == 550 ) {
+            // try to create directory end enter it
+            code = sendCmdGetResponse("MKD " ~ dirName(_uri.path).chompPrefix(`/`) ~ "\r\n");
+            if ( code/100 == 2 ) {
+                // like '257 "/home/testuser/x" created'
+                auto a = _responseHistory[$-1].split();
+                if ( a.length > 1 ) {
+                    auto p = a[1].chompPrefix(`"`).chomp(`"`);
+                    code = sendCmdGetResponse("CWD " ~ p ~ "\r\n");
+                }
+            }
+        }
         if ( code/100 > 2 ) {
             _response.code = code;
             return _response;

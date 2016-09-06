@@ -12,6 +12,7 @@ import std.range;
 import std.experimental.logger;
 import std.stdio;
 import std.path;
+import std.traits;
 
 import requests.uri;
 import requests.utils;
@@ -159,7 +160,11 @@ public struct FTPRequest {
         }
         return tryCdOrCreatePath(path[1..$]);
     }
-    auto post(R, A...)(string uri, R data, A args) {
+    auto post(R, A...)(string uri, R content, A args) 
+        if ( __traits(compiles, cast(ubyte[])content) 
+        || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front)))) 
+        || (rank!R == 2 && (is(Unqual!(typeof(content.front.front)) == ubyte)))
+        ) {
         enforce( uri || _uri.host, "FTP URL undefined");
         string response;
         ushort code;
@@ -275,16 +280,29 @@ public struct FTPRequest {
             _response.code = code;
             return _response;
         }
-        auto b = new ubyte[_bufferSize];
-        for(size_t pos = 0; pos < data.length;) {
-            auto chunk = data.take(_bufferSize).array;
-            auto rc = dataStream.send(chunk);
-            if ( rc <= 0 ) {
-                debug(requests) trace("done");
-                break;
+        static if ( __traits(compiles, cast(ubyte[])content) ) {
+            auto data = cast(ubyte[])content;
+            auto b = new ubyte[_bufferSize];
+            for(size_t pos = 0; pos < data.length;) {
+                auto chunk = data.take(_bufferSize).array;
+                auto rc = dataStream.send(chunk);
+                if ( rc <= 0 ) {
+                    debug(requests) trace("done");
+                    break;
+                }
+                debug(requests) tracef("sent %d bytes to data channel", rc);
+                pos += rc;
             }
-            debug(requests) tracef("sent %d bytes to data channel", rc);
-            pos += rc;
+        } else {
+            while (!content.empty) {
+                auto chunk = content.front;
+                content.popFront;
+                auto rc = dataStream.send(chunk);
+                if ( rc <= 0 ) {
+                    debug(requests) trace("done");
+                    break;
+                }
+            }
         }
         dataStream.close();
         dataStream = null;

@@ -135,7 +135,30 @@ public struct FTPRequest {
         throw new FTPServerResponseError("Failed to read server responce over control channel");
         assert(0);
     }
-
+    auto tryCdOrCreatePath(string[] path) {
+        /*
+         * At start we stay at original path, we have to create next path element
+         * For example:
+         * path = ["", "a", "b"] - we stay in root (path[0]), we have to cd and return ok
+         * or try to cteate "a" and cd to "a".
+         */
+        debug(requests) info("Trying to create path %s".format(path));
+        enforce(path.length>=2, "You called tryCdOrCreate, but there is nothing to create: %s".format(path));
+        auto next_dir = path[1];
+        auto code = sendCmdGetResponse("CWD " ~ next_dir ~ "\r\n");
+        if ( code >= 300) {
+            // try to create, then again CWD
+            code = sendCmdGetResponse("MKD " ~ next_dir ~ "\r\n");
+            if ( code > 300 ) {
+                return code;
+            }
+            code = sendCmdGetResponse("CWD " ~ next_dir ~ "\r\n");
+        }
+        if ( path.length == 2 ) {
+            return code;
+        }
+        return tryCdOrCreatePath(path[1..$]);
+    }
     auto post(R, A...)(string uri, R data, A args) {
         enforce( uri || _uri.host, "FTP URL undefined");
         string response;
@@ -203,15 +226,7 @@ public struct FTPRequest {
         code = sendCmdGetResponse("CWD " ~ path ~ "\r\n");
         if ( code == 550 ) {
             // try to create directory end enter it
-            code = sendCmdGetResponse("MKD " ~ dirName(_uri.path).chompPrefix(`/`) ~ "\r\n");
-            if ( code/100 == 2 ) {
-                // like '257 "/home/testuser/x" created'
-                auto a = _responseHistory[$-1].split();
-                if ( a.length > 1 ) {
-                    auto p = a[1].chompPrefix(`"`).chomp(`"`);
-                    code = sendCmdGetResponse("CWD " ~ p ~ "\r\n");
-                }
-            }
+            code = tryCdOrCreatePath(dirName(_uri.path).split('/'));
         }
         if ( code/100 > 2 ) {
             _response.code = code;

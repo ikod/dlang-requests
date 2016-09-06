@@ -296,12 +296,13 @@ public struct FTPRequest {
         } else {
             while (!content.empty) {
                 auto chunk = content.front;
-                content.popFront;
+                debug(requests) trace("ftp posting %d of data chunk".format(chunk.length));
                 auto rc = dataStream.send(chunk);
                 if ( rc <= 0 ) {
                     debug(requests) trace("done");
                     break;
                 }
+                content.popFront;
             }
         }
         dataStream.close();

@@ -135,7 +135,7 @@ public struct FTPRequest {
         throw new FTPServerResponseError("Failed to read server responce over control channel");
         assert(0);
     }
-    auto tryCdOrCreatePath(string[] path) {
+    ushort tryCdOrCreatePath(string[] path) {
         /*
          * At start we stay at original path, we have to create next path element
          * For example:

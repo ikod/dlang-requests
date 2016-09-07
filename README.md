@@ -96,10 +96,10 @@ Call postContent in the same way as getContent with parameters:
 ```d
     import std.stdio;
     import requests;
-    
+
     pragma(lib, "ssl");
     pragma(lib, "crypto");
-    
+
     void main() {
         auto content = postContent("http://httpbin.org/post", queryParams("name", "any name", "age", 42));
         writeln(content);
@@ -134,10 +134,10 @@ Posting multipart forms required MultipartForm structure to be prepared:
     import std.conv;
     import std.string;
     import requests;
-    
+
     pragma(lib, "ssl");
     pragma(lib, "crypto");
-    
+
     void main() {
         MultipartForm form;
         form.add(formData("name", "any name"));
@@ -175,13 +175,13 @@ Here is example on posting file:
     import std.conv;
     import std.string;
     import requests;
-    
+
     void main() {
         MultipartForm form;
         form.add(formData("file", File("test.txt", "rb"), ["filename":"test.txt", "Content-Type": "text/plain"]));
         form.add(formData("age", "42"));
         auto content = postContent("http://httpbin.org/post", form);
-    
+
         writeln("Output:");
         writeln(content);
     }
@@ -212,17 +212,17 @@ Here is example on posting file:
 ```d
     import std.stdio;
     import requests;
-    
+
     pragma(lib, "ssl");
     pragma(lib, "crypto");
-    
+
     void main() {
         auto f = File("test.txt", "rb");
         auto content = postContent("http://httpbin.org/post", f.byChunk(5), "application/binary");
         writeln("Output:");
         writeln(content);
     }
-   
+
     Output:
     {
       "args": {},
@@ -459,6 +459,33 @@ output:
 [F7EC2FAB:F7ED6FAB 2016.07.05 16:55:57.856 INF] Google request finished
 
 ```
+
+### FTP requests ###
+
+You can use the same structure to make ftp requests, both get and post.
+
+HTTP specific methods do not work if request use `ftp` scheme.
+
+Here is example:
+
+```
+import std.stdio;
+import requests;
+
+void main() {
+    auto rq = Request();
+    rq.verbosity = 3;
+    auto f = File("test.txt", "rb");
+    auto rs = rq.post("ftp://login:password@example.com/test.txt", f.byChunk(1024));
+    writeln(rs.code);
+    rs = rq.get("ftp://login:password@example.com/test.txt");
+    writeln(rs.code);
+}
+```
+
+Second argument for ftp posts can be anything that can be casted to ubyte[] or any InputRange with element type like ubyte[].
+If path in the post request doesn't exists, then we will try to create all required directories.
+As with HTTP you can call several ftp requests using same Request structure - we will reuse established connection (and authorization).
 
 ### Response() structure ###
 

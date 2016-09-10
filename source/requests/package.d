@@ -77,10 +77,19 @@ struct Request {
     @property Cookie[] cookie()  pure @nogc nothrow {
         return _http.cookie;
     }
+    ///
+    /// set "streaming" property
+    /// Params:
+    /// v = value to set (true - use streaming)
+    /// 
     @property void useStreaming(bool v) pure @nogc nothrow {
         _http.useStreaming = v;
         _ftp.useStreaming = v;
     }
+    ///
+    /// get length og actually received content.
+    /// this value increase over time, while we receive data
+    /// 
     @property long contentReceived() pure @nogc nothrow {
         final switch ( _uri.scheme ) {
             case "http", "https":
@@ -89,6 +98,7 @@ struct Request {
                 return _ftp.contentReceived;
         }
     }
+    /// get contentLength of the responce
     @property long contentLength() pure @nogc nothrow {
         final switch ( _uri.scheme ) {
             case "http", "https":
@@ -96,6 +106,12 @@ struct Request {
             case "ftp":
                 return _ftp.contentLength;
         }
+    }
+    /// Add headers to request
+    /// Params:
+    /// headers = headers to send.
+    void addHeaders(in string[string] headers) {
+        _http.addHeaders(headers);
     }
     /// Execute GET for http and retrieve file for FTP.
     /// You have to provide at least $(B uri). All other arguments should conform to HTTPRequest.get or FTPRequest.get depending on the URI scheme.
@@ -270,6 +286,7 @@ package unittest {
     info("Check compressed content");
     rq = Request();
     rq.keepAlive = true;
+    rq.addHeaders(["X-Header": "test"]);
     rs = rq.get(httpbinUrl ~ "gzip");
     assert(rs.code==200);
     info("gzip - ok");

@@ -11,12 +11,12 @@ import std.conv;
 import std.experimental.logger;
 import requests.utils;
 
-/***********************************
- * This is simplest interface to both http and ftp protocols.
- * Request has methods get, post and exec which routed to proper concrete handler (http or ftp, etc).
- * To enable some protocol-specific featutes you have to use protocol interface directly (see docs for HTTPRequest or FTPRequest)
- */
-struct Request {
+/**
+   This is simplest interface to both http and ftp protocols.
+   Request has methods get, post and exec which routed to proper concrete handler (http or ftp, etc).
+   To enable some protocol-specific featutes you have to use protocol interface directly (see docs for HTTPRequest or FTPRequest)
+*/
+public struct Request {
     private {
         URI         _uri;
         HTTPRequest _http;  // route all http/https requests here
@@ -25,7 +25,7 @@ struct Request {
     /// Set timeout on IO operation.
     /// $(B v) - timeout value
     /// 
-    @property void timeout(Duration v) pure @nogc nothrow {
+    public @property void timeout(Duration v) pure @nogc nothrow {
         _http.timeout = v;
         _ftp.timeout = v;
     }
@@ -492,12 +492,8 @@ public auto ref getContent(A...)(string url, A args) if (args.length > 1 && args
 }
 
 ///
-package unittest {
-}
-
-/**
- * Call post and return response content.
- */
+/// Call post and return response content.
+///
 public auto postContent(A...)(string url, A args) {
     auto rq = Request();
     auto rs = rq.post(url, args);

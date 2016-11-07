@@ -711,7 +711,7 @@ else {
             Captures!string _captures = void;
             string          _string;
         }
-        this(Captures!string c) @nogc @safe pure nothrow {
+        this(Captures!string c) @nogc @safe nothrow {
             _captures = c;
         }
         this(string s) @nogc @safe pure nothrow {
@@ -1176,12 +1176,11 @@ else {
         assert(r.args.empty);
 
         HTTPD_Request rq;
-        string headers = """GET /get?a=b&list[]=1&c=d&list[]=2 HTTP/1.1
-Host: host
-X-Test: test1
- test2
-Content-Length: 1
-""";
+        string headers = "GET /get?a=b&list[]=1&c=d&list[]=2 HTTP/1.1\n" ~
+                         "Host: host\n" ~
+                         "X-Test: test1\n" ~
+                         " test2\n" ~
+                         "Content-Length: 1\n";
         parseRequestHeaders(App(), rq, headers);
         assert(rq.requestHeaders["x-test"] == "test1 test2");
         assert(rq.requestHeaders["host"] == "host");

@@ -3,7 +3,7 @@ module requests.streams;
 private:
 import std.algorithm;
 import std.array;
-import std.conv;
+//import std.conv;
 import std.experimental.logger;
 import std.exception;
 import std.format;
@@ -430,17 +430,6 @@ public struct Buffer(T) {
     }
     ~this() {
         __repr = null;
-//        if ( cacheIndex >= CACHESIZE ) {
-//            __repr = null;
-//            return;
-//        }
-//        if ( __repr ) {
-//            __repr.__length = 0;
-//            __repr.__buffer = null;
-//            cache[cacheIndex] = __repr;
-//            cacheIndex += 1;
-//            __repr = null;
-//        }
     }
     /***************
      * store data. Data copied
@@ -453,7 +442,7 @@ public struct Buffer(T) {
             __repr = cachedOrNew();
         }
         static if (!is(U == T)) {
-            auto d = castFrom!(U[]).to!(T[])(data);
+            auto d = cast(T[])(data);
             __repr.__length += d.length;
             __repr.__buffer ~= d.dup;
         } else {
@@ -470,7 +459,7 @@ public struct Buffer(T) {
             __repr = cachedOrNew();
         }
         static if (!is(U == T)) {
-            auto d = castFrom!(U[]).to!(T[])(data);
+            auto d = cast(T[])(data);
             __repr.__length += d.length;
             __repr.__buffer ~= d;
         } else {
@@ -587,7 +576,7 @@ public struct Buffer(T) {
         static if ( is(U==T[]) ) {
             return a.data;
         } else {
-            return castFrom!(T[]).to!U(a.data);
+            return cast(U)a.data;
         }
     }
     string opCast(string)() {
@@ -640,7 +629,7 @@ public unittest {
     auto eoh = countUntil(c, "\n\n");
     assert(eoh == 47);
     foreach(header; c[0..eoh].splitter('\n') ) {
-        writeln(castFrom!(ubyte[]).to!(string)(header.data));
+        writeln(cast(string)header.data);
     }
     assert(equal(findSplit(c, "\n\n")[2], "body"));
     assert(c.length == c_length);

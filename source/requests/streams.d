@@ -3,7 +3,7 @@ module requests.streams;
 private:
 import std.algorithm;
 import std.array;
-//import std.conv;
+import std.conv;
 import std.experimental.logger;
 import std.exception;
 import std.format;
@@ -634,6 +634,96 @@ public unittest {
     assert(equal(findSplit(c, "\n\n")[2], "body"));
     assert(c.length == c_length);
 }
+
+public struct SSLOptions {
+    enum filetype {
+        pem,
+        asn1,
+        der = asn1,
+    }
+    private {
+        /**
+         * do we need to veryfy peer?
+         */
+        bool     _verifyPeer = false;
+        /**
+         * path to CA cert
+         */
+        string   _caCert;
+        /**
+         * path to key file (can also contain cert (for pem)
+         */
+        string   _keyFile;
+        /**
+         * path to cert file (can also contain key (for pem)
+         */
+        string   _certFile;
+        filetype _keyType = filetype.pem;
+        filetype _certType = filetype.pem;
+    }
+    ubyte haveFiles() pure nothrow @safe @nogc {
+        ubyte r = 0;
+        if ( _keyFile  ) r|=1;
+        if ( _certFile ) r|=2;
+        return r;
+    }
+    // do we want to verify peer certificates?
+    bool getVerifyPeer() pure nothrow @nogc {
+        return _verifyPeer;
+    }
+    SSLOptions setVerifyPeer(bool v) pure nothrow @nogc {
+        _verifyPeer = v;
+        return this;
+    }
+    /// set key file name and type (default - pem)
+    auto setKeyFile(string f, filetype t = filetype.pem) {
+        _keyFile = f;
+        _keyType = t;
+        return this;
+    }
+    auto getKeyFile() {
+        return _keyFile;
+    }
+    auto getKeyType() {
+        return _keyType;
+    }
+    /// set cert file name and type (default - pem)
+    auto setCertFile(string f, filetype t = filetype.pem) {
+        _certFile = f;
+        _certType = t;
+        return this;
+    }
+    auto setCaCert(string p) {
+        _caCert = p;
+        return this;
+    }
+    auto getCaCert() {
+        return _caCert;
+    }
+    auto getCertFile() {
+        return _certFile;
+    }
+    auto getCertType() {
+        return _certType;
+    }
+    /// set key file type
+    void setKeyType(string t) pure {
+        _keyType = cast(filetype)sslKeyTypes[t];
+    }
+    /// set cert file type
+    void setCertType(string t) pure {
+        _certType = cast(filetype)sslKeyTypes[t];
+    }
+}
+static immutable int[string] sslKeyTypes;
+shared static this() {
+    sslKeyTypes = [
+        "pem":SSLOptions.filetype.pem,
+        "asn1":SSLOptions.filetype.asn1,
+        "der":SSLOptions.filetype.der,
+    ];
+}
+
 version(vibeD) {
 }
 else {
@@ -657,38 +747,80 @@ else {
         void SSL_free(SSL*);
         void SSL_CTX_free(SSL_CTX*);
 
-        long    SSL_CTX_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg);
+        long SSL_CTX_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg);
 
         long SSL_CTX_set_mode(SSL_CTX *ctx, long mode);
+        int  SSL_CTX_set_default_verify_paths(SSL_CTX *ctx);
+        int SSL_CTX_load_verify_locations(SSL_CTX *ctx, const char *CAfile, const char *CApath);
+        void SSL_CTX_set_verify(SSL_CTX *ctx, int mode, void *);
         long SSL_set_mode(SSL *ssl, long mode);
+        int  SSL_CTX_use_PrivateKey_file(SSL_CTX *ctx, const char *file, int type);
+        int  SSL_CTX_use_certificate_file(SSL_CTX *ctx, const char *file, int type);
 
         long SSL_CTX_get_mode(SSL_CTX *ctx);
         long SSL_get_mode(SSL *ssl);
+
+        long ERR_get_error();
+        char* ERR_reason_error_string(ulong e);
 
         SSL_METHOD* SSLv3_client_method();
         SSL_METHOD* TLSv1_2_client_method();
         SSL_METHOD* TLSv1_client_method();
     }
 
-    //pragma(lib, "crypto");
-    //pragma(lib, "ssl");
+    enum SSL_VERIFY_PEER = 0x01;
+    enum SSL_FILETYPE_PEM = 1;
+    enum SSL_FILETYPE_ASN1 = 2;
+
+    immutable int[SSLOptions.filetype] ft2ssl;
 
     shared static this() {
         SSL_library_init();
         OpenSSL_add_all_ciphers();
         OpenSSL_add_all_digests();
         SSL_load_error_strings();
+        ft2ssl = [
+            SSLOptions.filetype.pem: SSL_FILETYPE_PEM,
+            SSLOptions.filetype.asn1: SSL_FILETYPE_ASN1,
+            SSLOptions.filetype.der: SSL_FILETYPE_ASN1
+        ];
     }
 
     public class OpenSslSocket : Socket {
-        enum SSL_MODE_RELEASE_BUFFERS = 0x00000010L;
+        //enum SSL_MODE_RELEASE_BUFFERS = 0x00000010L;
         private SSL* ssl;
         private SSL_CTX* ctx;
-        private void initSsl() {
+        private void initSsl(SSLOptions opts) {
             //ctx = SSL_CTX_new(SSLv3_client_method());
             ctx = SSL_CTX_new(TLSv1_client_method());
             assert(ctx !is null);
-
+            if ( opts.getVerifyPeer() ) {
+                SSL_CTX_set_default_verify_paths(ctx);
+                if ( opts.getCaCert() ) {
+                    SSL_CTX_load_verify_locations(ctx, opts.getCaCert().toStringz(), null);
+                }
+                SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, null);
+            }
+            immutable keyFile = opts.getKeyFile();
+            immutable keyType = opts.getKeyType();
+            immutable certFile = opts.getCertFile();
+            immutable certType = opts.getCertType();
+            final switch(opts.haveFiles()) {
+                case 0b11:  // both files
+                    SSL_CTX_use_PrivateKey_file(ctx,  keyFile.toStringz(), ft2ssl[keyType]);
+                    SSL_CTX_use_certificate_file(ctx, certFile.toStringz(),ft2ssl[certType]);
+                    break;
+                case 0b01:  // key only
+                    SSL_CTX_use_PrivateKey_file(ctx,  keyFile.toStringz(), ft2ssl[keyType]);
+                    SSL_CTX_use_certificate_file(ctx, keyFile.toStringz(), ft2ssl[keyType]);
+                    break;
+                case 0b10:  // cert only
+                    SSL_CTX_use_PrivateKey_file(ctx,  certFile.toStringz(), ft2ssl[certType]);
+                    SSL_CTX_use_certificate_file(ctx, certFile.toStringz(), ft2ssl[certType]);
+                    break;
+                case 0b00:
+                    break;
+            }
             //SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
             //SSL_CTX_ctrl(ctx, 33, SSL_MODE_RELEASE_BUFFERS, null);
             ssl = SSL_new(ctx);
@@ -696,10 +828,11 @@ else {
         }
 
         @trusted
-        override void connect(Address to) {
-            super.connect(to);
-            if(SSL_connect(ssl) == -1)
-                throw new Exception("ssl connect failed");
+        override void connect(Address dest) {
+            super.connect(dest);
+            if(SSL_connect(ssl) == -1) {
+                throw new Exception("ssl connect failed: %s".format(to!string(ERR_reason_error_string(ERR_get_error()))));
+            }
         }
 
         @trusted
@@ -716,14 +849,14 @@ else {
         override ptrdiff_t receive(void[] buf) {
             return receive(buf, SocketFlags.NONE);
         }
-        this(AddressFamily af, SocketType type = SocketType.STREAM) {
+        this(AddressFamily af, SocketType type = SocketType.STREAM, SSLOptions opts = SSLOptions()) {
             super(af, type);
-            initSsl();
+            initSsl(opts);
         }
 
         this(socket_t sock, AddressFamily af) {
             super(sock, af);
-            initSsl();
+            initSsl(SSLOptions());
         }
         override void close() {
             //SSL_shutdown(ssl);
@@ -736,11 +869,17 @@ else {
     }
 
     public class SSLSocketStream: SocketStream {
+        SSLOptions _sslOptions;
+
+        this(SSLOptions opts) {
+            _sslOptions = opts;
+        }
+
         override void open(AddressFamily fa) {
             if ( s !is null ) {
                 s.close();
             }
-            s = new OpenSslSocket(fa);
+            s = new OpenSslSocket(fa, SocketType.STREAM, _sslOptions);
             assert(s !is null, "Can't create socket");
             __isOpen = true;
         }
@@ -749,7 +888,7 @@ else {
             if ( s is null ) {
                 return null;
             }
-            auto newstream = new SSLSocketStream();
+            auto newstream = new SSLSocketStream(_sslOptions);
             auto sslSocket = new OpenSslSocket(newso.handle, s.addressFamily);
             newstream.s = sslSocket;
             newstream.__isOpen = true;
@@ -1009,13 +1148,47 @@ version (vibeD) {
     private:
         Stream _sslStream;
         bool   _isOpen = true;
+        SSLOptions _sslOptions;
+
     public:
+        this(SSLOptions opts) {
+            _sslOptions = opts;
+        }
         override NetworkStream connect(string host, ushort port, Duration timeout = 10.seconds) {
             try {
                 _conn = connectTCP(host, port);
                 auto sslctx = createTLSContext(TLSContextKind.client);
-                sslctx.peerValidationMode = TLSPeerValidationMode.none;
-                _sslStream = createTLSStream(_conn, sslctx);
+                if ( _sslOptions.getVerifyPeer() ) {
+                    if ( _sslOptions.getCaCert() == null ) {
+                        throw new ConnectError("With vibe.d you have to call setCaCert() before verify server certificate.");
+                    }
+                    sslctx.useTrustedCertificateFile(_sslOptions.getCaCert());
+                    sslctx.peerValidationMode = TLSPeerValidationMode.trustedCert;
+                } else {
+                    sslctx.peerValidationMode = TLSPeerValidationMode.none;
+                }
+                immutable keyFile = _sslOptions.getKeyFile();
+                immutable certFile = _sslOptions.getCertFile();
+                final switch(_sslOptions.haveFiles()) {
+                    case 0b11:  // both files
+                        sslctx.usePrivateKeyFile(keyFile);
+                        sslctx.useCertificateChainFile(certFile);
+                        break;
+                    case 0b01:  // key only
+                        sslctx.usePrivateKeyFile(keyFile);
+                        sslctx.useCertificateChainFile(keyFile);
+                        break;
+                    case 0b10:  // cert only
+                        sslctx.usePrivateKeyFile(certFile);
+                        sslctx.useCertificateChainFile(certFile);
+                        break;
+                    case 0b00:
+                        break;
+                }
+                _sslStream = createTLSStream(_conn, sslctx, host);
+            }
+            catch (ConnectError e) {
+                throw e;
             }
             catch (Exception e) {
                 throw new ConnectError("Can't connect to %s:%d".format(host, port), __FILE__, __LINE__, e);

@@ -294,22 +294,24 @@ public struct HTTPRequest {
         long           _contentLength;
         long           _contentReceived;
         Cookie[]       _cookie;
+        SSLOptions     _sslOptions;
     }
     package HTTPResponse   _response;
 
-    mixin(Getter_Setter!string   ("method"));
-    mixin(Getter_Setter!bool     ("keepAlive"));
-    mixin(Getter_Setter!size_t   ("maxContentLength"));
-    mixin(Getter_Setter!size_t   ("maxHeadersLength"));
-    mixin(Getter_Setter!size_t   ("bufferSize"));
-    mixin(Getter_Setter!uint     ("maxRedirects"));
-    mixin(Getter_Setter!uint     ("verbosity"));
-    mixin(Getter_Setter!string   ("proxy"));
-    mixin(Getter_Setter!Duration ("timeout"));
-    mixin(Setter!Auth            ("authenticator"));
-    mixin(Getter_Setter!bool     ("useStreaming"));
-    mixin(Getter!long            ("contentLength"));
-    mixin(Getter!long            ("contentReceived"));
+    mixin(Getter_Setter!string     ("method"));
+    mixin(Getter_Setter!bool       ("keepAlive"));
+    mixin(Getter_Setter!size_t     ("maxContentLength"));
+    mixin(Getter_Setter!size_t     ("maxHeadersLength"));
+    mixin(Getter_Setter!size_t     ("bufferSize"));
+    mixin(Getter_Setter!uint       ("maxRedirects"));
+    mixin(Getter_Setter!uint       ("verbosity"));
+    mixin(Getter_Setter!string     ("proxy"));
+    mixin(Getter_Setter!Duration   ("timeout"));
+    mixin(Setter!Auth              ("authenticator"));
+    mixin(Getter_Setter!bool       ("useStreaming"));
+    mixin(Getter!long              ("contentLength"));
+    mixin(Getter!long              ("contentReceived"));
+    mixin(Getter_Setter!SSLOptions ("sslOptions"));
 
     @property final void cookie(Cookie[] s) pure @safe @nogc nothrow {
         _cookie = s;
@@ -646,7 +648,7 @@ public struct HTTPRequest {
                     _stream = new TCPStream().connect(uri.host, uri.port, _timeout);
                     break;
                 case "https":
-                    _stream = new SSLStream().connect(uri.host, uri.port, _timeout);
+                    _stream = new SSLStream(_sslOptions).connect(uri.host, uri.port, _timeout);
                     break;
             }
         } else {

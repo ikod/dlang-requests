@@ -107,6 +107,13 @@ public struct Request {
                 return _ftp.contentLength;
         }
     }
+    /// Set ssl options.
+    @property void sslOptions(SSLOptions v) {
+        _http.sslOptions(v);
+    }
+    @property auto sslOptions() {
+        return _http.sslOptions();
+    }
     /// Add headers to request
     /// Params:
     /// headers = headers to send.

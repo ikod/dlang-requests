@@ -1049,13 +1049,15 @@ else {
             auto host = app.host;
             auto port = app.port;
             Address[] addresses;
+            SSLOptions _sslOptions;
+
             try {
                 addresses = getAddress(host, port);
             } catch (Exception e) {
                 throw new ConnectError("Can't resolve name when connect to %s:%d: %s".format(host, port, e.msg));
             }
             auto tcpStream = app.useSSL?
-                new SSLStream():
+                new SSLStream(_sslOptions):
                 new TCPStream();
             tcpStream.open(addresses[0].addressFamily);
             return tcpStream;

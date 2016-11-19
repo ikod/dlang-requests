@@ -10,9 +10,9 @@ HTTP requests library with goals:
 
 API docs: [Wiki](https://github.com/ikod/dlang-requests/wiki)
 
-###Library configurations###
+### Library configurations ###
 
-This library can either use the standard std.socket library or [vibe.d](http://vibed.org) for network IO. By default this library uses the standard std.socket configuration called *std*. To use vibe.d use the *vibed* configuration (see code example below):
+This library can either use the standard std.socket library or [vibe.d](http://vibed.org) for network IO. By default this library uses the standard std.socket configuration called *std*. To build vibe.d variant use the *vibed* configuration (see code example below):
 
 ```json
 "dependencies": {
@@ -23,13 +23,13 @@ This library can either use the standard std.socket library or [vibe.d](http://v
 }
 ```
 
-###Make a simple Request###
+### Make a simple Request ###
 
-Making http/https/ftp request with dlang-requests is very simple. First of all install and import *requests* module:
+Making http/https/ftp request with dlang-requests is simple. First of all install and import *requests* module:
 ```d
 import requests;
 ```
-Now, if all we need is content of some webpage, then we can call getContent to receive it:
+If you need just content of some webpage, then you can use getContent:
 ```d
 auto content = getContent("http://httpbin.org/");
 ```
@@ -45,13 +45,13 @@ writeln(content.splitter('\n').filter!"a!=``".count);
 ```d
 ubyte[] data = content.data;
 ```
-###Request with Parameters ###
+### Request with Parameters ###
 
 Requests propose simple way to make request with parameters. For example you have to simulate a search query for person: **name** - person name, **age** - person age, and so on... You can pass all parameters to get using *queryParams()* helper:
 ```d
 auto content = getContent("http://httpbin.org/get", queryParams("name", "any name", "age", 42));
 ```
-If you check httpbin response, you will see that server recognized all parameters:
+If you check httpbin response, you will see how server recognized all parameters:
 ```d
     {
       "args": {
@@ -84,7 +84,7 @@ Which give you the same response.
  * *RequestException* in case in some other
    cases.
 
-###Posting data to server###
+### Posting data to server ###
 The easy way to post with Requests is *postContent*. There are several way to post data to server:
 
  1. Post to web-form using "form-urlencode" - for posting short data.
@@ -94,16 +94,13 @@ The easy way to post with Requests is *postContent*. There are several way to po
 #### Form-urlencode ####
 Call postContent in the same way as getContent with parameters:
 ```d
-    import std.stdio;
-    import requests;
+import std.stdio;
+import requests;
 
-    pragma(lib, "ssl");
-    pragma(lib, "crypto");
-
-    void main() {
-        auto content = postContent("http://httpbin.org/post", queryParams("name", "any name", "age", 42));
-        writeln(content);
-    }
+void main() {
+    auto content = postContent("http://httpbin.org/post", queryParams("name", "any name", "age", 42));
+    writeln(content);
+}
 ```
 Output:
 ```
@@ -130,116 +127,114 @@ Output:
 #### Multipart form ####
 Posting multipart forms required MultipartForm structure to be prepared:
 ```d
-    import std.stdio;
-    import std.conv;
-    import std.string;
-    import requests;
+import std.stdio;
+import std.conv;
+import std.string;
+import requests;
 
-    pragma(lib, "ssl");
-    pragma(lib, "crypto");
-
-    void main() {
-        MultipartForm form;
-        form.add(formData("name", "any name"));
-        form.add(formData("age", to!string(42)));
-        form.add(formData("raw data", "some bytes".dup.representation));
-        auto content = postContent("http://httpbin.org/post", form);
-        writeln("Output:");
-        writeln(content);
-    }
-    Output:
-    {
-      "args": {},
-      "data": "",
-      "files": {},
-      "form": {
-        "age": "42",
-        "name": "any name",
-        "raw data": "some bytes"
-      },
-      "headers": {
-        "Accept-Encoding": "gzip, deflate",
-        "Content-Length": "332",
-        "Content-Type": "multipart/form-data; boundary=e3beab0d-d240-4ec1-91bb-d47b08af5999",
-        "Host": "httpbin.org",
-        "User-Agent": "dlang-requests"
-      },
-      "json": null,
-      "origin": "xxx.xxx.xxx.xxx",
-      "url": "http://httpbin.org/post"
-    }
+void main() {
+    MultipartForm form;
+    form.add(formData("name", "any name"));
+    form.add(formData("age", to!string(42)));
+    form.add(formData("raw data", "some bytes".dup.representation));
+    auto content = postContent("http://httpbin.org/post", form);
+    writeln("Output:");
+    writeln(content);
+}
+Output:
+{
+  "args": {},
+  "data": "",
+  "files": {},
+  "form": {
+    "age": "42",
+    "name": "any name",
+    "raw data": "some bytes"
+  },
+  "headers": {
+    "Accept-Encoding": "gzip, deflate",
+    "Content-Length": "332",
+    "Content-Type": "multipart/form-data; boundary=e3beab0d-d240-4ec1-91bb-d47b08af5999",
+    "Host": "httpbin.org",
+    "User-Agent": "dlang-requests"
+  },
+  "json": null,
+  "origin": "xxx.xxx.xxx.xxx",
+  "url": "http://httpbin.org/post"
+}
 ```
 Here is example on posting file:
 ```d
-    import std.stdio;
-    import std.conv;
-    import std.string;
-    import requests;
+import std.stdio;
+import std.conv;
+import std.string;
+import requests;
 
-    void main() {
-        MultipartForm form;
-        form.add(formData("file", File("test.txt", "rb"), ["filename":"test.txt", "Content-Type": "text/plain"]));
-        form.add(formData("age", "42"));
-        auto content = postContent("http://httpbin.org/post", form);
+void main() {
+    MultipartForm form;
+    form.add(formData("file", File("test.txt", "rb"), ["filename":"test.txt", "Content-Type": "text/plain"]));
+    form.add(formData("age", "42"));
+    auto content = postContent("http://httpbin.org/post", form);
 
-        writeln("Output:");
-        writeln(content);
-    }
-    Output:
-    {
-      "args": {},
-      "data": "",
-      "files": {
-        "file": "this is test file\n"
-      },
-      "form": {
-        "age": "42"
-      },
-      "headers": {
-        "Accept-Encoding": "gzip, deflate",
-        "Content-Length": "282",
-        "Content-Type": "multipart/form-data; boundary=3fd7317f-7082-4d63-82e2-16cfeaa416b4",
-        "Host": "httpbin.org",
-        "User-Agent": "dlang-requests"
-      },
-      "json": null,
-      "origin": "xxx.xxx.xxx.xxx",
-      "url": "http://httpbin.org/post"
-    }
+    writeln("Output:");
+    writeln(content);
+}
+
+Output:
+{
+  "args": {},
+  "data": "",
+  "files": {
+    "file": "this is test file\n"
+  },
+  "form": {
+    "age": "42"
+  },
+  "headers": {
+    "Accept-Encoding": "gzip, deflate",
+    "Content-Length": "282",
+    "Content-Type": "multipart/form-data; boundary=3fd7317f-7082-4d63-82e2-16cfeaa416b4",
+    "Host": "httpbin.org",
+    "User-Agent": "dlang-requests"
+  },
+  "json": null,
+  "origin": "xxx.xxx.xxx.xxx",
+  "url": "http://httpbin.org/post"
+}
 ```
 #### Posting raw data without forms ####
 *postContent()* can post from InputRanges. For example to post file content:
 ```d
-    import std.stdio;
-    import requests;
+import std.stdio;
+import requests;
 
-    pragma(lib, "ssl");
-    pragma(lib, "crypto");
+pragma(lib, "ssl");
+pragma(lib, "crypto");
 
-    void main() {
-        auto f = File("test.txt", "rb");
-        auto content = postContent("http://httpbin.org/post", f.byChunk(5), "application/binary");
-        writeln("Output:");
-        writeln(content);
-    }
+void main() {
+    auto f = File("test.txt", "rb");
+    auto content = postContent("http://httpbin.org/post", f.byChunk(5), "application/binary");
+    writeln("Output:");
+    writeln(content);
+}
 
-    Output:
-    {
-      "args": {},
-      "data": "this is test file\n",
-      "files": {},
-      "form": {},
-      "headers": {
-        "Accept-Encoding": "gzip, deflate",
-        "Content-Length": "18",
-        "Content-Type": "application/binary",
-        "Host": "httpbin.org",
-        "User-Agent": "dlang-requests"
-      },
-      "json": null,
-      "origin": "xxx.xxx.xxx.xxx",
-      "url": "http://httpbin.org/post"
-    }
+Output:
+{
+  "args": {},
+  "data": "this is test file\n",
+  "files": {},
+  "form": {},
+  "headers": {
+    "Accept-Encoding": "gzip, deflate",
+    "Content-Length": "18",
+    "Content-Type": "application/binary",
+    "Host": "httpbin.org",
+    "User-Agent": "dlang-requests"
+  },
+  "json": null,
+  "origin": "xxx.xxx.xxx.xxx",
+  "url": "http://httpbin.org/post"
+}
 ```
 Or if your keep your data in memory, then just use something like this:
 ```d
@@ -249,7 +244,7 @@ That is all details about simple API with default request parameters. Next secti
 
 ### Request() structure ###
 
-When you need access to response code, or configure request details, you have to use *Request* and *Response* structures:
+When you need to configure request details (like timeouts and other limits, keepalive, ssl properties), or to response details (code, headers) you have to use *Request* and *Response* structures:
 
 ```d
 Request rq = Request();
@@ -272,23 +267,21 @@ void main()
     writeln(rs.responseBody.length);
 }
 ```
-Second rq.get() will reuse previous connection to server. Request() will authomatically reopen connection when host, protocol or port changes(so it is safe to send different requests through single instance of Request). It also recover when server prematurely close keepalive connection. You can turn keepAlive off when needed:
+In the latter case rq.get() will reuse previous connection to server. Request() will automatically reopen connection when host, protocol or port changes(so it is safe to send different requests through single instance of Request). It also recover when server prematurely close keepalive connection. You can turn keepAlive off when needed:
 ```d
 rq.keepAlive = false;
 ```
 
-
-For anything other than default, you can configure *Request* structure for keep-alive, redirects, headers, o
-r for different io-buffer and maximum sizes of response headers and body.
+For anything other than default, you can configure *Request* structure for keep-alive, redirects handling, add/remove headers, set io-buffer size and maximum size of response headers and body.
 
 For example to authorize with Basic authorization use next code:
 ```d
-    rq = Request();
-    rq.authenticator = new BasicAuthentication("user", "passwd");
-    rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
+rq = Request();
+rq.authenticator = new BasicAuthentication("user", "passwd");
+rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
 ```
 
-Here is short descrition of some Request options, you can set:
+Here is short description of some Request options, you can set:
 
 | name                | type           | meaning                                | default    |
 |---------------------|----------------|----------------------------------------|------------|
@@ -316,6 +309,8 @@ Request() properties you can read:
 | contentLength    | long           | current document content Length or -1 if unknown    |
 | contentReceived  | long           | content recived                                     |
 
+#### Streaming server response ####
+With *useStreaming* you can lazily receive response body as input range.
 contentLength and contentReceived can be used to monitor streaming response:
 
 ```d
@@ -425,9 +420,9 @@ void main() {
     assert(lines == 287);
 }
 ```
-
-Also you can safely use *requests* with vibe.d. When *requests* compiled with support for vibe.d sockets, each call to *requests* API can block only current fiber, not thread:
-```
+#### vibe.d ####
+You can safely use *requests* with vibe.d. When *requests* compiled with support for vibe.d sockets, each call to *requests* API can block only current fiber, not thread:
+```d
 import requests, vibe.d;
 
 shared static this()
@@ -459,6 +454,33 @@ output:
 [F7EC2FAB:F7ED6FAB 2016.07.05 16:55:57.856 INF] Google request finished
 
 ```
+#### Adding/replacing request headers ###
+Use string[string] and addHeaders method to add or replace some request headers:
+
+ ```d
+import requests;
+
+void main() {
+    auto rq = Request();
+    rq.verbosity = 2;
+    rq.addHeaders(["User-Agent": "test-123", "X-Header": "x-value"]);
+    auto rs = rq.post("http://httpbin.org/post", `{"a":"b"}`, "application/x-www-form-urlencoded");
+}
+Output:
+> POST /post HTTP/1.1
+> Content-Length: 9
+> Connection: Keep-Alive
+> User-Agent: test-123
+> Accept-Encoding: gzip, deflate
+> Host: httpbin.org
+> X-Header: x-value
+> Content-Type: application/x-www-form-urlencoded
+>
+< HTTP/1.1 200 OK
+< server: nginx
+...
+```
+#### SSL settings ####
 
 ### FTP requests ###
 

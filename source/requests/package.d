@@ -107,9 +107,17 @@ public struct Request {
                 return _ftp.contentLength;
         }
     }
-    /// Set ssl options.
-    @property void sslOptions(SSLOptions v) {
-        _http.sslOptions(v);
+    @property void sslSetVerifyPeer(bool v) {
+        _http.sslSetVerifyPeer(v);
+    }
+    @property void sslSetKeyFile(string path, SSLOptions.filetype type = SSLOptions.filetype.pem) pure @safe nothrow @nogc {
+        _http.sslSetKeyFile(path, type);
+    }
+    @property void sslSetCertFile(string path, SSLOptions.filetype type = SSLOptions.filetype.pem) pure @safe nothrow @nogc {
+        _http.sslSetCertFile(path, type);
+    }
+    @property void sslSetCaCert(string path) pure @safe nothrow @nogc {
+        _http.sslSetCaCert(path);
     }
     @property auto sslOptions() {
         return _http.sslOptions();

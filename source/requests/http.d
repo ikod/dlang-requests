@@ -313,6 +313,18 @@ public struct HTTPRequest {
     mixin(Getter!long              ("contentReceived"));
     mixin(Getter_Setter!SSLOptions ("sslOptions"));
 
+    @property void sslSetVerifyPeer(bool v) pure @safe nothrow @nogc {
+        _sslOptions.setVerifyPeer(v);
+    }
+    @property void sslSetKeyFile(string p, SSLOptions.filetype t = SSLOptions.filetype.pem) pure @safe nothrow @nogc {
+        _sslOptions.setKeyFile(p, t);
+    }
+    @property void sslSetCertFile(string p, SSLOptions.filetype t = SSLOptions.filetype.pem) pure @safe nothrow @nogc {
+        _sslOptions.setCertFile(p, t);
+    }
+    @property void sslSetCaCert(string path) pure @safe nothrow @nogc {
+        _sslOptions.setCaCert(path);
+    }
     @property final void cookie(Cookie[] s) pure @safe @nogc nothrow {
         _cookie = s;
     }

@@ -671,47 +671,47 @@ public struct SSLOptions {
     bool getVerifyPeer() pure nothrow @nogc {
         return _verifyPeer;
     }
-    SSLOptions setVerifyPeer(bool v) pure nothrow @nogc {
+    SSLOptions setVerifyPeer(bool v) pure nothrow @nogc @safe {
         _verifyPeer = v;
         return this;
     }
     /// set key file name and type (default - pem)
-    auto setKeyFile(string f, filetype t = filetype.pem) {
+    auto setKeyFile(string f, filetype t = filetype.pem) @safe pure nothrow @nogc {
         _keyFile = f;
         _keyType = t;
         return this;
     }
-    auto getKeyFile() {
+    auto getKeyFile() @safe pure nothrow @nogc {
         return _keyFile;
     }
-    auto getKeyType() {
+    auto getKeyType() @safe pure nothrow @nogc {
         return _keyType;
     }
     /// set cert file name and type (default - pem)
-    auto setCertFile(string f, filetype t = filetype.pem) {
+    auto setCertFile(string f, filetype t = filetype.pem) @safe pure nothrow @nogc {
         _certFile = f;
         _certType = t;
         return this;
     }
-    auto setCaCert(string p) {
+    auto setCaCert(string p) @safe pure nothrow @nogc {
         _caCert = p;
         return this;
     }
-    auto getCaCert() {
+    auto getCaCert() @safe pure nothrow @nogc {
         return _caCert;
     }
-    auto getCertFile() {
+    auto getCertFile() @safe pure nothrow @nogc {
         return _certFile;
     }
-    auto getCertType() {
+    auto getCertType() @safe pure nothrow @nogc {
         return _certType;
     }
     /// set key file type
-    void setKeyType(string t) pure {
+    void setKeyType(string t) @safe pure nothrow {
         _keyType = cast(filetype)sslKeyTypes[t];
     }
     /// set cert file type
-    void setCertType(string t) pure {
+    void setCertType(string t) @safe pure nothrow {
         _certType = cast(filetype)sslKeyTypes[t];
     }
 }

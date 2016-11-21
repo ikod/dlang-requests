@@ -310,8 +310,8 @@ Request() properties you can read:
 | contentReceived  | long           | content recived                                     |
 
 #### Streaming server response ####
-With *useStreaming* you can lazily receive response body as input range.
-contentLength and contentReceived can be used to monitor streaming response:
+With *useStreaming* you can receive response body as input range.
+contentLength and contentReceived can be used to monitor progress:
 
 ```d
 import std.stdio;
@@ -421,7 +421,7 @@ void main() {
 }
 ```
 #### vibe.d ####
-You can safely use *requests* with vibe.d. When *requests* compiled with support for vibe.d sockets, each call to *requests* API can block only current fiber, not thread:
+You can safely use *requests* with vibe.d. When *requests* compiled with support for vibe.d sockets (--config=vibed), each call to *requests* API can block only current fiber, not thread:
 ```d
 import requests, vibe.d;
 
@@ -481,6 +481,30 @@ Output:
 ...
 ```
 #### SSL settings ####
+
+HTTP requests can be configured for SSL options: you can enable or disable remote server certificate verification, set key and certificate to use for authorizing to remote server:
+
+```d
+import std.stdio;
+import requests;
+import std.experimental.logger;
+
+void main() {
+    globalLogLevel(LogLevel.trace);
+    auto rq = Request();
+    rq.sslSetVerifyPeer(true); // enable peer verification
+    rq.sslSetKeyFile("client01.key"); // set key file
+    rq.sslSetCertFile("client01.crt"); // set cert file
+    auto rs = rq.get("https://httpbin.org/");
+    writeln(rs.code);
+    writeln(rs.responseBody);
+}
+```
+Please note that with vibe.d you have to add call
+```d
+rq.sslSetCaCert("/opt/local/etc/openssl/cert.pem");
+```
+with path to CA cert file(location may differ for different OS or openssl packaging).
 
 ### FTP requests ###
 

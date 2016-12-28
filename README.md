@@ -274,7 +274,7 @@ rq.keepAlive = false;
 
 For anything other than default, you can configure *Request* structure for keep-alive, redirects handling, add/remove headers, set io-buffer size and maximum size of response headers and body.
 
-For example to authorize with Basic authorization use next code:
+For example to authorize with Basic authorization use next code (works both for http and ftp url's):
 ```d
 rq = Request();
 rq.authenticator = new BasicAuthentication("user", "passwd");

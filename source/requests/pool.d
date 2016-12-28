@@ -425,7 +425,7 @@ unittest {
         scope(exit) {
             server.stop();
         }
-        string httpbinurl = "http://0.0.0.0:8081";
+        string httpbinurl = "http://127.0.0.1:8081";
         Job[] jobs = [
             Job(httpbinurl ~ "/get").addHeaders([
                                 "X-Header": "X-Value",

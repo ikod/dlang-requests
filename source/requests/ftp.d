@@ -28,6 +28,30 @@ public class FTPServerResponseError: Exception {
 public class FTPResponse : Response {
 }
 
+public class FtpAuthentication: Auth {
+    private {
+        string   _username, _password;
+    }
+    /// Constructor.
+    /// Params:
+    /// username = username
+    /// password = password
+    ///
+    this(string username, string password) {
+        _username = username;
+        _password = password;
+    }
+    override string userName() {
+        return _username;
+    }
+    override string password() {
+        return _password;
+    }
+    override string[string] authHeaders(string domain) {
+        return null;
+    }
+}
+
 enum defaultBufferSize = 8192;
 
 public struct FTPRequest {
@@ -43,6 +67,7 @@ public struct FTPRequest {
         string[]      _responseHistory;
         FTPResponse   _response;
         bool          _useStreaming;
+        Auth           _authenticator;
     }
     mixin(Getter_Setter!Duration("timeout"));
     mixin(Getter_Setter!uint("verbosity"));
@@ -51,6 +76,7 @@ public struct FTPRequest {
     mixin(Getter_Setter!bool("useStreaming"));
     mixin(Getter!long("contentLength"));
     mixin(Getter!long("contentReceived"));
+    mixin(Setter!Auth("authenticator"));
 
     @property final string[] responseHistory() @safe @nogc nothrow {
         return _responseHistory;
@@ -191,8 +217,15 @@ public struct FTPRequest {
                 return _response;
             }
             // Log in
-            string user = _uri.username.length ? _uri.username : "anonymous";
-            string pass = _uri.password.length ? _uri.password : "requests@";
+            string user, pass;
+            if ( _authenticator ) {
+                user = _authenticator.userName();
+                pass = _authenticator.password();
+            }
+            else{
+                user = _uri.username.length ? _uri.username : "anonymous";
+                pass = _uri.password.length ? _uri.password : "requests@";
+            }
             debug(requests) tracef("Use %s:%s%s as username:password", user, pass[0], replicate("-", pass.length-1));
             
             code = sendCmdGetResponse("USER " ~ user ~ "\r\n");
@@ -344,8 +377,15 @@ public struct FTPRequest {
                 return _response;
             }
             // Log in
-            string user = _uri.username.length ? _uri.username : "anonymous";
-            string pass = _uri.password.length ? _uri.password : "requests@";
+            string user, pass;
+            if ( _authenticator ) {
+                user = _authenticator.userName();
+                pass = _authenticator.password();
+            }
+            else{
+                user = _uri.username.length ? _uri.username : "anonymous";
+                pass = _uri.password.length ? _uri.password : "requests@";
+            }
             debug(requests) tracef("Use %s:%s%s as username:password", user, pass[0], replicate("-", pass.length-1));
             
             code = sendCmdGetResponse("USER " ~ user ~ "\r\n");
@@ -537,6 +577,10 @@ package unittest {
     rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "another test, ignore please\n".representation);
     assert(rs.code == 226);
     info("ftp get  ", "ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
+    rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
+    assert(rs.code == 226);
+    info("ftp get  ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT with authenticator");
+    rq.authenticator = new FtpAuthentication("anonymous", "requests@");
     rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
     assert(rs.code == 226);
     assert(rs.finalURI.path == "/pub/FreeBSD/README.TXT");

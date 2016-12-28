@@ -29,9 +29,6 @@ public class MaxRedirectsException: Exception {
     }
 }
 
-public interface Auth {
-    string[string] authHeaders(string domain);
-}
 /**
  * Basic authentication.
  * Adds $(B Authorization: Basic) header to request.
@@ -57,6 +54,12 @@ public class BasicAuthentication: Auth {
         string[string] auth;
         auth["Authorization"] = "Basic " ~ to!string(Base64.encode(cast(ubyte[])"%s:%s".format(_username, _password)));
         return auth;
+    }
+    override string userName() {
+        return _username;
+    }
+    override string password() {
+        return _password;
     }
 }
 ///
@@ -347,7 +350,9 @@ public struct HTTPRequest {
         _bodyDecoder = null;
         _unChunker = null;
     }
-
+    void clearHeaders() {
+        _headers = null;
+    }
     @property void uri(in URI newURI) {
         handleURLChange(_uri, newURI);
         _uri = newURI;
@@ -1128,13 +1133,15 @@ public struct HTTPRequest {
 
         Appender!string req;
 
-        if ( ["POST", "PUT"].canFind(_method) && params ) {
-            encoded = params2query(params);
-            h["Content-Type"] = "application/x-www-form-urlencoded";
-            h["Content-Length"] = to!string(encoded.length);
-            req.put(requestString());
-        } else {
-            req.put(requestString(params));
+        switch (_method) {
+            case "POST","PUT":
+                encoded = params2query(params);
+                h["Content-Type"] = "application/x-www-form-urlencoded";
+                h["Content-Length"] = to!string(encoded.length);
+                req.put(requestString());
+                break;
+            default:
+                req.put(requestString(params));
         }
 
         h.byKeyValue.

@@ -16,7 +16,7 @@ This library can either use the standard std.socket library or [vibe.d](http://v
 
 ```json
 "dependencies": {
-    "requests": "~>0.1.9"
+    "requests": "~>0.3.2"
 },
 "subConfigurations": {
     "requests": "vibed"
@@ -599,3 +599,80 @@ void main()
   "url": "http://httpbin.org/put?exampleTitle=PUT content"
 }
 ```
+
+#### Requests Pool ####
+
+When you have a large number of requests to execute, you can use request pool to speed things up.
+
+Pool is fixed set of worker threads, receiving request *Job*'s, and returing *Result*'s.
+
+Each Job can be configured for URL, method, data (for POST requests) and some other parameters.
+
+Pool act as parallel map from Jobs to Results - consume InputRange of *Job*'s, and produce *InputRange* of *Result*'s as fast as it can.
+
+It is important to note that Pool do not preserve result order. If you need somehow tie jobs and results, you can use Job's *opaque* field.
+
+Here is sample of usage:
+
+```d
+    Job[] jobs = [
+        Job("http://httpbin.org/get").addHeaders([
+                            "X-Header": "X-Value",
+                            "Y-Header": "Y-Value"
+                        ]),
+        Job("http://httpbin.org/gzip"),
+        Job("http://httpbin.org/deflate"),
+        Job("http://httpbin.org/absolute-redirect/3")
+                .maxRedirects(2),                   // limit redirects
+        Job("http://httpbin.org/range/1024"),
+        Job("http://httpbin.org/post")
+                .method("POST")                     // change default GET to POST
+                .data("test".representation())      // attach data for POST
+                .opaque("id".representation),       // opaque data - you will receive the same in Result
+        Job("http://httpbin.org/delay/3")
+                .timeout(1.seconds),                // set timeout to 1.seconds - this request will throw exception and fails
+        Job("http://httpbin.org/stream/1024"),
+        Job("ftp://speedtest.tele2.net/1KB.zip"),   // ftp requests too
+    ];
+
+    auto count = jobs.
+        pool(5).
+        filter!(r => r.code==200).
+        count();
+
+    assert(count == jobs.length - 2, "failed");
+    // generate post data from input range
+    // and process in 10 workers pool
+    iota(20)
+        .map!(n => Job("http://httpbin.org/post")
+                        .data("%d".format(n).representation))
+        .pool(10)
+        .each!(r => assert(r.code==200));
+
+```
+
+*Job* methods
+
+| name        | parameter type           | description           |
+|-------------|--------------------------|-----------------------|
+| method      | *string* "GET" or "POST" | request method        |
+| data        | immutable(ubyte)[]       | data for POST request |
+| timeout     | Duration                 | timeout for netw.io   |
+| maxRedirects| uint                     | max N of redirects    |
+| opaque      | immutable(ubyte)[]       | opaque data           |
+| addHeaders  | string[string]           | headers to add to rq  |
+
+*Result* fields
+
+| name   | type             | description          |
+|--------|------------------|----------------------|
+| flags  | uint             | or'ed flags          |
+| code   |ushort            | response code        |
+| data   |immutable(ubyte)[]| response body        |
+| opaque |immutable(ubyte)[]| opaque data from job |
+
+### Pool limitations ###
+
+1. currently it doesn't work under vibe.d - use vibe.d parallelisation
+1. it limits you in tuning request (e.g. you can add authorization only through addHeaders, you can't tune SSL parameters, etc)
+1. *Job* and *Result* *data* are immutable byte arrays (as we use send/receive for data exchange)

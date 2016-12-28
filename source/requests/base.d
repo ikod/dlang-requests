@@ -4,6 +4,12 @@ import requests.streams;
 import requests.utils;
 import requests.uri;
 
+public interface Auth {
+    string[string] authHeaders(string domain);
+    string         userName();
+    string         password();
+}
+
 public class RequestException: Exception {
     this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
         super(msg, file, line, next);

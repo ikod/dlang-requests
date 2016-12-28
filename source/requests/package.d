@@ -357,14 +357,14 @@ package unittest {
     globalLogLevel(LogLevel.info);
 
     /// ftp upload from range
-    info("Test postContent ftp");
-    auto r = postContent("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
-    assert(r.length == 0);
-
     info("Test getContent(ftp)");
-    r = getContent("ftp://speedtest.tele2.net/1KB.zip");
+    auto r = getContent("ftp://speedtest.tele2.net/1KB.zip");
     assert(r.length == 1024);
     
+    info("Test postContent ftp");
+    r = postContent("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
+    assert(r.length == 0);
+
     info("Test receiveAsRange with GET(ftp)");
     ubyte[] streamedContent;
     auto rq = Request();

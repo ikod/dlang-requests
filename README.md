@@ -651,13 +651,98 @@ Here is sample of usage:
 
 ```
 
+One more example, with more features combined:
+
+```d
+import requests;
+import std.stdio;
+import std.string;
+
+void main() {
+    Job[] jobs_array = [
+        Job("http://0.0.0.0:9998/3"),
+        Job("http://httpbin.org/post").method("POST").data("test".representation()).addHeaders(["a":"b"]),
+        Job("http://httpbin.org/post", Job.Method.POST, "test".representation()).opaque([1,2,3]),
+        Job("http://httpbin.org/absolute-redirect/4").maxRedirects(2),
+    ];
+    auto p = pool(jobs_array, 10);
+    while(!p.empty) {
+        auto r = p.front;
+        p.popFront;
+        switch(r.flags) {
+        case Result.OK:
+            writeln(r.code);
+            writeln(cast(string)r.data);
+            writeln(r.opaque);
+            break;
+        case Result.EXCEPTION:
+            writefln("Exception: %s", cast(string)r.data);
+            break;
+        default:
+            continue;
+        }
+        writeln("---");
+    }
+}
+
+Output:
+
+2016-12-29T10:22:00.861:streams.d:connect:973 Failed to connect to 0.0.0.0:9998(0.0.0.0:9998): Unable to connect socket: Connection refused
+2016-12-29T10:22:00.861:streams.d:connect:973 Failed to connect to 0.0.0.0:9998(0.0.0.0:9998): Unable to connect socket: Connection refused
+Exception: Can't connect to 0.0.0.0:9998
+---
+200
+{
+  "args": {},
+  "data": "test",
+  "files": {},
+  "form": {},
+  "headers": {
+    "A": "b",
+    "Accept-Encoding": "gzip, deflate",
+    "Content-Length": "4",
+    "Content-Type": "application/octet-stream",
+    "Host": "httpbin.org",
+    "User-Agent": "dlang-requests"
+  },
+  "json": null,
+  "origin": "xxx.xxx.xxx.xxx",
+  "url": "http://httpbin.org/post"
+}
+
+[]
+---
+200
+{
+  "args": {},
+  "data": "test",
+  "files": {},
+  "form": {},
+  "headers": {
+    "Accept-Encoding": "gzip, deflate",
+    "Content-Length": "4",
+    "Content-Type": "application/octet-stream",
+    "Host": "httpbin.org",
+    "User-Agent": "dlang-requests"
+  },
+  "json": null,
+  "origin": "xxx.xxx.xxx.xxx",
+  "url": "http://httpbin.org/post"
+}
+
+[1, 2, 3]
+---
+Exception: 2 redirects reached maxRedirects 2.
+---
+```
+
 *Job* methods
 
 | name        | parameter type           | description           |
 |-------------|--------------------------|-----------------------|
 | method      | *string* "GET" or "POST" | request method        |
 | data        | immutable(ubyte)[]       | data for POST request |
-| timeout     | Duration                 | timeout for netw.io   |
+| timeout     | Duration                 | timeout for network io|
 | maxRedirects| uint                     | max N of redirects    |
 | opaque      | immutable(ubyte)[]       | opaque data           |
 | addHeaders  | string[string]           | headers to add to rq  |
@@ -666,7 +751,7 @@ Here is sample of usage:
 
 | name   | type             | description          |
 |--------|------------------|----------------------|
-| flags  | uint             | or'ed flags          |
+| flags  | uint             | flags  (OK,EXCEPTION)|
 | code   |ushort            | response code        |
 | data   |immutable(ubyte)[]| response body        |
 | opaque |immutable(ubyte)[]| opaque data from job |

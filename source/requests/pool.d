@@ -410,6 +410,7 @@ public:
 }
 
 Pool!R pool(R)(R r, uint w) {
+    enforce(w>0, "Number of workers must me > 0");
     return Pool!R(r, w);
 }
 

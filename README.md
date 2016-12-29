@@ -521,10 +521,11 @@ import requests;
 void main() {
     auto rq = Request();
     rq.verbosity = 3;
+    rq.authenticator = new BasicAuthentication("login", "password");
     auto f = File("test.txt", "rb");
-    auto rs = rq.post("ftp://login:password@example.com/test.txt", f.byChunk(1024));
+    auto rs = rq.post("ftp://example.com/test.txt", f.byChunk(1024));
     writeln(rs.code);
-    rs = rq.get("ftp://login:password@example.com/test.txt");
+    rs = rq.get("ftp://@example.com/test.txt");
     writeln(rs.code);
 }
 ```

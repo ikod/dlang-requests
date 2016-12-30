@@ -24,14 +24,17 @@ struct Job {
         GET,
         POST,
     };
-    string              _url;
-    Method              _method = Method.GET;
-    immutable(ubyte)[]  _data;                  // data for post
-    immutable(ubyte)[]  _opaque;                // opaque data tie request and response
-    uint                _maxRedirects = 10;
-    Duration            _timeout = 30.seconds;
-    immutable(string)[] _headers_h;
-    immutable(string)[] _headers_v;
+
+    package {
+        string              _url;
+        Method              _method = Method.GET;
+        immutable(ubyte)[]  _data;                  // data for post
+        immutable(ubyte)[]  _opaque;                // opaque data tie request and response
+        uint                _maxRedirects = 10;
+        Duration            _timeout = 30.seconds;
+        immutable(string)[] _headers_h;
+        immutable(string)[] _headers_v;
+    }
 
     auto method(Method m) {
         _method = m;
@@ -81,10 +84,24 @@ struct Result {
         QUIT = 2,
         EXCEPTION = 4
     }
-    uint                flags;
-    ushort              code;
-    immutable(ubyte)[]  data;       // response body
-    immutable(ubyte)[]  opaque;     // opaque data tie request and response
+    package {
+        uint                _flags;
+        ushort              _code;
+        immutable(ubyte)[]  _data;       // response body
+        immutable(ubyte)[]  _opaque;     // opaque data tie request and response
+    }
+    auto flags() pure @nogc {
+        return _flags;
+    }
+    auto code() pure @nogc {
+        return _code;
+    }
+    auto data() pure @nogc {
+        return _data;
+    }
+    auto opaque() pure @nogc {
+        return _opaque;
+    }
 }
 
 struct Quit {
@@ -258,7 +275,7 @@ public:
     void popFront()
     in
     {
-        assert(_m._busy.length > 0 || _m._range.empty);
+        assert(_m._busy.length > 0 || _m._range.empty || _m._result.isNull);
         assert(_m._busy.length + _m._idle.length <= _m._workers);
     }
     body
@@ -267,7 +284,10 @@ public:
         Nullable!Tid  idle;
         bool result_ready = false;
         debug(requests) tracef("busy: %d, idle: %d, workers: %d", _m._busy.length, _m._idle.length, _m._workers);
-        
+        if ( _m._result.isNull ) {
+            // case when popFront called without front
+            front;
+        }
         if ( _m._busy.length > 0 ) {
             receive(
                 (Tid t, Result r) {
@@ -277,7 +297,7 @@ public:
                     result_ready = true;
                     if ( ! _m.boxIsEmpty(t) ) {
                         Job j = _m._box[t];
-                        assert(Route(j._url) == _m._busy[t]);
+                        assert(Route(j._url) == _m._busy[t], "wrong route");
                         debug(requests) tracef("send job %s from the box", j._url);
                         // have job with the same route, worker is still busy
                         _m._box[t] = Job.init;

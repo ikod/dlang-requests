@@ -4,6 +4,10 @@ import requests.streams;
 import requests.utils;
 import requests.uri;
 
+import std.format;
+import std.datetime;
+import core.time;
+
 public interface Auth {
     string[string] authHeaders(string domain);
     string         userName();
@@ -49,6 +53,10 @@ public class Response {
         /// Final URI. Can differ from __URI if request go through redirections.
         URI              _finalURI;
         ReceiveAsRange   _receiveAsRange;
+        SysTime          _startedAt,
+                         _connectedAt,
+                         _requestSentAt,
+                         _finishedAt;
         mixin(Setter!ushort("code"));
         mixin(Setter!URI("uri"));
         mixin(Setter!URI("finalURI"));
@@ -64,5 +72,51 @@ public class Response {
     }
     @property auto ref receiveAsRange() pure @safe nothrow {
         return _receiveAsRange;
+    }
+    override string toString() const {
+        return "Response(%d, %s)".format(_code, _uri.uri());
+    }
+    string format(string fmt) const {
+        import std.array;
+        auto a = appender!string();
+        auto f = FormatSpec!char(fmt);
+        while (f.writeUpToNextSpec(a)) {
+            switch (f.spec) {
+                case 'h':
+                    // Remote hostname.
+                    a.put(_uri.host);
+                    break;
+                case 'p':
+                    // Remote port.
+                    a.put("%d".format(_uri.port));
+                    break;
+                case 'P':
+                    // Path.
+                    a.put(_uri.path);
+                    break;
+                case 'q':
+                    // query parameters supplied with url.
+                    a.put(_uri.query);
+                    break;
+                case 's':
+                    a.put("Response(%d, %s)".format(_code, _uri.uri()));
+                    break;
+                case 'B': // received bytes
+                    a.put("%d".format(_responseBody.length));
+                    break;
+                case 'T': // request total time, ms
+                    a.put("%d".format((_finishedAt - _startedAt).total!"msecs"));
+                    break;
+                case 'U':
+                    a.put(_uri.uri());
+                    break;
+                case 'S':
+                    a.put("%d".format(_code));
+                    break;
+                default:
+                    throw new FormatException("Unknown Response format specifier: %" ~ f.spec);
+            }
+        }
+        return a.data();
     }
 }

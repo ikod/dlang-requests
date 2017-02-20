@@ -99,7 +99,6 @@ public class HTTPResponse : Response {
         string         _status_line;
 
         HTTPResponse[] _history; // redirects history
-        SysTime        _startedAt, _connectedAt, _requestSentAt, _finishedAt;
 
         mixin(Setter!string("status_line"));
     }
@@ -350,6 +349,45 @@ public struct HTTPRequest {
         _bodyDecoder = null;
         _unChunker = null;
     }
+    string toString() const {
+        return "HTTPRequest(%s, %s)".format(_method, _uri.uri());
+    }
+    string format(string fmt) const {
+        import std.array;
+        import std.stdio;
+        auto a = appender!string();
+        auto f = FormatSpec!char(fmt);
+        while (f.writeUpToNextSpec(a)) {
+            switch(f.spec) {
+                case 'h':
+                    // Remote hostname.
+                    a.put(_uri.host);
+                    break;
+                case 'm':
+                    // method.
+                    a.put(_method);
+                    break;
+                case 'p':
+                    // Remote port.
+                    a.put("%d".format(_uri.port));
+                    break;
+                case 'P':
+                    // Path
+                    a.put(_uri.path);
+                    break;
+                case 'q':
+                    // query parameters supplied with url.
+                    a.put(_uri.query);
+                    break;
+                case 'U':
+                    a.put(_uri.uri());
+                    break;
+                default:
+                    throw new FormatException("Unknown Request format spec " ~ f.spec);
+            }
+        }
+        return a.data();
+    }
     void clearHeaders() {
         _headers = null;
     }
@@ -415,7 +453,7 @@ public struct HTTPRequest {
         }
         auto query = _uri.query.dup;
         if ( params ) {
-            query ~= params2query(params);
+            query ~= "&" ~ params2query(params);
             if ( query[0] != '?' ) {
                 query = "?" ~ query;
             }
@@ -1328,10 +1366,13 @@ package unittest {
     HTTPRequest  rq;
     HTTPResponse rs;
     info("Check GET");
+    URI uri = URI(httpbinUrl);
     rs = rq.get(httpbinUrl);
     assert(rs.code==200);
     assert(rs.responseBody.length > 0);
-
+    assert(rq.format("%m|%h|%p|%P|%q|%U") ==
+            "GET|%s|%d|%s||%s"
+            .format(uri.host, uri.port, uri.path, httpbinUrl));
     info("Check GET with AA params");
     {
         rs = HTTPRequest().get(httpbinUrl ~ "get", ["c":" d", "a":"b"]);

@@ -68,6 +68,7 @@ public struct FTPRequest {
         FTPResponse   _response;
         bool          _useStreaming;
         Auth           _authenticator;
+        string        _method;
     }
     mixin(Getter_Setter!Duration("timeout"));
     mixin(Getter_Setter!uint("verbosity"));
@@ -94,7 +95,45 @@ public struct FTPRequest {
             _controlChannel.close();
         }
     }
-
+    string toString() const {
+        return "FTPRequest(%s, %s)".format(_method, _uri.uri());
+    }
+    string format(string fmt) const {
+        import std.array;
+        import std.stdio;
+        auto a = appender!string();
+        auto f = FormatSpec!char(fmt);
+        while (f.writeUpToNextSpec(a)) {
+            switch(f.spec) {
+                case 'h':
+                    // Remote hostname.
+                    a.put(_uri.host);
+                    break;
+                case 'm':
+                    // method.
+                    a.put(_method);
+                    break;
+                case 'p':
+                    // Remote port.
+                    a.put("%d".format(_uri.port));
+                    break;
+                case 'P':
+                    // Path
+                    a.put(_uri.path);
+                    break;
+                case 'q':
+                    // query parameters supplied with url.
+                    a.put(_uri.query);
+                    break;
+                case 'U':
+                    a.put(_uri.uri());
+                    break;
+                default:
+                    throw new FormatException("Unknown Request format spec " ~ f.spec);
+            }
+        }
+        return a.data();
+    }
     ushort sendCmdGetResponse(string cmd) {
         debug(requests) tracef("cmd to server: %s", cmd.strip);
         if ( _verbosity >=1 ) {
@@ -196,6 +235,12 @@ public struct FTPRequest {
         ushort code;
 
         _response = new FTPResponse;
+        _response._startedAt = Clock.currTime;
+        _method = "POST";
+
+        scope(exit) {
+            _response._finishedAt = Clock.currTime;
+        }
 
         if ( uri ) {
             handleChangeURI(uri);
@@ -285,7 +330,7 @@ public struct FTPRequest {
         try {
             ubyte a1,a2,a3,a4,p1,p2;
             formattedRead(v, "%d,%d,%d,%d,%d,%d", &a1, &a2, &a3, &a4, &p1, &p2);
-            host = format("%d.%d.%d.%d", a1, a2, a3, a4);
+            host = std.format.format("%d.%d.%d.%d", a1, a2, a3, a4);
             port = (p1<<8) + p2;
         } catch (FormatException e) {
             error("Failed to parse ", v);
@@ -356,6 +401,12 @@ public struct FTPRequest {
 
         _response = new FTPResponse;
         _contentReceived = 0;
+        _method = "GET";
+
+        _response._startedAt = Clock.currTime;
+        scope(exit) {
+            _response._finishedAt = Clock.currTime;
+        }
 
         if ( uri ) {
             handleChangeURI(uri);
@@ -367,6 +418,7 @@ public struct FTPRequest {
         if ( !_controlChannel ) {
             _controlChannel = new TCPStream();
             _controlChannel.connect(_uri.host, _uri.port, _timeout);
+            _response._connectedAt = Clock.currTime;
             response = serverResponse();
             _responseHistory ~= response;
             
@@ -400,7 +452,9 @@ public struct FTPRequest {
                     return _response;
                 }
             }
-
+        }
+        else {
+            _response._connectedAt = Clock.currTime;
         }
 
         code = sendCmdGetResponse("PWD\r\n");
@@ -466,7 +520,7 @@ public struct FTPRequest {
         try {
             ubyte a1,a2,a3,a4,p1,p2;
             formattedRead(v, "%d,%d,%d,%d,%d,%d", &a1, &a2, &a3, &a4, &p1, &p2);
-            host = format("%d.%d.%d.%d", a1, a2, a3, a4);
+            host = std.format.format("%d.%d.%d.%d", a1, a2, a3, a4);
             port = (p1<<8) + p2;
         } catch (FormatException e) {
             error("Failed to parse ", v);
@@ -584,5 +638,7 @@ package unittest {
     rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
     assert(rs.code == 226);
     assert(rs.finalURI.path == "/pub/FreeBSD/README.TXT");
+    assert(rq.format("%m|%h|%p|%P|%q|%U") == "GET|ftp.iij.ad.jp|21|/pub/FreeBSD/README.TXT||ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
+    assert(rs.format("%h|%p|%P|%q|%U") == "ftp.iij.ad.jp|21|/pub/FreeBSD/README.TXT||ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
     info("testing ftp - done.");
 }

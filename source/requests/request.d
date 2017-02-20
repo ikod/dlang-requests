@@ -8,6 +8,7 @@ import requests.uri;
 import std.datetime;
 import std.conv;
 import std.experimental.logger;
+import std.format;
 import requests.utils;
 
 
@@ -21,11 +22,12 @@ public struct Request {
         URI         _uri;
         HTTPRequest _http;  // route all http/https requests here
         FTPRequest  _ftp;   // route all ftp requests here
+        string      _method;
     }
     /// Set timeout on IO operation.
     /// $(B v) - timeout value
     /// 
-    public @property void timeout(Duration v) pure @nogc nothrow {
+    @property void timeout(Duration v) pure @nogc nothrow {
         _http.timeout = v;
         _ftp.timeout = v;
     }
@@ -141,6 +143,7 @@ public struct Request {
         if ( uri ) {
             _uri = URI(uri);
         }
+        _method = "GET";
         final switch ( _uri.scheme ) {
             case "http", "https":
                 _http.uri = _uri;
@@ -165,6 +168,7 @@ public struct Request {
         if ( uri ) {
             _uri = URI(uri);
         }
+        _method = "POST";
         final switch ( _uri.scheme ) {
             case "http", "https":
                 _http.uri = _uri;
@@ -181,7 +185,22 @@ public struct Request {
                 }
         }
     }
-    Response exec(string method="GET", A...)(A args) {
-        return _http.exec!(method)(args);
+    Response exec(string method="GET", A...)(string uri, A args) {
+        _method = method;
+        _uri = URI(uri);
+        _http.uri = _uri;
+        return _http.exec!(method)(null, args);
+    }
+
+    string toString() const {
+        return "Request(%s, %s)".format(_method, _uri.uri());
+    }
+    string format(string fmt) const {
+        final switch(_uri.scheme) {
+            case "http", "https":
+                return _http.format(fmt);
+            case "ftp":
+                return _ftp.format(fmt);
+        }
     }
 }

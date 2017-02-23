@@ -69,10 +69,10 @@ public class DataPipe(E) : DataPipeIface!E {
     /// Append data processor to pipeline
     /// Params:
     /// p = processor
-    void insert(DataPipeIface!E p) {
+    final void insert(DataPipeIface!E p) {
         pipe ~= p;
     }
-    E[][] process(DataPipeIface!E p, E[][] data) {
+    final E[][] process(DataPipeIface!E p, E[][] data) {
         E[][] result;
         data.each!(e => p.putNoCopy(e));
         while(!p.empty()) result ~= p.get();
@@ -82,7 +82,7 @@ public class DataPipe(E) : DataPipeIface!E {
     /// Params:
     /// data = input data buffer.
     /// NoCopy means we do not copy data to buffer, we keep reference
-    void putNoCopy(E[] data) {
+    final void putNoCopy(E[] data) {
         if ( pipe.empty ) {
             buffer.putNoCopy(data);
             return;
@@ -101,7 +101,7 @@ public class DataPipe(E) : DataPipeIface!E {
     /// Get what was collected in internal buffer and clear it. 
     /// Returns:
     /// data collected.
-    E[] get() {
+    final E[] get() {
         if ( buffer.empty ) {
             return E[].init;
         }
@@ -112,7 +112,7 @@ public class DataPipe(E) : DataPipeIface!E {
     ///
     /// get without datamove. but user receive [][]
     /// 
-    E[][] getNoCopy()  {
+    final E[][] getNoCopy()  {
         if ( buffer.empty ) {
             return E[][].init;
         }
@@ -123,10 +123,10 @@ public class DataPipe(E) : DataPipeIface!E {
     /// Test if internal buffer is empty
     /// Returns:
     /// true if internal buffer is empty (nothing to get())
-    bool empty() pure const @safe {
+    final bool empty() pure const @safe {
         return buffer.empty;
     }
-    void flush() {
+    final void flush() {
         E[][] product;
         foreach(ref p; pipe) {
             product.each!(e => p.putNoCopy(e));
@@ -151,37 +151,37 @@ public class Decompressor(E) : DataPipeIface!E {
         __buff = Buffer!ubyte();
         __zlib = new UnCompress();
     }
-    override void putNoCopy(E[] data) {
+    final override void putNoCopy(E[] data) {
         if ( __zlib is null  ) {
             __zlib = new UnCompress();
         }
         __buff.putNoCopy(__zlib.uncompress(data));
     }
-    override E[] get() pure {
+    final override E[] get() pure {
         assert(__buff.length);
         auto r = __buff.__repr.__buffer[0];
         __buff.popFrontN(r.length);
         return cast(E[])r;
     }
-    override void flush() {
+    final override void flush() {
         if ( __zlib is null  ) {
             return;
         }
         __buff.put(__zlib.flush());
     }
-    override @property bool empty() const pure @safe {
+    final override @property bool empty() const pure @safe {
         debug(requests) tracef("empty=%b", __buff.empty);
         return __buff.empty;
     }
-    @property auto ref front() pure const @safe {
+    final @property auto ref front() pure const @safe {
         debug(requests) tracef("front: buff length=%d", __buff.length);
         return __buff.front;
     }
-    @property auto popFront() pure @safe {
+    final @property auto popFront() pure @safe {
         debug(requests) tracef("popFront: buff length=%d", __buff.length);
         return __buff.popFront;
     }
-    @property void popFrontN(size_t n) pure @safe {
+    final @property void popFrontN(size_t n) pure @safe {
         __buff.popFrontN(n);
     }
 }
@@ -232,7 +232,7 @@ public class DecodeChunked : DataPipeIface!ubyte {
         Buffer!ubyte buff;
         ubyte[]      linebuff;
     }
-    void putNoCopy(eType[] data) {
+    final void putNoCopy(eType[] data) {
         while ( data.length ) {
             if ( state == States.trailer ) {
                 to_receive = to_receive - min(to_receive, data.length);
@@ -295,18 +295,18 @@ public class DecodeChunked : DataPipeIface!ubyte {
             }
         }
     }
-    eType[] get() {
+    final eType[] get() {
         auto r = buff.__repr.__buffer[0];
         buff.popFrontN(r.length);
         return r;
     }
-    void flush() {
+    final void flush() {
     }
-    bool empty() {
+    final bool empty() {
         debug(requests) tracef("empty=%b", buff.empty);
         return buff.empty;
     }
-    bool done() {
+    final bool done() {
         return state==States.trailer && to_receive==0;
     }
 }

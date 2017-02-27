@@ -17,7 +17,9 @@ import std.datetime;
 import std.socket;
 import core.stdc.errno;
 
-alias InDataHandler = DataPipeIface!ubyte;
+import requests.buffer;
+
+alias InDataHandler = DataPipeIface;
 
 public class ConnectError: Exception {
     this(string message, string file =__FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
@@ -46,45 +48,50 @@ public class NetworkException: Exception {
 /**
  * DataPipeIface can accept some data, process, and return processed data.
  */
-public interface DataPipeIface(E) {
+public interface DataPipeIface {
     /// Is there any processed data ready for reading?
     bool empty();
     /// Put next data portion for processing
     //void put(E[]);
-    void putNoCopy(E[]);
+    void put(in BufferChunk);
     /// Get any ready data
-    E[] get();
+    BufferChunk get();
     /// Signal on end of incoming data stream.
     void flush();
 }
+
 /**
  * DataPipe is a pipeline of data processors, each accept some data, process it, and put result to next element in line.
  * This class used to combine different Transfer- and Content- encodings. For example: unchunk transfer-encoding "chunnked",
  * and uncompress Content-Encoding "gzip".
  */
-public class DataPipe(E) : DataPipeIface!E {
+public class DataPipe : DataPipeIface {
 
-    DataPipeIface!(E)[]  pipe;
-    Buffer!E             buffer;
+    DataPipeIface[] pipe;
+    Buffer          buffer;
     /// Append data processor to pipeline
     /// Params:
     /// p = processor
-    final void insert(DataPipeIface!E p) {
+
+    final void insert(DataPipeIface p) {
         pipe ~= p;
     }
-    final E[][] process(DataPipeIface!E p, E[][] data) {
-        E[][] result;
-        data.each!(e => p.putNoCopy(e));
-        while(!p.empty()) result ~= p.get();
+
+    final BufferChunk[] process(DataPipeIface p, BufferChunk[] data) {
+        BufferChunk[] result;
+        data.each!(e => p.put(e));
+        while(!p.empty()) {
+            result ~= p.get();
+        }
         return result;
     }
     /// Process next data portion. Data passed over pipeline and store result in buffer.
     /// Params:
     /// data = input data buffer.
     /// NoCopy means we do not copy data to buffer, we keep reference
-    final void putNoCopy(E[] data) {
+    final void put(in BufferChunk data) {
         if ( pipe.empty ) {
-            buffer.putNoCopy(data);
+            buffer.put(data);
             return;
         }
         try {
@@ -92,7 +99,12 @@ public class DataPipe(E) : DataPipeIface!E {
             foreach(ref p; pipe[1..$]) {
                 t = process(p, t);
             }
-            t.each!(b => buffer.putNoCopy(b));
+            while(!t.empty) {
+                auto b = t[0];
+                buffer.put(b);
+                t.popFront();
+            }
+            // t.each!(b => buffer.put(b));
         }
         catch (Exception e) {
             throw new DecodingException(e.msg);
@@ -101,23 +113,21 @@ public class DataPipe(E) : DataPipeIface!E {
     /// Get what was collected in internal buffer and clear it. 
     /// Returns:
     /// data collected.
-    final E[] get() {
+    final BufferChunk get() {
         if ( buffer.empty ) {
-            return E[].init;
+            return BufferChunk.init;
         }
         auto res = buffer.data;
-        buffer = Buffer!E.init;
+        buffer = Buffer.init;
         return res;
     }
+    alias getNoCopy = getChunks;
     ///
     /// get without datamove. but user receive [][]
     /// 
-    final E[][] getNoCopy()  {
-        if ( buffer.empty ) {
-            return E[][].init;
-        }
-        E[][] res = buffer.__repr.__buffer;
-        buffer = Buffer!E.init;
+    final immutable(BufferChunk)[] getChunks()  {
+        auto res = buffer.dataChunks();
+        buffer = Buffer();
         return res;
     }
     /// Test if internal buffer is empty
@@ -127,14 +137,14 @@ public class DataPipe(E) : DataPipeIface!E {
         return buffer.empty;
     }
     final void flush() {
-        E[][] product;
+        BufferChunk[] product;
         foreach(ref p; pipe) {
-            product.each!(e => p.putNoCopy(e));
+            product.each!(e => p.put(e));
             p.flush();
             product.length = 0;
             while( !p.empty ) product ~= p.get();
         }
-        product.each!(b => buffer.putNoCopy(b));
+        product.each!(b => buffer.put(b));
     }
 }
 
@@ -142,32 +152,38 @@ public class DataPipe(E) : DataPipeIface!E {
  * Processor for gzipped/compressed content.
  * Also support InputRange interface.
  */
-public class Decompressor(E) : DataPipeIface!E {
+import std.zlib;
+
+public class Decompressor : DataPipeIface {
     private {
-        Buffer!ubyte __buff;
+        Buffer       __buff;
         UnCompress   __zlib;
     }
     this() {
-        __buff = Buffer!ubyte();
+        __buff = Buffer();
         __zlib = new UnCompress();
     }
-    final override void putNoCopy(E[] data) {
+    final override void put(in BufferChunk data) {
         if ( __zlib is null  ) {
             __zlib = new UnCompress();
         }
-        __buff.putNoCopy(__zlib.uncompress(data));
+        __buff.put(cast(BufferChunk)__zlib.uncompress(data));
     }
-    final override E[] get() pure {
+    final override BufferChunk get() pure {
         assert(__buff.length);
-        auto r = __buff.__repr.__buffer[0];
-        __buff.popFrontN(r.length);
-        return cast(E[])r;
+        // auto r = __buff.__repr.__buffer[0];
+        // __buff.popFrontN(r.length);
+        auto r = __buff.frontChunk();
+        __buff.popFrontChunk();// = __buff._chunks[1..$];
+        //debug(requests) writefln("a: %s", __buff);
+        return cast(BufferChunk)r;
     }
     final override void flush() {
         if ( __zlib is null  ) {
             return;
         }
-        __buff.put(__zlib.flush());
+        auto r = __zlib.flush();
+        __buff.put(cast(immutable(ubyte)[])r);
     }
     final override @property bool empty() const pure @safe {
         debug(requests) tracef("empty=%b", __buff.empty);
@@ -181,15 +197,18 @@ public class Decompressor(E) : DataPipeIface!E {
         debug(requests) tracef("popFront: buff length=%d", __buff.length);
         return __buff.popFront;
     }
-    final @property void popFrontN(size_t n) pure @safe {
-        __buff.popFrontN(n);
+    // final @property void popFrontN(size_t n) pure @safe {
+    //     __buff.popFrontN(n);
+    // }
+    auto data() {
+        return __buff.range();
     }
 }
 
 /**
  * Unchunk chunked http responce body.
  */
-public class DecodeChunked : DataPipeIface!ubyte {
+public class DecodeChunked : DataPipeIface {
     //    length := 0
     //    read chunk-size, chunk-extension (if any) and CRLF
     //    while (chunk-size > 0) {
@@ -229,10 +248,11 @@ public class DecodeChunked : DataPipeIface!ubyte {
         enum         States {huntingSize, huntingSeparator, receiving, trailer};
         char         state = States.huntingSize;
         size_t       chunk_size, to_receive;
-        Buffer!ubyte buff;
+        Buffer       buff;
         ubyte[]      linebuff;
     }
-    final void putNoCopy(eType[] data) {
+    final void put(in BufferChunk in_data) {
+        BufferChunk data = in_data;
         while ( data.length ) {
             if ( state == States.trailer ) {
                 to_receive = to_receive - min(to_receive, data.length);
@@ -271,7 +291,7 @@ public class DecodeChunked : DataPipeIface!ubyte {
             if ( state == States.receiving ) {
                 if (to_receive > 0 ) {
                     auto can_store = min(to_receive, data.length);
-                    buff.putNoCopy(data[0..can_store]);
+                    buff.put(data[0..can_store]);
                     data = data[can_store..$];
                     to_receive -= can_store;
                     //tracef("Unchunked %d bytes from %d", can_store, chunk_size);
@@ -295,10 +315,14 @@ public class DecodeChunked : DataPipeIface!ubyte {
             }
         }
     }
-    final eType[] get() {
-        auto r = buff.__repr.__buffer[0];
-        buff.popFrontN(r.length);
-        return r;
+    final BufferChunk get() {
+        // auto r = buff.__repr.__buffer[0];
+        // buff.popFrontN(r.length);
+        auto r = buff.frontChunk();
+        buff.popFrontChunk();// = __buff._chunks[1..$];
+        //debug(requests) writefln("a: %s", buff);
+        return cast(BufferChunk)r;
+//        return r;
     }
     final void flush() {
     }
@@ -312,56 +336,53 @@ public class DecodeChunked : DataPipeIface!ubyte {
 }
 
 unittest {
-    info("Testing DataPipe");
+    info("Testing Decompressor");
     globalLogLevel(LogLevel.info);
-    alias eType = char;
+    alias eType = immutable(ubyte);
     eType[] gzipped = [
         0x1F, 0x8B, 0x08, 0x00, 0xB1, 0xA3, 0xEA, 0x56,
         0x00, 0x03, 0x4B, 0x4C, 0x4A, 0xE6, 0x4A, 0x49,
         0x4D, 0xE3, 0x02, 0x00, 0x75, 0x0B, 0xB0, 0x88,
         0x08, 0x00, 0x00, 0x00
     ]; // "abc\ndef\n"
-    auto d = new Decompressor!eType();
-    d.putNoCopy(gzipped[0..2].dup);
-    d.putNoCopy(gzipped[2..10].dup);
-    d.putNoCopy(gzipped[10..$].dup);
+    auto d = new Decompressor();
+    d.put(gzipped[0..2]);
+    d.put(gzipped[2..10]);
+    d.put(gzipped[10..$]);
     d.flush();
     assert(equal(d.filter!(a => a!='b'), "ac\ndef\n"));
-
-    auto e = new Decompressor!eType();
-    e.putNoCopy(gzipped[0..10].dup);
-    e.putNoCopy(gzipped[10..$].dup);
+    auto e = new Decompressor();
+    e.put(gzipped[0..10]);
+    e.put(gzipped[10..$]);
     e.flush();
     assert(equal(e.filter!(a => a!='b'), "ac\ndef\n"));
-    //    writeln(gzipped.decompress.filter!(a => a!='b').array);
-    auto dp = new DataPipe!eType;
-    dp.insert(new Decompressor!eType());
-    dp.putNoCopy(gzipped[0..2].dup);
-    dp.putNoCopy(gzipped[2..$].dup);
+
+    info("Testing DataPipe");
+    auto dp = new DataPipe();
+    dp.insert(new Decompressor());
+    dp.put(gzipped[0..2]);
+    dp.put(gzipped[2..$].dup);
     dp.flush();
     assert(equal(dp.get(), "abc\ndef\n"));
-    // empty datapipe shoul just pass input to output
-    auto dpu = new DataPipe!ubyte;
-    dpu.putNoCopy("abcd".dup.representation);
-    dpu.putNoCopy("efgh".dup.representation);
-    dpu.flush();
-    assert(equal(dpu.get(), "abcdefgh"));
+
     info("Test unchunker properties");
-    ubyte[] twoChunks = "2\r\n12\r\n2\r\n34\r\n0\r\n\r\n".dup.representation;
-    ubyte[][] result;
+    BufferChunk twoChunks = "2\r\n12\r\n2\r\n34\r\n0\r\n\r\n".dup.representation;
+    BufferChunk[] result;
     auto uc = new DecodeChunked();
-    uc.putNoCopy(twoChunks);
+    uc.put(twoChunks);
     while(!uc.empty) {
         result ~= uc.get();
     }
-    assert(equal(result[0], ['1', '2']));
-    assert(equal(result[1], ['3', '4']));
+    assert(equal(result[0], "12"));
+    assert(equal(result[1], "34"));
     info("unchunker correctness - ok");
-    result[0][0] = '5';
-    assert(twoChunks[3] == '5');
-    info("unchunker zero copy - ok");
+    //result[0][0] = '5';
+    // assert(twoChunks[3] == '5');
+    // info("unchunker zero copy - ok");
     info("Testing DataPipe - done");
 }
+
+
 /**
  * Buffer used to collect and process data from network. It remainds Appender, but support
  * also Range interface.
@@ -375,264 +396,6 @@ unittest {
 static this() {
 }
 static ~this() {
-}
-enum   CACHESIZE = 1024;
-
-static long reprAlloc;
-static long reprCacheHit;
-static long reprCacheRequests;
-
-
-public struct Buffer(T) {
-//    static Repr[CACHESIZE]  cache;
-//    static uint             cacheIndex;
-
-    private {
-        Repr  cachedOrNew() {
-            return new Repr;
-//            reprCacheRequests++;
-//            if ( false && cacheIndex>0 ) {
-//                reprCacheHit++;
-//                cacheIndex -= 1;
-//                return cache[cacheIndex];
-//            } else {
-//                return new Repr;
-//            }
-        }
-        class Repr {
-            size_t         __length;
-            Unqual!T[][]   __buffer;
-            this() {
-                reprAlloc++;
-                __length = 0;
-            }
-            this(Repr other) {
-                reprAlloc++;
-                if ( other is null )
-                    return;
-                __length = other.__length;
-                __buffer = other.__buffer.dup;
-            }
-        }
-        Repr __repr;
-    }
-    
-    alias toString = data!string;
-    
-    this(this) {
-        if ( !__repr ) {
-            return;
-        }
-        __repr = new Repr(__repr);
-    }
-    this(U)(U[] data) {
-        put(data);
-    }
-    ~this() {
-        __repr = null;
-    }
-    /***************
-     * store data. Data copied
-     */
-    auto put(U)(U[] data) {
-        if ( data.length == 0 ) {
-            return;
-        }
-        if ( !__repr ) {
-            __repr = cachedOrNew();
-        }
-        static if (!is(U == T)) {
-            auto d = cast(T[])(data);
-            __repr.__length += d.length;
-            __repr.__buffer ~= d.dup;
-        } else {
-            __repr.__length += data.length;
-            __repr.__buffer ~= data.dup;
-        }
-        return;
-    }
-    auto putNoCopy(U)(U[] data) {
-        if ( data.length == 0 ) {
-            return;
-        }
-        if ( !__repr ) {
-            __repr = cachedOrNew();
-        }
-        static if (!is(U == T)) {
-            auto d = cast(T[])(data);
-            __repr.__length += d.length;
-            __repr.__buffer ~= d;
-        } else {
-            __repr.__length += data.length;
-            __repr.__buffer ~= data;
-        }
-        return;
-    }
-    @property auto opDollar() const pure @safe {
-        return __repr.__length;
-    }
-    @property auto length() const pure @safe {
-        if ( !__repr ) {
-            return 0;
-        }
-        return __repr.__length;
-    }
-    @property auto empty() const pure @safe {
-        return length == 0;
-    }
-    @property auto ref front() const pure @safe {
-        assert(length);
-        return __repr.__buffer.front.front;
-    }
-    @property auto ref back() const pure @safe {
-        assert(length);
-        return __repr.__buffer.back.back;
-    }
-    @property void popFront() pure @safe {
-        assert(length);
-        with ( __repr ) {
-            __buffer.front.popFront;
-            if ( __buffer.front.length == 0 ) {
-                __buffer.popFront;
-            }
-            __length--;
-        }
-    }
-    @property void popFrontN(size_t n) pure @safe {
-        assert(n <= length, "lengnt: %d, n=%d".format(length, n));
-        __repr.__length -= n;
-        while( n ) {
-            if ( n <= __repr.__buffer.front.length ) {
-                __repr.__buffer.front.popFrontN(n);
-                if ( __repr.__buffer.front.length == 0 ) {
-                    __repr.__buffer.popFront;
-                }
-                return;
-            }
-            n -= __repr.__buffer.front.length;
-            __repr.__buffer.popFront;
-        }
-    }
-    @property void popBack() pure @safe {
-        assert(length);
-        __repr.__buffer.back.popBack;
-        if ( __repr.__buffer.back.length == 0 ) {
-            __repr.__buffer.popBack;
-        }
-        __repr.__length--;
-    }
-    @property void popBackN(size_t n) pure @safe {
-        assert(n <= length, "n: %d, length: %d".format(n, length));
-        __repr.__length -= n;
-        while( n ) {
-            if ( n <= __repr.__buffer.back.length ) {
-                __repr.__buffer.back.popBackN(n);
-                if ( __repr.__buffer.back.length == 0 ) {
-                    __repr.__buffer.popBack;
-                }
-                return;
-            }
-            n -= __repr.__buffer.back.length;
-            __repr.__buffer.popBack;
-        }
-    }
-    @property auto save() @safe {
-        auto n = Buffer!T();
-        n.__repr = new Repr(__repr);
-        return n;
-    }
-    @property auto ref opIndex(size_t n) const pure @safe {
-        assert( __repr && n < __repr.__length );
-        foreach(b; __repr.__buffer) {
-            if ( n < b.length ) {
-                return b[n];
-            }
-            n -= b.length;
-        }
-        assert(false, "Impossible");
-    }
-    Buffer!T opSlice(size_t m, size_t n) {
-        if ( empty || m == n ) {
-            return Buffer!T();
-        }
-        assert( m <= n && n <= __repr.__length);
-        auto res = this.save();
-        res.popBackN(res.__repr.__length-n);
-        res.popFrontN(m);
-        return res;
-    }
-    @property auto data(U=T[])() pure {
-        static if ( is(U==T[]) ) {
-            if ( __repr && __repr.__buffer && __repr.__buffer.length == 1 ) {
-                return __repr.__buffer.front;
-            }
-        }
-        Appender!(T[]) a;
-        if ( __repr && __repr.__buffer ) {
-            foreach(ref b; __repr.__buffer) {
-                a.put(b);
-            }
-        }
-        static if ( is(U==T[]) ) {
-            return a.data;
-        } else {
-            return cast(U)a.data;
-        }
-    }
-    string opCast(string)() {
-        return this.toString;
-    }
-    bool opEquals(U)(U x) {
-        return cast(U)this == x;
-    }
-
-}
-///
-public unittest {
-
-    static assert(isInputRange!(Buffer!ubyte));
-    static assert(isForwardRange!(Buffer!ubyte));
-    static assert(hasLength!(Buffer!ubyte));
-    static assert(hasSlicing!(Buffer!ubyte));
-    static assert(isBidirectionalRange!(Buffer!ubyte));
-    static assert(isRandomAccessRange!(Buffer!ubyte));
-    
-    auto b = Buffer!ubyte();
-    b.put("abc".representation.dup);
-    b.put("def".representation.dup);
-    assert(b.length == 6);
-    assert(b.toString == "abcdef");
-    assert(b.front == 'a');
-    assert(b.back == 'f');
-    assert(equal(b[0..$], "abcdef"));
-    assert(equal(b[$-2..$], "ef"));
-    assert(b == "abcdef");
-    b.popFront;
-    b.popBack;
-    assert(b.front == 'b');
-    assert(b.back == 'e');
-    assert(b.length == 4);
-    assert(retro(b).front == 'e');
-    assert(countUntil(b, 'e') == 3);
-    assert(equal(splitter(b, 'c').array[1], ['d', 'e'])); // split "bcde" on 'c'
-    assert(equal(b, "bcde"));
-    b.popFront; b.popFront;
-    assert(b.front == 'd');
-    assert(b.front == b[0]);
-    assert(b.back == b[$-1]);
-
-    auto c = Buffer!ubyte();
-    c.put("Header0: value0\n".representation.dup);
-    c.put("Header1: value1\n".representation.dup);
-    c.put("Header2: value2\n\nbody".representation.dup);
-    auto c_length = c.length;
-    auto eoh = countUntil(c, "\n\n");
-    assert(eoh == 47);
-    foreach(header; c[0..eoh].splitter('\n') ) {
-        writeln(cast(string)header.data);
-    }
-    assert(equal(findSplit(c, "\n\n")[2], "body"));
-    assert(c.length == c_length);
 }
 
 public struct SSLOptions {

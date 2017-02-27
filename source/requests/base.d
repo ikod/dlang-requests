@@ -3,6 +3,7 @@
 import requests.streams;
 import requests.utils;
 import requests.uri;
+import requests.buffer;
 
 import std.format;
 import std.datetime;
@@ -21,10 +22,10 @@ public class RequestException: Exception {
 }
 
 public struct ReceiveAsRange {
-    bool empty() {
+    bool empty() const pure @safe nothrow {
         return data.length == 0;
     };
-    ubyte[] front() {
+    immutable(ubyte)[] front() const pure @safe nothrow {
         return data;
     };
     void popFront() {
@@ -37,16 +38,16 @@ public struct ReceiveAsRange {
         }
     };
     package {
-        bool            activated;
-        ubyte[]         data;
-        ubyte[]         delegate() read;
+        bool                activated;
+        immutable(ubyte)[]  data;
+        immutable(ubyte)[]  delegate() read;
     }
 }
 
 public class Response {
     package {
         ushort           _code;
-        Buffer!ubyte     _responseBody;
+        Buffer           _responseBody;
         string[string]   _responseHeaders;
         /// Initial URI
         URI              _uri;
@@ -57,26 +58,26 @@ public class Response {
                          _connectedAt,
                          _requestSentAt,
                          _finishedAt;
-        mixin(Setter!ushort("code"));
-        mixin(Setter!URI("uri"));
-        mixin(Setter!URI("finalURI"));
+        final mixin(Setter!ushort("code"));
+        final mixin(Setter!URI("uri"));
+        final mixin(Setter!URI("finalURI"));
     }
-    mixin(Getter!ushort("code"));
-    mixin(Getter!URI("uri"));
-    mixin(Getter!URI("finalURI"));
-    @property auto ref responseBody() @safe nothrow {
+    final mixin(Getter!ushort("code"));
+    final mixin(Getter!URI("uri"));
+    final mixin(Getter!URI("finalURI"));
+    final @property auto ref responseBody() pure @safe nothrow {
         return _responseBody;
     }
-    @property auto ref responseHeaders() pure @safe nothrow {
+    final @property auto ref responseHeaders() pure @safe nothrow {
         return _responseHeaders;
     }
-    @property auto ref receiveAsRange() pure @safe nothrow {
+    final @property auto ref receiveAsRange() pure @safe nothrow {
         return _receiveAsRange;
     }
-    override string toString() const {
+    final override string toString() const pure @safe {
         return "Response(%d, %s)".format(_code, _uri.uri());
     }
-    string format(string fmt) const {
+    final string format(string fmt) const pure @safe {
         import std.array;
         auto a = appender!string();
         auto f = FormatSpec!char(fmt);

@@ -18,6 +18,7 @@ import requests.uri;
 import requests.utils;
 import requests.streams;
 import requests.base;
+import requests.buffer;
 
 public class FTPServerResponseError: Exception {
     this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
@@ -552,7 +553,8 @@ public struct FTPRequest {
             debug(requests) tracef("got %d bytes from data channel", rc);
 
             _contentReceived += rc;
-            _response._responseBody.putNoCopy(b[0..rc]);
+            _response._responseBody.put(assumeUnique(b[0..rc]));
+            b = null;
 
             if ( _maxContentLength && _response._responseBody.length >= _maxContentLength ) {
                 throw new RequestException("maxContentLength exceeded for ftp data");
@@ -562,8 +564,8 @@ public struct FTPRequest {
                 _response.receiveAsRange.activated = true;
                 _response.receiveAsRange.data.length = 0;
                 _response.receiveAsRange.data = _response._responseBody.data;
-                _response.receiveAsRange.read = delegate ubyte[] () {
-                    Buffer!ubyte result;
+                _response.receiveAsRange.read = delegate immutable(ubyte)[] () {
+                    Buffer result;
                     while(true) {
                         // check if we received everything we need
                         if ( _contentReceived >= _maxContentLength ) 
@@ -583,7 +585,8 @@ public struct FTPRequest {
 
                         if ( read > 0 ) {
                             _contentReceived += read;
-                            result.putNoCopy(b[0..read]);
+                            result.put(assumeUnique(b[0..read]));
+                            b = null;
                             return result.data;
                         }
                         if ( read == 0 ) {

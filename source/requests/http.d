@@ -19,6 +19,7 @@ import requests.streams;
 import requests.uri;
 import requests.utils;
 import requests.base;
+import requests.buffer;
 
 static immutable ushort[] redirectCodes = [301, 302, 303];
 static immutable uint     defaultBufferSize = 12*1024;
@@ -291,7 +292,7 @@ public struct HTTPRequest {
 
         NetworkStream   _stream;
         HTTPResponse[] _history; // redirects history
-        DataPipe!ubyte _bodyDecoder;
+        DataPipe       _bodyDecoder;
         DecodeChunked  _unChunker;
         long           _contentLength;
         long           _contentReceived;
@@ -506,7 +507,7 @@ public struct HTTPRequest {
                 throw new RequestException("Unknown content-encoding " ~ *contentEncoding);
             case "gzip":
             case "deflate":
-                _bodyDecoder.insert(new Decompressor!ubyte);
+                _bodyDecoder.insert(new Decompressor);
         }
 
     }
@@ -619,7 +620,7 @@ public struct HTTPRequest {
     ///
     /// Do we received \r\n\r\n?
     /// 
-    private bool headersHaveBeenReceived(in ubyte[] data, ref Buffer!ubyte buffer, out string separator) const @safe {
+    private bool headersHaveBeenReceived(in ubyte[] data, ref Buffer buffer, out string separator) const @safe {
         foreach(s; ["\r\n\r\n", "\n\n"]) {
             if ( data.canFind(s) || buffer.canFind(s) ) {
                 separator = s;
@@ -723,7 +724,7 @@ public struct HTTPRequest {
             }
         }
 
-        _bodyDecoder = new DataPipe!ubyte();
+        _bodyDecoder = new DataPipe();
         scope(exit) {
             if ( !_useStreaming ) {
                 _bodyDecoder = null;
@@ -731,8 +732,8 @@ public struct HTTPRequest {
             }
         }
 
-        auto buffer = Buffer!ubyte();
-        Buffer!ubyte partialBody;
+        auto buffer = Buffer();
+        Buffer partialBody;
         ptrdiff_t read;
         string separator;
         
@@ -746,7 +747,8 @@ public struct HTTPRequest {
                 break;
             }
             auto data = b[0..read];
-            buffer.putNoCopy(data);
+            buffer.put(assumeUnique(data));
+            b = null;
             if ( verbosity>=3 ) {
                 writeln(data.dump.join("\n"));
             }
@@ -757,7 +759,7 @@ public struct HTTPRequest {
             if ( headersHaveBeenReceived(data, buffer, separator) ) {
                 auto s = buffer.data.findSplit(separator);
                 auto ResponseHeaders = s[0];
-                partialBody = Buffer!ubyte(s[2]);
+                partialBody = Buffer(s[2]);
                 _contentReceived += partialBody.length;
                 parseResponseHeaders(ResponseHeaders);
                 break;
@@ -766,7 +768,7 @@ public struct HTTPRequest {
         
         analyzeHeaders(_response._responseHeaders);
 
-        _bodyDecoder.putNoCopy(partialBody.data);
+        _bodyDecoder.put(partialBody.data);
 
         if ( _verbosity >= 2 ) writefln("< %d bytes of body received", partialBody.length);
 
@@ -787,7 +789,7 @@ public struct HTTPRequest {
                 debug(requests) trace("streaming requested");
                 _response.receiveAsRange.activated = true;
                 _response.receiveAsRange.data = _response._responseBody.data;
-                _response.receiveAsRange.read = delegate ubyte[] () {
+                _response.receiveAsRange.read = delegate immutable(ubyte)[] () {
                     while(true) {
                         // check if we received everything we need
                         if ( ( _unChunker && _unChunker.done )
@@ -819,28 +821,9 @@ public struct HTTPRequest {
                         }
 
                         _contentReceived += read;
-                        _bodyDecoder.putNoCopy(b[0..read]);
-                        auto res = _bodyDecoder.getNoCopy();
-                        if ( res.length == 0 ) {
-                            // there were nothing to produce (beginning of the chunk or no decompressed data)
-                            continue;
-                        }
-                        if (res.length == 1) {
-                            return res[0];
-                        }
-                        //
-                        // I'd like to "return _bodyDecoder.getNoCopy().join;" but if is slower
-                        //
-                        auto total = res.map!(b=>b.length).sum;
-                        // create buffer for joined bytes
-                        ubyte[] joined = new ubyte[total];
-                        size_t p;
-                        // memcopy 
-                        foreach(ref _; res) {
-                            joined[p .. p + _.length] = _;
-                            p += _.length;
-                        }
-                        return joined;
+                        _bodyDecoder.put(assumeUnique(b[0..read]));
+                        b = null;
+                        return _bodyDecoder.get();
                     }
                     assert(0);
                 };
@@ -870,16 +853,17 @@ public struct HTTPRequest {
                     format(_contentLength, _maxContentLength));
             }
 
-            _bodyDecoder.putNoCopy(b[0..read]); // send buffer to all decoders
+            _bodyDecoder.put(assumeUnique(b[0..read])); // send buffer to all decoders
+            b = null;
 
-            _bodyDecoder.getNoCopy.             // fetch result and place to body
-                each!(b => _response._responseBody.putNoCopy(b));
+            _bodyDecoder.getChunks.             // fetch result and place to body
+                each!(b => _response._responseBody.put(b));
 
             debug(requests) tracef("receivedTotal: %d, contentLength: %d, bodyLength: %d", _contentReceived, _contentLength, _response._responseBody.length);
 
         }
         _bodyDecoder.flush();
-        _response._responseBody.putNoCopy(_bodyDecoder.get());
+        _response._responseBody.put(_bodyDecoder.get()); // XXX
     }
     private bool serverClosedKeepAliveConnection() pure @safe nothrow {
         return _response._responseHeaders.length == 0 && _keepAlive;

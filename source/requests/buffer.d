@@ -50,103 +50,6 @@ struct Buffer {
     long                _end_pos;   // offset of the _length in the last chunk
  
   public:
-    static struct _Range {
-        // implement InputRange
-        size_t              _pos;
-        size_t              _end;
-        Buffer              _buffer;
-        this(in Buffer b) pure @safe @nogc nothrow {
-            _buffer = b;
-            _pos = 0;
-            _end = _buffer.length;
-        }
-        @property auto ref front() const pure @safe @nogc nothrow {
-            return _buffer[_pos];
-        }
-        @property void popFront() pure @safe @nogc {
-            //enforce(!empty, "popFront from empty buffer");
-            if ( empty ) {
-                throw RangeEmpty;
-            }
-            _pos++;
-        }
-        @property void popFrontN(size_t n) pure @safe @nogc nothrow {
-            _pos += min(n, length);
-        }
-        @property auto ref back() const pure @safe @nogc nothrow {
-            return _buffer[_end-1];
-        }
-        @property auto popBack() pure @safe @nogc {
-            //enforce(!empty, "popBack from empty buffer");
-            if ( empty ) {
-                throw RangeEmpty;
-            }
-            _end--;
-        }
-        @property void popBackN(size_t n) pure @safe @nogc nothrow {
-            _end -= min(n, length);
-        }
-        @property bool empty() const pure @safe @nogc nothrow {
-            return _pos == _end;
-        }
-        @property auto save() pure @safe @nogc nothrow {
-            return this;
-        }
-        @property size_t length() const pure @safe @nogc nothrow {
-            return _end - _pos;
-        }
-        auto ref opIndex(size_t i) const pure @safe @nogc {
-            if ( i >= length ) {
-                throw IndexOutOfRange;
-            }
-            return _buffer[_pos + i];
-        }
-        auto opSlice(size_t m, size_t n) const pure @safe {
-            auto another = _buffer[m..n];
-            return another.range();
-        }
-        auto opDollar() const pure @safe @nogc {
-            return length;
-        }
-        // auto opCast(T)() const pure @safe if (is(T==immutable(ubyte)[])) {
-        //     return _buffer[_pos.._end].data();
-        // }
-        // auto opCast(T)() const pure @safe if (is(T==ubyte[])) {
-        //     return _buffer[_pos.._end].data().dup;
-        // }
-        auto opEquals(T)(T other) const pure @safe @nogc nothrow if (isSomeString!T) {
-            if (other.length != length ) {
-                return false;
-            }
-            size_t m = _pos, n = _end, i = 0;
-            while( m > _buffer._chunks[i].length ) {
-                auto l = _buffer._chunks[i].length;
-                m -= l;
-                n -= l;
-                i++;
-            }
-            foreach(ref chunk; _buffer._chunks[i..$]) {
-                auto cmp_len = min(n-m, chunk.length-m, other.length);
-                if (chunk[m..m+cmp_len] != other[0..cmp_len]) {
-                    return false;
-                }
-                m = 0;
-                n -= cmp_len;
-                if ( n == 0 ) {
-                    break;
-                }
-                other = other[cmp_len..$];
-            }
-            return true;
-        }
-    }
-
-    // this(string s) pure @safe nothrow immutable {
-    //     _chunks = [s.representation];
-    //     _length = s.length;
-    //     _end_pos = _length;
-    // }
-
     this(string s) pure @safe nothrow {
         _chunks = [s.representation];
         _length = s.length;
@@ -160,12 +63,12 @@ struct Buffer {
     }
 
     this(in Buffer other, size_t m, size_t n) pure @safe {
-        ulong i;
-        BufferChunksArray  content;
         // produce slice view m..n
         if ( n == m ) {
             return;
         }
+
+        BufferChunksArray  content;
 
         enforce(m < n && n <=other.length, "wrong m or n");
         assert(other._pos < other._chunks[0].length);
@@ -174,6 +77,8 @@ struct Buffer {
 
         _length = n - m;
         n = n - m;
+
+        ulong i;
         while( m > other._chunks[i].length ) {
             m -= other._chunks[i].length;
             i++;
@@ -181,28 +86,32 @@ struct Buffer {
         auto to_copy = min(n, other._chunks[i].length - m);
         if ( to_copy > 0 ) {
             content ~= other._chunks[i][m..m+to_copy];
-            _end_pos = to_copy;
         }
         i++;
         n -= to_copy;
         while(n > 0) {
             to_copy = min(n, other._chunks[i].length);
-            content ~= other._chunks[i][0..to_copy];
+            if ( n > to_copy ) {
+                content ~= other._chunks[i];
+            }
+            else {
+                content ~= other._chunks[i][0..to_copy];
+            }
             n -= to_copy;
-            _end_pos = to_copy;
             i++;
         }
+        _end_pos = to_copy;
         _chunks = content;
 
     }
 
     this(in Buffer other, size_t m, size_t n) pure @safe immutable {
-        ulong               i;
-        BufferChunksArray   content;
         // produce slice view m..n
         if ( n == m ) {
             return;
         }
+
+        BufferChunksArray  content;
 
         enforce(m < n && n <=other.length, "wrong m or n");
         assert(other._pos < other._chunks[0].length);
@@ -211,6 +120,8 @@ struct Buffer {
 
         _length = n - m;
         n = n - m;
+
+        ulong i;
         while( m > other._chunks[i].length ) {
             m -= other._chunks[i].length;
             i++;
@@ -218,15 +129,22 @@ struct Buffer {
         auto to_copy = min(n, other._chunks[i].length - m);
         if ( to_copy > 0 ) {
             content ~= other._chunks[i][m..m+to_copy];
+            //_end_pos = to_copy;
         }
         i++;
         n -= to_copy;
         while(n > 0) {
             to_copy = min(n, other._chunks[i].length);
-            content ~= other._chunks[i][0..to_copy];
+            if ( n > to_copy ) {
+                content ~= other._chunks[i];
+            }
+            else {
+                content ~= other._chunks[i][0..to_copy];
+            }
             n -= to_copy;
             i++;
         }
+        _end_pos = to_copy;
         _chunks = content;
     }
 
@@ -235,7 +153,7 @@ struct Buffer {
     }
 
     alias put = append;
-    auto append(string s) pure @safe nothrow {
+    auto append(in string s) pure @safe nothrow {
         if (s.length == 0 ) {
             return;
         }
@@ -249,7 +167,7 @@ struct Buffer {
         _end_pos = s.length;
     }
 
-    auto append(BufferChunk s) pure @safe nothrow {
+    auto append(in BufferChunk s) pure @safe nothrow {
         if (s.length == 0 ) {
             return;
         }
@@ -280,21 +198,48 @@ struct Buffer {
     }
 
     @property ubyte opIndex(size_t n) const pure @safe @nogc nothrow {
+        if ( n >= _length ) {
+            return _chunks[$][0];
+        }
         n += _pos;
-        foreach(b; _chunks) {
-            if ( n < b.length ) {
+        if ( _chunks.length == 1 ) {
+            return _chunks[0][n];
+        }
+        foreach(ref b; _chunks) {
+            auto l = b.length;
+            if ( n < l ) {
                 return b[n];
             }
-            n -= b.length;
+            n -= l;
         }
         // XXX
         // this is a way to have @nogc, while throwing RangeError
         // in case of wrong n value (n>=_length)
-        return _chunks[$-1][$];
+        return _chunks[$][0];
     }
 
-    auto opEquals(T)(T other) const pure @safe @nogc nothrow if (isSomeString!T) {
-        return this.range() == other;
+    auto opEquals(T)(in T other) const pure @safe @nogc nothrow if (isSomeString!T) {
+        if (other.length != _length ) {
+            return false;
+        }
+        size_t n, m, last_chunk = _chunks.length;
+        foreach(i, ref c; _chunks) {
+            size_t a, b;
+            if ( i == 0 ) {
+                a = _pos;
+            }
+            if ( i == last_chunk ) {
+                b = _end_pos;
+            } else {
+                b = c.length;
+            }
+            auto cmp_len = b - a;
+            if ( c[a..b] != other[m..m+cmp_len] ) {
+                return false;
+            }
+            m += cmp_len;
+        }
+        return true;
     }
 
     @property auto save() pure @safe @nogc nothrow {
@@ -310,6 +255,9 @@ struct Buffer {
 
     @property void popFrontByte() pure @safe @nogc {
         assert(_pos < _chunks[0].length);
+        if ( _length == 0 ) {
+            throw RangeEmpty;
+        }
         _pos++;
         _length--;
         if ( _pos >= _chunks[0].length ) {
@@ -347,6 +295,7 @@ struct Buffer {
             _end_pos = _chunks[$-1].length;
         }
     }
+
     BufferChunksArray dataChunks() const pure @safe nothrow {
 
         BufferChunksArray res;
@@ -366,6 +315,7 @@ struct Buffer {
         }
         return res;
     }
+
     BufferChunk data() const pure @trusted {
         if ( _chunks.length == 0 ) {
             return BufferChunk.init;
@@ -386,9 +336,11 @@ struct Buffer {
         r[d..$] = c[p.._end_pos];
         return assumeUnique(r);
     }
+
     Buffer find(alias pred="a==b")(char needle) const pure @safe {
         return find!pred(cast(ubyte)needle);
     }
+
     Buffer find(alias pred="a==b")(ubyte needle) const pure @safe {
         auto chunk_last = _chunks.length - 1;
         long chunk_pos = 0;
@@ -414,9 +366,9 @@ struct Buffer {
         }
         return Buffer();
     }
-    _Range range() const pure @safe @nogc nothrow {
-        return _Range(this);
-    }
+    // _Range range() const pure @safe @nogc nothrow {
+    //     return _Range(this);
+    // }
     string toString() const @safe {
         return cast(string)data();
     }
@@ -463,87 +415,9 @@ unittest {
     // |de|
     // +--+
     assert(cast(string)di.data == "bcde");
-    assert(equal(di.range.map!(c => cast(char)c), "bcde"));
-    b = di[0..2];
-    assert(cast(string)b.data, "ab");
-    assert(b.length == 2);
-    b = di[$-2..$];
-    assert(cast(string)b.data == "de");
-    assert(b._chunks.length==1);
-    assert(b.length == 2);
-    b = di[$-1..$];
-    assert(cast(string)b.data == "e");
-    assert(b._chunks.length==1);
-    assert(b.length == 1);
-    b = Buffer();
-    b.append("abc");
-    auto br = b.range();
-    b.append("def".representation);
-    b.append("123");
-    assert(br=="abc");
-    // +-b-+
-    // |abc|
-    // |def|
-    // |123|
-    // +---+
-    assert(b._chunks.length==3);
-    c = b[3..$];
-    // +-c-+
-    // |def|
-    // |123|
-    // +---+
-    assert(c.length == 6);
-    assert(c._chunks.length==2);
-    assert(c[1] == 'e');
-    assert(c[3] == '1');
-    assert(c[$-1] == '3');
-
-    static assert(hasLength!(Buffer));
-
-
-    static assert(isInputRange!(Buffer._Range));
-    static assert(isForwardRange!(Buffer._Range));
-    static assert(hasLength!(Buffer._Range));
-    static assert(hasSlicing!(Buffer._Range));
-    static assert(isBidirectionalRange!(Buffer._Range));
-    static assert(isRandomAccessRange!(Buffer._Range));
-    auto bit = b.range();
-    assert(!bit.canFind('4'));
-    assert(bit.canFind('1'));
-    assert(equal(splitter(bit, 'd').array[0], "abc"));
-    assert(equal(splitter(bit, 'd').array[1], "ef123"));
-    assert(bit.length == 9);
-    assert(bit.front == 'a');
-    assert(bit.back == '3');
-    bit.popBack;
-    assert(bit.front == 'a');
-    assert(bit.back == '2');
-    assert(bit[$-1] == '2');
-    assert(bit.length == 8);
-    assertThrown(bit[8]);
-    assert(equal(bit, ['a', 'b', 'c', 'd', 'e', 'f', '1', '2']));
-    assert(bit.countUntil('d')==3);
-    assert(bit.countUntil('2')==7);
-    assert(retro(bit).front == '2');
-    bit.popFront();
-    assert(equal(bit, ['b', 'c', 'd', 'e', 'f', '1', '2']));
-    assert(bit == "bcdef12");
-    bit.popFrontN(2);
-    assert(equal(bit, ['d', 'e', 'f', '1', '2']));
-    assert(bit == "def12");
-    bit.popBackN(2);
-    assert(equal(bit, ['d', 'e', 'f']));
-    assert(bit.length == 3);
-    assert(bit == "def");
-    bit.popBackN(bit.length);
-    assert(bit.length == 0);
-    assert(bit == "");
-    bit = b.range();
-    assert(equal(bit, ['a', 'b', 'c', 'd', 'e', 'f', '1', '2', '3']));
-    assert(equal(bit[1..4], "bcd"));
 
     b = Buffer("a\nb");
-    assert(findSplit(b.range(), "\n")[2] == ['b']);
+    assert(findSplit(b, "\n")[2] == ['b']);
     b = Buffer("012");
     b.append("345");
     b.popFrontByte();
@@ -583,6 +457,7 @@ unittest {
     assert(bb[$-1] == '4');
     assert(bb.data == "1234");
     assert(bb.length == 4);
+    assertThrown!RangeError(bb[5]==0);
     bb.popFront();
     bb.popBack();
     assert(bb.front == '2');

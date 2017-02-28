@@ -90,6 +90,9 @@ public class DataPipe : DataPipeIface {
     /// data = input data buffer.
     /// NoCopy means we do not copy data to buffer, we keep reference
     final void put(in BufferChunk data) {
+        if ( data.empty ) {
+            return;
+        }
         if ( pipe.empty ) {
             buffer.put(data);
             return;
@@ -175,7 +178,6 @@ public class Decompressor : DataPipeIface {
         // __buff.popFrontN(r.length);
         auto r = __buff.frontChunk();
         __buff.popFrontChunk();// = __buff._chunks[1..$];
-        //debug(requests) writefln("a: %s", __buff);
         return cast(BufferChunk)r;
     }
     final override void flush() {
@@ -183,7 +185,9 @@ public class Decompressor : DataPipeIface {
             return;
         }
         auto r = __zlib.flush();
-        __buff.put(cast(immutable(ubyte)[])r);
+        if ( r.length ) {
+            __buff.put(cast(immutable(ubyte)[])r);
+        }
     }
     final override @property bool empty() const pure @safe {
         debug(requests) tracef("empty=%b", __buff.empty);
@@ -201,7 +205,7 @@ public class Decompressor : DataPipeIface {
     //     __buff.popFrontN(n);
     // }
     auto data() {
-        return __buff.range();
+        return __buff;
     }
 }
 
@@ -320,7 +324,6 @@ public class DecodeChunked : DataPipeIface {
         // buff.popFrontN(r.length);
         auto r = buff.frontChunk();
         buff.popFrontChunk();// = __buff._chunks[1..$];
-        //debug(requests) writefln("a: %s", buff);
         return cast(BufferChunk)r;
 //        return r;
     }

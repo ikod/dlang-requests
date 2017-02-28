@@ -768,7 +768,9 @@ public struct HTTPRequest {
         
         analyzeHeaders(_response._responseHeaders);
 
-        _bodyDecoder.put(partialBody.data);
+        if ( !partialBody.empty ) {
+            _bodyDecoder.put(partialBody.data);
+        }
 
         if ( _verbosity >= 2 ) writefln("< %d bytes of body received", partialBody.length);
 
@@ -863,7 +865,10 @@ public struct HTTPRequest {
 
         }
         _bodyDecoder.flush();
-        _response._responseBody.put(_bodyDecoder.get()); // XXX
+        auto r = _bodyDecoder.get();
+        if ( !r.empty ) {
+            _response._responseBody.put(r); // XXX
+        }
     }
     private bool serverClosedKeepAliveConnection() pure @safe nothrow {
         return _response._responseHeaders.length == 0 && _keepAlive;

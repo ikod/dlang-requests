@@ -128,7 +128,7 @@ public class DataPipe : DataPipeIface {
     ///
     /// get without datamove. but user receive [][]
     /// 
-    final immutable(BufferChunk)[] getChunks()  {
+    final immutable(BufferChunk)[] getChunks() @safe pure nothrow {
         auto res = buffer.dataChunks();
         buffer = Buffer();
         return res;
@@ -136,7 +136,7 @@ public class DataPipe : DataPipeIface {
     /// Test if internal buffer is empty
     /// Returns:
     /// true if internal buffer is empty (nothing to get())
-    final bool empty() pure const @safe {
+    final bool empty() pure const @safe @nogc nothrow {
         return buffer.empty;
     }
     final void flush() {
@@ -204,7 +204,7 @@ public class Decompressor : DataPipeIface {
     // final @property void popFrontN(size_t n) pure @safe {
     //     __buff.popFrontN(n);
     // }
-    auto data() {
+    auto data() pure @safe @nogc nothrow {
         return __buff;
     }
 }

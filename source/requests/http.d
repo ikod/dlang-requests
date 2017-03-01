@@ -523,7 +523,7 @@ public struct HTTPRequest {
         string lastHeader;
         auto buffer = cast(string)input;
  
-        foreach(line; buffer.split("\n").map!(l => l.stripRight)) {
+        foreach(line; buffer.split('\n').map!(l => l.stripRight)) {
             if ( ! _response.status_line.length ) {
                 debug (requests) tracef("statusLine: %s", line);
                 _response.status_line = line;
@@ -616,18 +616,6 @@ public struct HTTPRequest {
             res ~= cookie;
         }
         return res;
-    }
-    ///
-    /// Do we received \r\n\r\n?
-    /// 
-    private bool headersHaveBeenReceived(in ubyte[] data, ref Buffer buffer, out string separator) const @safe {
-        foreach(s; ["\r\n\r\n", "\n\n"]) {
-            if ( data.canFind(s) || buffer.canFind(s) ) {
-                separator = s;
-                return true;
-            }
-        }
-        return false;
     }
 
     private bool followRedirectResponse() {
@@ -735,7 +723,6 @@ public struct HTTPRequest {
         auto buffer = Buffer();
         Buffer partialBody;
         ptrdiff_t read;
-        string separator;
         
         while(true) {
 
@@ -747,19 +734,34 @@ public struct HTTPRequest {
                 break;
             }
             auto data = b[0..read];
-            buffer.put(assumeUnique(data));
-            b = null;
+
             if ( verbosity>=3 ) {
                 writeln(data.dump.join("\n"));
             }
 
+            buffer.put(assumeUnique(data));
+            b = null;
+
             if ( buffer.length > maxHeadersLength ) {
                 throw new RequestException("Headers length > maxHeadersLength (%d > %d)".format(buffer.length, maxHeadersLength));
             }
-            if ( headersHaveBeenReceived(data, buffer, separator) ) {
-                auto s = buffer.data.findSplit(separator);
-                auto ResponseHeaders = s[0];
-                partialBody = Buffer(s[2]);
+
+            string separator;
+            long   separator_position = -1;
+            foreach(s; ["\r\n\r\n", "\n\n"]) {
+                separator = s;
+                separator_position = buffer.indexOf(s);
+                if ( separator_position >= 0) {
+                    break;
+                }
+            }
+
+            if ( separator_position >= 0 ) {
+                // auto s = buffer.data.findSplit(separator);
+                // auto ResponseHeaders = s[0];
+                // partialBody = Buffer(s[2]);
+                auto ResponseHeaders = buffer[0..separator_position].data;
+                partialBody = buffer[separator_position+separator.length..$];
                 _contentReceived += partialBody.length;
                 parseResponseHeaders(ResponseHeaders);
                 break;

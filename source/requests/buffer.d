@@ -1,6 +1,7 @@
 module requests.buffer;
 
 import std.string:representation;
+import std.array;
 import std.algorithm;
 import std.conv;
 import std.range;
@@ -68,8 +69,6 @@ struct Buffer {
             return;
         }
 
-        BufferChunksArray  content;
-
         enforce(m < n && n <=other.length, "wrong m or n");
         assert(other._pos < other._chunks[0].length);
         m += other._pos;
@@ -83,6 +82,8 @@ struct Buffer {
             m -= other._chunks[i].length;
             i++;
         }
+
+        BufferChunksArray content;
         auto to_copy = min(n, other._chunks[i].length - m);
         if ( to_copy > 0 ) {
             content ~= other._chunks[i][m..m+to_copy];
@@ -102,7 +103,6 @@ struct Buffer {
         }
         _end_pos = to_copy;
         _chunks = content;
-
     }
 
     this(in Buffer other, size_t m, size_t n) pure @safe immutable {
@@ -192,9 +192,7 @@ struct Buffer {
         if ( this._length==0 || m == n ) {
             return Buffer();
         }
-        enforce( m <= n && n <= _length, "Wrong slice parameters: start: %d, end: %d, this.length: %d".format(m, n, _length));
-        auto res = Buffer(this, m, n);
-        return res;
+        return Buffer(this, m, n);
     }
 
     @property ubyte opIndex(size_t n) const pure @safe @nogc nothrow {
@@ -248,7 +246,7 @@ struct Buffer {
 
     alias front = frontByte;
     alias popFront = popFrontByte;
-    @property ubyte frontByte() const pure @safe @nogc {
+    @property ubyte frontByte() const pure @safe @nogc nothrow {
         assert(_pos < _chunks[0].length);
         return _chunks[0][_pos];
     }
@@ -266,12 +264,15 @@ struct Buffer {
         }
     }
 
-    BufferChunk frontChunk() pure @safe @nogc nothrow {
+    BufferChunk frontChunk() const pure @safe @nogc nothrow {
         return _chunks[0][_pos..$];
     }
 
-    void popFrontChunk() pure @nogc @safe nothrow {
+    void popFrontChunk() pure @nogc @safe {
         assert(_pos < _chunks[0].length);
+        if ( _length == 0 ) {
+            throw RangeEmpty;
+        }
         _length -= _chunks[0].length - _pos;
         _pos = 0;
         _chunks = _chunks[1..$];
@@ -317,7 +318,7 @@ struct Buffer {
     }
 
     BufferChunk data() const pure @trusted {
-        if ( _chunks.length == 0 ) {
+        if ( _length == 0 ) {
             return BufferChunk.init;
         }
         if ( _chunks.length == 1 ) {
@@ -335,6 +336,45 @@ struct Buffer {
         auto c = _chunks[$-1];
         r[d..$] = c[p.._end_pos];
         return assumeUnique(r);
+    }
+    Buffer[] splitOn(ubyte sep) const pure @safe {
+        Buffer[] res;
+        auto a = this[0..$];
+        auto b = this.find(sep);
+        while( b.length ) {
+            auto al = a.length;
+            auto bl = b.length;
+            res ~= a[0..al-bl];
+            b.popFront;
+            a = b;
+            b = b.find(sep);
+        }
+        res ~= a;
+        return res;
+    }
+
+    ptrdiff_t indexOf(string s) const pure @safe {
+        if ( s.length == 0 || s.length > _length ) {
+            return -1;
+        }
+
+        auto haystack = this[0..$];
+        ubyte b = s.representation[0];
+        while( haystack.length > 0 ) {
+            auto r = haystack.find(b);
+            if ( r.length < s.length ) {
+                return -1;
+            }
+            if ( r[0..s.length] == s) {
+                return _length - r.length;
+            }
+            haystack = r[1..$];
+        }
+        return -1;
+    }
+
+    bool canFindString(string s) const pure @safe {
+        return indexOf(s) >= 0;
     }
 
     Buffer find(alias pred="a==b")(char needle) const pure @safe {
@@ -569,6 +609,37 @@ unittest {
     bb.popFront;
     bb.popFront;
     assert(equal(splitter(bb, '\n').array[0], "aaa"));
+
+    bb = Buffer();
+    bb.append("0\naaa\n");
+    bb.append("bbb\n\n");
+    bb.append("ccc\n1");
+    bb.popFrontN(2);
+    bb.popBackN(2);
+    assert(bb.indexOf("aaa") ==  0);
+    assert(bb.indexOf("bbb") ==  4);
+    assert(bb.indexOf("0")   == -1);
+    assert(bb.indexOf("1")   == -1);
+    assert(equal(bb.splitOn('\n'), ["aaa", "bbb", "", "ccc"]));
+    bb = Buffer();
+    bb.append("0\naaa\nbbb\n\nccc\n1");
+    bb.popFrontN(2);
+    bb.popBackN(2);
+    assert(equal(bb.splitOn('\n'), ["aaa", "bbb", "", "ccc"]));
+
+    bb = Buffer();
+    bb.append("aaa\nbbb\n\nccc\n");
+    assert(bb.canFindString("\n\n"));
+    assert(!bb.canFindString("\na\n"));
+    bb = Buffer();
+    bb.append("aaa\nbbb\n");
+    bb.append("\nccc\n");
+    assert(bb.canFindString("\n\n"));
+    assert(!bb.canFindString("\na\n"));
+    bb = Buffer();
+    bb.append("aaa\r\nbbb\r\n\r\nddd");
+    assert(bb.indexOf("\r\n\r\n") == 8);
+    assert(!bb.canFindString("\na\n"));
 }
 
 class DecodingException: Exception {

@@ -69,13 +69,22 @@ struct Buffer {
             return;
         }
 
-        enforce(m < n && n <=other.length, "wrong m or n");
+        enforce(m < n && n <=other._length, "wrong m or n");
         assert(other._pos < other._chunks[0].length);
+
         m += other._pos;
         n += other._pos;
 
         _length = n - m;
         n = n - m;
+
+        if ( other._chunks.length == 1 ) {
+            // special frequent usecase
+            // no loops
+            _chunks = [other._chunks[0][m .. m+n]];
+            _end_pos = n;
+            return;
+        }
 
         ulong i;
         while( m > other._chunks[i].length ) {
@@ -84,6 +93,7 @@ struct Buffer {
         }
 
         BufferChunksArray content;
+
         auto to_copy = min(n, other._chunks[i].length - m);
         if ( to_copy > 0 ) {
             content ~= other._chunks[i][m..m+to_copy];
@@ -339,8 +349,8 @@ struct Buffer {
     }
     Buffer[] splitOn(ubyte sep) const pure @safe {
         Buffer[] res;
-        auto a = this[0..$];
-        auto b = this.find(sep);
+        Buffer a = this;
+        Buffer b = this.find(sep);
         while( b.length ) {
             auto al = a.length;
             auto bl = b.length;
@@ -358,17 +368,18 @@ struct Buffer {
             return -1;
         }
 
-        auto haystack = this[0..$];
+        Buffer haystack = this;
         ubyte b = s.representation[0];
         while( haystack.length > 0 ) {
             auto r = haystack.find(b);
             if ( r.length < s.length ) {
                 return -1;
             }
-            if ( r[0..s.length] == s) {
+            if ( s.length == 1 || r[1..s.length] == s[1..$]) {
                 return _length - r.length;
             }
-            haystack = r[1..$];
+            haystack = r;
+            haystack.popFront;
         }
         return -1;
     }

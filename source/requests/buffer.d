@@ -231,6 +231,10 @@ struct Buffer {
             return false;
         }
         size_t n, m, last_chunk = _chunks.length;
+        if (_chunks.length == 1) {
+            // single chunk
+            return _chunks[0][_pos.._end_pos] == other;
+        }
         foreach(i, ref c; _chunks) {
             size_t a, b;
             if ( i == 0 ) {
@@ -651,10 +655,4 @@ unittest {
     bb.append("aaa\r\nbbb\r\n\r\nddd");
     assert(bb.indexOf("\r\n\r\n") == 8);
     assert(!bb.canFindString("\na\n"));
-}
-
-class DecodingException: Exception {
-    this(string message, string file =__FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
-        super(message, file, line, next);
-    }
 }

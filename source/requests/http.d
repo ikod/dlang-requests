@@ -1295,6 +1295,7 @@ public struct HTTPRequest {
     ///     params = dictionary with field names as keys and field values as values.
     /// Returns:
     ///     Response
+    //deprecated("Please, use queryParams instead of string[string] for request query params.")
     HTTPResponse exec(string method="GET")(string url, string[string] params) {
         return exec!method(url, params.byKeyValue.map!(p => QueryParam(p.key, p.value)).array);
     }

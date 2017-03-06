@@ -185,6 +185,54 @@ public struct Request {
                 }
         }
     }
+    /// Execute PUT for http and STOR file for FTP.
+    /// You have to provide  $(B uri) and data. Data should conform to HTTPRequest.putt or FTPRequest.post depending on the URI scheme.
+    /// When arguments do not conform scheme you will receive Exception("Operation not supported for ftp")
+    ///
+    Response put(A...)(string uri, A args) {
+        if ( uri ) {
+            _uri = URI(uri);
+        }
+        _method = "PUT";
+        final switch ( _uri.scheme ) {
+            case "http", "https":
+                _http.uri = _uri;
+                static if (__traits(compiles, _http.post(null, args))) {
+                    return _http.exec!"PUT"(null, args);
+                } else {
+                    throw new Exception("Operation not supported for http");
+                }
+            case "ftp":
+                static if (__traits(compiles, _ftp.post(uri, args))) {
+                    return _ftp.post(uri, args);
+                } else {
+                    throw new Exception("Operation not supported for ftp");
+                }
+        }
+    }
+    /// Execute DELETE for http and DEL file for FTP(not implemented right now).
+    ///
+    Response del(A...)(string uri, A args) {
+        if ( uri ) {
+            _uri = URI(uri);
+        }
+        _method = "DELETE";
+        final switch ( _uri.scheme ) {
+            case "http", "https":
+                _http.uri = _uri;
+                static if (__traits(compiles, _http.post(null, args))) {
+                    return _http.exec!"DELETE"(null, args);
+                } else {
+                    throw new Exception("Operation not supported for http");
+                }
+            case "ftp":
+                static if (__traits(compiles, _ftp.post(uri, args))) {
+                    return _ftp.del(uri, args);
+                } else {
+                    throw new Exception("Operation not supported for ftp");
+                }
+        }
+    }
     Response exec(string method="GET", A...)(string uri, A args) {
         _method = method;
         _uri = URI(uri);

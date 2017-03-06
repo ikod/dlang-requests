@@ -234,11 +234,31 @@ package unittest {
     mpform.add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
     postContent(httpbinUrl ~ "post", mpform);
     
+    /// put content using multipart/form-data (large data and files). See docs fot HTTPRequest
+    info("Test putContent form");
+    mpform = MultipartForm();
+    mpform.add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
+    putContent(httpbinUrl ~ "put", mpform);
+
+    info("Test delContent");
+    delContent(httpbinUrl ~ "delete");
+
     /// you can do this using Request struct to access response details
-    info("Test postContent form via Request()");
+    info("Test post form via Request()");
     rq = Request();
     mpform = MultipartForm().add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
     rs = rq.post(httpbinUrl ~ "post", mpform);
+    assert(rs.code == 200);
+    
+    info("Test put form via Request()");
+    rq = Request();
+    mpform = MultipartForm().add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
+    rs = rq.put(httpbinUrl ~ "put", mpform);
+    assert(rs.code == 200);
+    
+    info("Test del via Request()");
+    rq = Request();
+    rs = rq.del(httpbinUrl ~ "delete");
     assert(rs.code == 200);
     
     info("Test receiveAsRange with POST");
@@ -344,6 +364,24 @@ public auto ref getContent(A...)(string url, A args) if (args.length > 1 && args
 public auto postContent(A...)(string url, A args) {
     auto rq = Request();
     auto rs = rq.post(url, args);
+    return rs.responseBody;
+}
+
+///
+/// Call put and return response content.
+///
+public auto putContent(A...)(string url, A args) {
+    auto rq = Request();
+    auto rs = rq.put(url, args);
+    return rs.responseBody;
+}
+
+///
+/// Call put and return response content.
+///
+public auto delContent(A...)(string url, A args) {
+    auto rq = Request();
+    auto rs = rq.del(url, args);
     return rs.responseBody;
 }
 

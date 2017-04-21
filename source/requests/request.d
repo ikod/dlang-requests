@@ -70,6 +70,12 @@ public struct Request {
         _http.authenticator = v;
         _ftp.authenticator = v;
     }
+    /// set proxy property.
+    /// $(B v) - full url to proxy.
+    @property void proxy(string v) {
+        _http.proxy = v;
+        _ftp.proxy = v;
+    }
     /// Set Cookie for http requests.
     /// $(B v) - array of cookie.
     @property void cookie(Cookie[] v) pure @nogc nothrow {

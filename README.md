@@ -343,7 +343,7 @@ Here is a short description of some `Request` options you can set:
 | bufferSize          | `size_t`         | socket io buffer size                   | 16KB       |
 | verbosity           | `uint`           | verbosity level (0, 1, 2 or 3)          | 0          |
 | proxy               | `string`         | url of the HTTP proxy                   | null       |
-| headers             | `string[string]` | additional headers                      | null       |
+| addHeaders          | `string[string]` | additional headers                      | null       |
 | useStreaming        | `bool`           | receive data as lazy `InputRange`       | false      |
 | cookie              | `Cookie[]`       | cookies you will send to server         | null       |
 | authenticator       | `Auth`           | authenticatior                          | null       |

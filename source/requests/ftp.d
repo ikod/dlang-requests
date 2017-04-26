@@ -70,6 +70,7 @@ public struct FTPRequest {
         bool          _useStreaming;
         Auth           _authenticator;
         string        _method;
+        string        _proxy;
     }
     mixin(Getter_Setter!Duration("timeout"));
     mixin(Getter_Setter!uint("verbosity"));
@@ -79,6 +80,7 @@ public struct FTPRequest {
     mixin(Getter!long("contentLength"));
     mixin(Getter!long("contentReceived"));
     mixin(Setter!Auth("authenticator"));
+    mixin(Getter_Setter!string("proxy"));
 
     @property final string[] responseHistory() @safe @nogc nothrow {
         return _responseHistory;

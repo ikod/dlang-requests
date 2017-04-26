@@ -664,6 +664,10 @@ public struct HTTPRequest {
     /// If uri changed so that we have to change host or port, then we have to close socket stream
     /// 
     private void handleURLChange(in URI from, in URI to) {
+        if ( _proxy !is null ) {
+            // we do not have to close proxy connection in any case
+            return;
+        }
         if ( _stream !is null && _stream.isConnected && 
             ( from.scheme != to.scheme || from.host != to.host || from.port != to.port) ) {
             debug tracef("Have to reopen stream, because of URI change");

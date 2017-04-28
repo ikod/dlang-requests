@@ -687,6 +687,9 @@ public struct HTTPRequest {
             if ( _proxy ) {
                 // use proxy uri to connect
                 uri.uri_parse(_proxy);
+                if ( uri.scheme != "http" && uri.scheme != "https" ) {
+                    throw new RequestException("wrong uri used for proxy: %s, must be complete http(s) uri".format(_proxy));
+                }
             } else {
                 // use original uri
                 uri = _uri;

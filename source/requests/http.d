@@ -892,6 +892,10 @@ public struct HTTPRequest {
     HTTPResponse exec(string method="POST")(string url, MultipartForm sources) {
         import std.uuid;
         import std.file;
+
+        if ( _response && _response._receiveAsRange.activated && _stream && _stream.isConnected ) {
+            _stream.close();
+        }
         //
         // application/json
         //
@@ -1031,6 +1035,9 @@ public struct HTTPRequest {
             || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front)))) 
             || (rank!R == 2 && (is(Unqual!(typeof(content.front.front)) == ubyte)))
         ) {
+        if ( _response && _response._receiveAsRange.activated && _stream && _stream.isConnected ) {
+            _stream.close();
+        }
         //
         // application/json
         //
@@ -1142,6 +1149,9 @@ public struct HTTPRequest {
     ///     
     HTTPResponse exec(string method="GET")(string url = null, QueryParam[] params = null) {
 
+        if ( _response && _response._receiveAsRange.activated && _stream && _stream.isConnected ) {
+            _stream.close();
+        }
         _method = method;
         _response = new HTTPResponse;
         _history.length = 0;

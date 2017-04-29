@@ -3,6 +3,7 @@ module requests.http;
 private:
 import std.algorithm;
 import std.array;
+import std.ascii;
 import std.conv;
 import std.datetime;
 import std.exception;
@@ -338,7 +339,7 @@ public struct HTTPRequest {
     this(string uri) {
         _uri = URI(uri);
     }
-   ~this() {
+    ~this() {
         if ( _stream && _stream.isConnected) {
             _stream.close();
         }
@@ -395,12 +396,24 @@ public struct HTTPRequest {
         handleURLChange(_uri, newURI);
         _uri = newURI;
     }
+    string normalizeHeader(string h) {
+        auto s = h.split("-");
+        if ( s.all!(word => word.length && isUpper(word[0])) ) {
+            // no need for transformation and copy
+            return h;
+        }
+        return s.map!(w => w.length ?
+                                toUpper(w[0..1]) ~ w[1..$]
+                                :
+                                "")
+                .join("-");
+    }
     /// Add headers to request
     /// Params:
     /// headers = headers to send.
     void addHeaders(in string[string] headers) {
         foreach(pair; headers.byKeyValue) {
-            _headers[pair.key] = pair.value;
+            _headers[normalizeHeader(pair.key)] = pair.value;
         }
     }
     /// Remove headers from request

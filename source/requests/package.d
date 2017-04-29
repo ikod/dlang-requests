@@ -47,7 +47,7 @@ package unittest {
     assert(rs.responseBody.length > 0);
     rs = rq.get(httpbinUrl ~ "get", ["c":" d", "a":"b"]);
     assert(rs.code == 200);
-    auto json = parseJSON(rs.responseBody.data).object["args"].object;
+    auto json = parseJSON(cast(string)rs.responseBody.data).object["args"].object;
     assert(json["c"].str == " d");
     assert(json["a"].str == "b");
     
@@ -57,9 +57,9 @@ package unittest {
     info("Check POST json");
     rs = rq.post(httpbinUrl ~ "post?b=x", `{"a":"b ", "c":[1,2,3]}`, "application/json");
     assert(rs.code==200);
-    json = parseJSON(rs.responseBody.data).object["args"].object;
+    json = parseJSON(cast(string)rs.responseBody.data).object["args"].object;
     assert(json["b"].str == "x");
-    json = parseJSON(rs.responseBody.data).object["json"].object;
+    json = parseJSON(cast(string)rs.responseBody.data).object["json"].object;
     assert(json["a"].str == "b ");
     assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
     {
@@ -83,7 +83,7 @@ package unittest {
         rs = rq.post(httpbinUrl ~ "post", f.byChunk(3), "application/octet-stream");
         if (httpbinUrl != "http://httpbin.org/" ) {
             assert(rs.code==200);
-            auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
+            auto data = fromJsonArrayToStr(parseJSON(cast(string)rs.responseBody).object["data"]);
             assert(data=="abcdefgh\n12345678\n");
         }
         f.close();
@@ -95,7 +95,7 @@ package unittest {
         rs = rq.exec!"POST"(httpbinUrl ~ "post", s, "application/octet-stream");
         if (httpbinUrl != "http://httpbin.org/" ) {
             assert(rs.code==200);
-            auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
+            auto data = fromJsonArrayToStr(parseJSON(cast(string)rs.responseBody).object["data"]);
             assert(data=="one,two,three.");
         }
     }
@@ -105,7 +105,7 @@ package unittest {
         rs = rq.post(httpbinUrl ~ "post", s, "application/octet-stream");
         if (httpbinUrl != "http://httpbin.org/" ) {
             assert(rs.code==200);
-            auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
+            auto data = fromJsonArrayToStr(parseJSON(cast(string)rs.responseBody).object["data"]);
             assert(data=="one,two,three.");
         }
     }
@@ -115,14 +115,14 @@ package unittest {
         rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
         if (httpbinUrl != "http://httpbin.org/") {
             assert(rs.code==200);
-            auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
+            auto data = fromJsonArrayToStr(parseJSON(cast(string)rs.responseBody).object["data"]);
             assert(data==s);
         }
     }
     // associative array
     rs = rq.post(httpbinUrl ~ "post", ["a":"b ", "c":"d"]);
     assert(rs.code==200);
-    auto form = parseJSON(rs.responseBody.data).object["form"].object;
+    auto form = parseJSON(cast(string)rs.responseBody.data).object["form"].object;
     assert(form["a"].str == "b ");
     assert(form["c"].str == "d");
     info("Check HEAD");
@@ -160,7 +160,7 @@ package unittest {
     rq = Request();
     rs = rq.get(httpbinUrl ~ "cookies/set?A=abcd&b=cdef");
     assert(rs.code == 200);
-    json = parseJSON(rs.responseBody.data).object["cookies"].object;
+    json = parseJSON(cast(string)rs.responseBody.data).object["cookies"].object;
     assert(json["A"].str == "abcd");
     assert(json["b"].str == "cdef");
     auto cookie = rq.cookie();
@@ -228,7 +228,7 @@ package unittest {
     assert(streamedContent.length == rs.responseBody.data.length);
     info("Test postContent");
     r = postContent(httpbinUrl ~ "post", `{"a":"b", "c":1}`, "application/json");
-    assert(parseJSON(r).object["json"].object["c"].integer == 1);
+    assert(parseJSON(cast(string)r).object["json"].object["c"].integer == 1);
 
     /// Posting to forms (for small data)
     ///

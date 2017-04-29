@@ -1407,7 +1407,7 @@ package unittest {
     {
         rs = HTTPRequest().get(httpbinUrl ~ "get", ["c":" d", "a":"b"]);
         assert(rs.code == 200);
-        auto json = parseJSON(rs.responseBody.data).object["args"].object;
+        auto json = parseJSON(cast(string)rs.responseBody.data).object["args"].object;
         assert(json["c"].str == " d");
         assert(json["a"].str == "b");
     }
@@ -1441,7 +1441,7 @@ package unittest {
         rs = rq.post(httpbinUrl ~ "post", f.byChunk(3), "application/octet-stream");
         if (httpbinUrl != "http://httpbin.org/") {
             assert(rs.code==200);
-            auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
+            auto data = fromJsonArrayToStr(parseJSON(cast(string)rs.responseBody).object["data"]);
             assert(data=="abcdefgh\n12345678\n");
         }
         f.close();
@@ -1452,7 +1452,7 @@ package unittest {
         rs = rq.exec!"POST"(httpbinUrl ~ "post", s, "application/octet-stream");
         if (httpbinUrl != "http://httpbin.org/") {
             assert(rs.code==200);
-            auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
+            auto data = fromJsonArrayToStr(parseJSON(cast(string)rs.responseBody).object["data"]);
             assert(data=="one,two,three.");
         }
     }
@@ -1462,7 +1462,7 @@ package unittest {
         rs = rq.post(httpbinUrl ~ "post", s, "application/octet-stream");
         if (httpbinUrl != "http://httpbin.org/") {
             assert(rs.code==200);
-            auto data = fromJsonArrayToStr(parseJSON(rs.responseBody).object["data"]);
+            auto data = fromJsonArrayToStr(parseJSON(cast(string)rs.responseBody).object["data"]);
             assert(data=="one,two,three.");
         }
     }
@@ -1472,7 +1472,7 @@ package unittest {
         rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
         if (httpbinUrl != "http://httpbin.org/") {
             assert(rs.code==200);
-            auto data = fromJsonArrayToStr(parseJSON(rs.responseBody.data).object["data"]);
+            auto data = fromJsonArrayToStr(parseJSON(cast(string)rs.responseBody.data).object["data"]);
             assert(data==s);
         }
     }
@@ -1480,7 +1480,7 @@ package unittest {
     {
         rs = rq.post(httpbinUrl ~ "post", queryParams("name[]", "first", "name[]", 2));
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody).object["form"].object;
+        auto data = parseJSON(cast(string)rs.responseBody).object["form"].object;
         string[] a;
         try {
             a = to!(string[])(data["name[]"].str);
@@ -1494,7 +1494,7 @@ package unittest {
     {
         rs = rq.post(httpbinUrl ~ "post", ["a":"b ", "c":"d"]);
         assert(rs.code==200);
-        auto form = parseJSON(rs.responseBody.data).object["form"].object;
+        auto form = parseJSON(cast(string)rs.responseBody.data).object["form"].object;
         assert(form["a"].str == "b ");
         assert(form["c"].str == "d");
     }
@@ -1502,9 +1502,9 @@ package unittest {
     {
         rs = rq.post(httpbinUrl ~ "post?b=x", `{"a":"a b", "c":[1,2,3]}`, "application/json");
         assert(rs.code==200);
-        auto json = parseJSON(rs.responseBody).object["args"].object;
+        auto json = parseJSON(cast(string)rs.responseBody).object["args"].object;
         assert(json["b"].str == "x");
-        json = parseJSON(rs.responseBody).object["json"].object;
+        json = parseJSON(cast(string)rs.responseBody).object["json"].object;
         assert(json["a"].str == "a b");
         assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
     }
@@ -1517,19 +1517,19 @@ package unittest {
     info("Check PUT");
     rs = rq.exec!"PUT"(httpbinUrl ~ "put",  `{"a":"b", "c":[1,2,3]}`, "application/json");
     assert(rs.code==200);
-    assert(parseJSON(rs.responseBody).object["json"].object["a"].str=="b");
+    assert(parseJSON(cast(string)rs.responseBody).object["json"].object["a"].str=="b");
     info("Check PATCH");
     rs = rq.exec!"PATCH"(httpbinUrl ~ "patch", "привiт, свiт!", "application/octet-stream");
     assert(rs.code==200);
     info("Check compressed content");
     rs = rq.get(httpbinUrl ~ "gzip");
     assert(rs.code==200);
-    bool gzipped = parseJSON(rs.responseBody).object["gzipped"].type == JSON_TYPE.TRUE;
+    bool gzipped = parseJSON(cast(string)rs.responseBody).object["gzipped"].type == JSON_TYPE.TRUE;
     assert(gzipped);
     info("gzip - ok");
     rs = rq.get(httpbinUrl ~ "deflate");
     assert(rs.code==200);
-    bool deflated = parseJSON(rs.responseBody).object["deflated"].type == JSON_TYPE.TRUE;
+    bool deflated = parseJSON(cast(string)rs.responseBody).object["deflated"].type == JSON_TYPE.TRUE;
     assert(deflated);
     info("deflate - ok");
 
@@ -1548,7 +1548,7 @@ package unittest {
     {
         rs = rq.get(httpbinUrl ~ "cookies/set?A=abcd&b=cdef");
         assert(rs.code == 200);
-        auto json = parseJSON(rs.responseBody.data).object["cookies"].object;
+        auto json = parseJSON(cast(string)rs.responseBody.data).object["cookies"].object;
         assert(json["A"].str == "abcd");
         assert(json["b"].str == "cdef");
         foreach(c; rq.cookie) {

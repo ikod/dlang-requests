@@ -1400,7 +1400,7 @@ else {
         info("httpd Check GET with parameters");
         rs = request.get(httpbin_url ~ "get", ["c":" d", "a":"b"]);
         assert(rs.code == 200);
-        json = parseJSON(rs.responseBody.data).object["args"].object;
+        json = parseJSON(cast(string)rs.responseBody.data).object["args"].object;
         assert(json["a"].str == "b");
         assert(json["c"].str == " d");
 
@@ -1429,13 +1429,13 @@ else {
         info("httpd Check gzip");
         rs = request.get(httpbin_url ~ "gzip");
         assert(rs.code==200);
-        json = parseJSON(rs.responseBody);
+        json = parseJSON(cast(string)rs.responseBody);
         assert(json.object["url"].str == httpbin_url ~ "gzip");
 
         info("httpd Check deflate");
         rs = request.get(httpbin_url ~ "deflate");
         assert(rs.code==200);
-        json = parseJSON(rs.responseBody);
+        json = parseJSON(cast(string)rs.responseBody);
         assert(json.object["url"].str == httpbin_url ~ "deflate");
 
         info("httpd Check range");
@@ -1454,27 +1454,27 @@ else {
 
         info("httpd Check POST json");
         rs = request.post(httpbin_url ~ "post?b=x", `{"a":"b", "c":[1,2,3]}`, "application/json");
-        json = parseJSON(rs.responseBody);
+        json = parseJSON(cast(string)rs.responseBody);
         auto rqJson = parseJSON(json.object["json"].str);
         assert(rqJson.object["a"].str == "b");
         assert(equal([1,2,3], rqJson.object["c"].array.map!"a.integer"));
 
         info("httpd Check POST json/chunked body");
         rs = request.post(httpbin_url ~ "post?b=x", [`{"a":"b",`,` "c":[1,2,3]}`], "application/json");
-        json = parseJSON(rs.responseBody);
+        json = parseJSON(cast(string)rs.responseBody);
         assert(json.object["args"].object["b"].str == "x");
         rqJson = parseJSON(json.object["json"].str);
         assert(rqJson.object["a"].str == "b");
         assert(equal([1,2,3], rqJson.object["c"].array.map!"a.integer"));
         
         rs = request.post(httpbin_url ~ "post", "0123456789".repeat(32));
-        json = parseJSON(rs.responseBody);
+        json = parseJSON(cast(string)rs.responseBody);
         assert(equal(json.object["data"].array.map!"a.integer", "0123456789".repeat(32).join));
 
         info("httpd Check POST with params");
         rs = request.post(httpbin_url ~ "post", queryParams("b", 2, "a", "A"));
         assert(rs.code==200);
-        auto data = parseJSON(rs.responseBody).object["form"].object;
+        auto data = parseJSON(cast(string)rs.responseBody).object["form"].object;
         assert((data["a"].str == "A"));
         assert((data["b"].str == "2"));
 
@@ -1558,7 +1558,7 @@ else {
              "url": "http://httpbin.org/post?a=b"
              }
              */
-            json = parseJSON(rs.responseBody);
+            json = parseJSON(cast(string)rs.responseBody);
             assert("file field from memory" == cast(string)(json.object["files"].object["Field2"].array.map!(a => cast(ubyte)a.integer).array));
             assert("file1 content\n" == cast(string)(json.object["files"].object["File1"].array.map!(a => cast(ubyte)a.integer).array));
 
@@ -1575,7 +1575,7 @@ else {
         }
         info("httpd Check cookies");
         rs = request.get(httpbin_url ~ "cookies/set?A=abcd&b=cdef");
-        json = parseJSON(rs.responseBody.data).object["cookies"].object;
+        json = parseJSON(cast(string)rs.responseBody.data).object["cookies"].object;
         assert(json["A"].str == "abcd");
         assert(json["b"].str == "cdef");
     }

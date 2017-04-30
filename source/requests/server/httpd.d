@@ -1390,7 +1390,7 @@ else {
         assert(rs.code == 200);
         assert(rs.responseBody.length > 0);
         auto content = rs.responseBody.data!string;
-        auto json = parseJSON(content);
+        auto json = parseJSON(cast(string)content);
         assert(json.object["url"].str == httpbin_url);
 
         info("httpd Check GET with parameters");

@@ -190,7 +190,6 @@ public class Decompressor : DataPipeIface {
         }
     }
     final override @property bool empty() const pure @safe {
-        debug(requests) tracef("empty=%b", __buff.empty);
         return __buff.empty;
     }
     final @property auto ref front() pure const @safe {

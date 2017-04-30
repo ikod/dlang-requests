@@ -1,7 +1,7 @@
 {
     "name": "requests",
     "description": "http/ftp client library, inspired by python-requests",
-    "copyright": "Copyright © 2016, igor",
+    "copyright": "Copyright 2016, igor",
     "authors": ["ikod"],
     "license": "BSL-1.0",
     "sourcePaths": ["tests", "source"],
@@ -9,6 +9,13 @@
     "configurations": [
         {
             "name": "std",
+            "libs-posix": ["ssl", "crypto"],
+            "libs-windows": ["libssl32", "libeay32"]
+        },
+        {
+            "name": "application",
+            "targetType": "executable",
+            "sourceFiles": ["app/requested.d"],
             "libs-posix": ["ssl", "crypto"],
             "libs-windows": ["libssl32", "libeay32"]
         },

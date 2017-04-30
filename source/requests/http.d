@@ -905,7 +905,12 @@ public struct HTTPRequest {
     /// Params:
     ///     url = url
     ///     sources = array of sources.
+
     HTTPResponse exec(string method="POST")(string url, MultipartForm sources) {
+        return execute(method, url, sources);
+    }
+
+    HTTPResponse execute(string method, string url, MultipartForm sources) {
         import std.uuid;
         import std.file;
 
@@ -1046,7 +1051,10 @@ public struct HTTPRequest {
     ///      auto f = File("tests/test.txt", "rb");
     ///      rs = rq.exec!"POST"("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
     ///  --------------------------------------------------------------------------------------------------------
-    HTTPResponse exec(string method="POST", R)(string url, R content, string contentType="application/octet-stream")
+    HTTPResponse exec(string method="POST", R)(string url, R content, string contentType="application/octet-stream") {
+        return execute!R(method, url, content, contentType);
+    }
+    HTTPResponse execute(R)(string method, string url, R content, string contentType="application/octet-stream")
         if ( (rank!R == 1)
             || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front)))) 
             || (rank!R == 2 && (is(Unqual!(typeof(content.front.front)) == ubyte)))
@@ -1164,6 +1172,9 @@ public struct HTTPRequest {
     ///  ---------------------------------------------------------------------------------
     ///     
     HTTPResponse exec(string method="GET")(string url = null, QueryParam[] params = null) {
+        return execute(method, url, params);
+    }
+    HTTPResponse execute(string method, string url = null, QueryParam[] params = null) {
 
         if ( _response && _response._receiveAsRange.activated && _stream && _stream.isConnected ) {
             _stream.close();
@@ -1327,7 +1338,10 @@ public struct HTTPRequest {
     ///     Response
     //deprecated("Please, use queryParams instead of string[string] for request query params.")
     HTTPResponse exec(string method="GET")(string url, string[string] params) {
-        return exec!method(url, params.byKeyValue.map!(p => QueryParam(p.key, p.value)).array);
+        return execute(method, url, params.byKeyValue.map!(p => QueryParam(p.key, p.value)).array);
+    }
+    HTTPResponse execute(string method, string url, string[string] params) {
+        return execute(method, url, params.byKeyValue.map!(p => QueryParam(p.key, p.value)).array);
     }
     ///
     /// GET request. Simple wrapper over exec!"GET"
@@ -1335,7 +1349,7 @@ public struct HTTPRequest {
     /// args = request parameters. see exec docs.
     ///
     HTTPResponse get(A...)(A args) {
-        return exec!"GET"(args);
+        return execute("GET", args);
     }
     ///
     /// POST request. Simple wrapper over exec!"POST"
@@ -1344,7 +1358,7 @@ public struct HTTPRequest {
     /// args = request parameters. see exec docs.
     ///
     HTTPResponse post(A...)(string uri, A args) {
-        return exec!"POST"(uri, args);
+        return execute("POST", uri, args);
     }
 }
 

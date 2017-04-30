@@ -140,6 +140,28 @@ public struct Request {
     void clearHeaders() {
         _http.clearHeaders();
     }
+    Response execute(A...)(string method, string uri, A args) {
+        if ( uri ) {
+            _uri = URI(uri);
+        }
+        final switch ( _uri.scheme ) {
+            case "http", "https":
+                return _http.execute!A(method, uri, args);
+            case "ftp":
+                if (method == "GET") {
+                    return _ftp.get(uri);
+                }
+                if (method == "POST") {
+                    static if (__traits(compiles, _ftp.post(uri, args))) {
+                        return _ftp.post(uri, args);
+                    } else {
+                        throw new Exception("Operation not supported for ftp");
+                    }
+                }
+                // for fto only GET and POST methods
+                assert(0);
+        }
+    }
     /// Execute GET for http and retrieve file for FTP.
     /// You have to provide at least $(B uri). All other arguments should conform to HTTPRequest.get or FTPRequest.get depending on the URI scheme.
     /// When arguments do not conform scheme (for example you try to call get("ftp://somehost.net/pub/README", {"a":"b"}) which doesn't make sense)

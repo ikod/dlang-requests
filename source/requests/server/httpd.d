@@ -19,6 +19,7 @@ import core.thread;
 import requests.utils;
 import requests.streams;
 import requests.uri;
+import requests.buffer;
 
 version(vibeD){
     pragma(msg, "httpd will not compile with vibeD");
@@ -41,7 +42,7 @@ else {
         private {
             string          _requestLine;
             string[string]  _requestHeaders;
-            Buffer!ubyte    _requestBody;
+            Buffer          _requestBody;
             bool            _keepAlive;
             URI             _uri;
             string[string]  _query; // query in url
@@ -135,11 +136,11 @@ else {
         class _DataSource {
             private {
                 NetworkStream  _stream;
-                DataPipe!ubyte _bodyDecoder;
+                DataPipe       _bodyDecoder;
                 DecodeChunked  _unChunker;
                 long           _contentLength =  0;
                 long           _receivedLength = 0;
-                ubyte[]        _content;
+                immutable(ubyte)[]        _content;
                 bool           _requestHasBody;         // request has body
                 bool           _requestBodyRecvInProgr; // loading body currently active
                 bool           _requestBodyProcessed;   // we processed body - this can happens only once
@@ -150,7 +151,7 @@ else {
                 debug(httpd) tracef("datasource empty: %s", _content.length==0);
                 return _content.length==0;
             }
-            ubyte[] front() {
+            auto front() {
                 return _content;
             }
             void popFront() {
@@ -171,7 +172,8 @@ else {
                     }
                     debug(httpd) tracef("place %d bytes to datasource", read);
                     _receivedLength += read;
-                    _bodyDecoder.putNoCopy(b[0..read]);
+                    _bodyDecoder.put(assumeUnique(b[0..read]));
+                    b = null;
                     if (   (_unChunker && _unChunker.done)
                         || (_contentLength > 0 && _receivedLength >= _contentLength) )
                     {
@@ -188,7 +190,7 @@ else {
             ///
             /// raplace current front with another value
             /// 
-            void unPop(ubyte[] data) {
+            void unPop(immutable(ubyte)[] data) {
                 assert(data.length > 0);
                 _content = data;
             }
@@ -211,7 +213,7 @@ else {
                     auto s = l.findSplit(d);
                     if ( s[1].length ) {
                         if ( s[2].length ) {
-                            this.unPop(s[2]);
+                            this.unPop(s[2].idup);
                         } else {
                             this.popFront;
                         }
@@ -275,7 +277,7 @@ else {
 
             ds._requestHasBody = true;
             ds._requestBodyRecvInProgr = true;
-            ds._bodyDecoder = new DataPipe!ubyte;
+            ds._bodyDecoder = new DataPipe;
             ds._stream = stream;
 
             if ( auto contentLengthHeader = "content-length" in _requestHeaders ) {
@@ -288,7 +290,7 @@ else {
                 }
             }
             if ( partialBody.length ) {
-                ds._bodyDecoder.putNoCopy(cast(ubyte[])partialBody);
+                ds._bodyDecoder.put(cast(immutable(ubyte)[])partialBody);
                 ds._receivedLength = (cast(ubyte[])partialBody).length;
             }
             while ( ds._bodyDecoder.empty ) {
@@ -301,7 +303,8 @@ else {
                 }
                 debug(httpd) tracef("place %d bytes to datasource", read);
                 ds._receivedLength += read;
-                ds._bodyDecoder.putNoCopy(b[0..read]);
+                ds._bodyDecoder.put(assumeUnique(b[0..read]));
+                b = null;
             }
             ds._content = ds._bodyDecoder.getNoCopy().join();
             if (   ( ds._contentLength > 0 && ds._receivedLength >= ds._contentLength )
@@ -846,7 +849,7 @@ else {
         return q;
     }
 
-    private bool headersReceived(in ubyte[] data, ref Buffer!ubyte buffer, out string separator) @safe {
+    private bool headersReceived(in ubyte[] data, ref Buffer buffer, out string separator) @safe {
         foreach(s; ["\r\n\r\n", "\n\n"]) {
             if ( data.canFind(s) || buffer.canFind(s) ) {
                 separator = s;
@@ -918,7 +921,7 @@ else {
 
     private auto read_request(in App app, NetworkStream stream) {
         HTTPD_Request rq;
-        Buffer!ubyte  input;
+        Buffer        input;
         string        separator;
 
         while( true ) {
@@ -929,24 +932,25 @@ else {
                 return rq;
             }
             debug(httpd) tracef("received %d bytes", read);
-            input.putNoCopy(b[0..read]);
+            input.put(assumeUnique(b[0..read]));
 
             if ( headersReceived(b, input, separator) ) {
                 break;
             }
+            b = null;
 
             if ( input.length >= app.maxHeadersSize ) {
                 throw new HTTPD_RequestException("Request headers length %d too large".format(input.length));
             }
         }
         debug(httpd) trace("Headers received");
-        auto s = input.data!(string).findSplit(separator);
+        auto s = input.data.findSplit(separator);
         auto requestHeaders = s[0];
         debug(httpd) tracef("Headers: %s", cast(string)requestHeaders);
-        parseRequestHeaders(app, rq, requestHeaders);
+        parseRequestHeaders(app, rq, cast(string)requestHeaders);
         debug(httpd) trace("Headers parsed");
 
-        rq._dataSource = rq.createDataSource(s[2], stream);
+        rq._dataSource = rq.createDataSource(cast(string)s[2], stream);
 
         return rq;
     }
@@ -1389,7 +1393,7 @@ else {
         auto rs = request.get(httpbin_url);
         assert(rs.code == 200);
         assert(rs.responseBody.length > 0);
-        auto content = rs.responseBody.data!string;
+        auto content = rs.responseBody.data;
         auto json = parseJSON(content);
         assert(json.object["url"].str == httpbin_url);
 

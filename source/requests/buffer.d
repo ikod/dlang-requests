@@ -427,6 +427,9 @@ struct Buffer {
     string toString() const @safe {
         return cast(string)data();
     }
+    string opCast(string)() {
+        return toString();
+    }
     void describe() const @safe {
         writefln("leng: %d", _length);
         writefln("_pos: %d", _pos);

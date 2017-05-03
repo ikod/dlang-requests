@@ -847,7 +847,10 @@ public struct HTTPRequest {
                         _contentReceived += read;
                         _bodyDecoder.put(assumeUnique(b[0..read]));
                         b = null;
-                        return _bodyDecoder.get();
+                        auto data = _bodyDecoder.get();
+                        if ( data.length ) {
+                            return data;
+                        }
                     }
                     assert(0);
                 };

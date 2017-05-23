@@ -461,7 +461,7 @@ public struct HTTPRequest {
     /// Handle proxy and query parameters.
     /// 
     private @property string requestString(QueryParam[] params = null) {
-        if ( _proxy ) {
+        if ( _proxy && _uri.scheme != "https" ) {
             return "%s %s HTTP/1.1\r\n".format(_method, _uri.uri);
         }
         auto query = _uri.query.dup;
@@ -679,6 +679,9 @@ public struct HTTPRequest {
     private void handleURLChange(in URI from, in URI to) {
         if ( _proxy !is null ) {
             // we do not have to close proxy connection in any case
+            if ( _stream && _stream.isConnected && from.scheme != to.scheme ) {
+                _stream.close();
+            }
             return;
         }
         if ( _stream !is null && _stream.isConnected && 
@@ -705,29 +708,54 @@ public struct HTTPRequest {
     /// Setup connection. Handle proxy and https case
     /// 
     private void setupConnection() {
-        if ( !_stream || !_stream.isConnected ) {
-            debug(requests) tracef("Set up new connection");
-            URI   uri;
-            if ( _proxy ) {
-                // use proxy uri to connect
-                uri.uri_parse(_proxy);
-                if ( uri.scheme != "http" && uri.scheme != "https" ) {
-                    throw new RequestException("wrong uri used for proxy: %s, must be complete http(s) uri".format(_proxy));
-                }
-            } else {
-                // use original uri
-                uri = _uri;
-            }
-            final switch (uri.scheme) {
-                case "http":
-                    _stream = new TCPStream().connect(uri.host, uri.port, _timeout);
-                    break;
-                case "https":
-                    _stream = new SSLStream(_sslOptions).connect(uri.host, uri.port, _timeout);
-                    break;
-            }
-        } else {
+        if ( _stream && _stream.isConnected ) {
             debug(requests) tracef("Use old connection");
+            return;
+        }
+
+        debug(requests) tracef("Set up new connection");
+
+        URI   uri; // this URI will be used temporarry if we need proxy
+        final switch (_uri.scheme) {
+            case "http":
+                if ( _proxy ) {
+                    uri.uri_parse(_proxy);
+                } else {
+                    // use original uri
+                    uri = _uri;
+                }
+                _stream = new TCPStream().connect(uri.host, uri.port, _timeout);
+                break;
+            case "https":
+                if ( _proxy ) {
+                    uri.uri_parse(_proxy);
+                    _stream = new TCPStream().connect(uri.host, uri.port, _timeout);
+                    if ( verbosity>=1 ) {
+                        writeln("> CONNECT %s:%d HTTP/1.1".format(_uri.host, _uri.port));
+                    }
+                    _stream.send("CONNECT %s:%d HTTP/1.1\r\n\r\n".format(_uri.host, _uri.port));
+                    while ( _stream.isConnected ) {
+                        ubyte[1024] b;
+                        auto read = _stream.receive(b);
+                        if ( verbosity>=1) {
+                            writefln("< %s", cast(string)b[0..read]);
+                        }
+                        debug(requests) tracef("read: %d", read);
+                        if ( b[0..read].canFind("\r\n\r\n") || b[0..read].canFind("\n\n") ) {
+                            debug(requests) tracef("proxy connection ready");
+                            // convert connection to ssl
+                            _stream = new SSLStream(_stream, _sslOptions, _uri.host);
+                            break;
+                        } else {
+                            debug(requests) tracef("still wait for proxy connection");
+                        }
+                    }
+                } else {
+                    uri = _uri;
+                    _stream = new SSLStream(_sslOptions).connect(uri.host, uri.port, _timeout);
+                    debug(requests) tracef("ssl connection to origin server ready");
+                }
+                break;
         }
     }
     ///

@@ -834,7 +834,13 @@ else {
                 throw new Exception("ssl connect failed: %s".format(to!string(ERR_reason_error_string(ERR_get_error()))));
             }
         }
-
+        auto connectSSL() {
+            if(SSL_connect(ssl) == -1) {
+                throw new Exception("ssl connect failed: %s".format(to!string(ERR_reason_error_string(ERR_get_error()))));
+            }
+            debug(requests) tracef("ssl socket connected");
+            return this;
+        }
         @trusted
         override ptrdiff_t send(const(void)[] buf, SocketFlags flags) {
             return SSL_write(ssl, buf.ptr, cast(uint) buf.length);
@@ -853,10 +859,9 @@ else {
             super(af, type);
             initSsl(opts);
         }
-
-        this(socket_t sock, AddressFamily af) {
+        this(socket_t sock, AddressFamily af, SSLOptions opts = SSLOptions()) {
             super(sock, af);
-            initSsl(SSLOptions());
+            initSsl(opts);
         }
         override void close() {
             //SSL_shutdown(ssl);
@@ -870,11 +875,26 @@ else {
 
     public class SSLSocketStream: SocketStream {
         SSLOptions _sslOptions;
+        Socket underlyingSocket;
 
         this(SSLOptions opts) {
             _sslOptions = opts;
         }
-
+        this(NetworkStream ostream, SSLOptions opts, string host = null) {
+            _sslOptions = opts;
+            auto osock = ostream.so();
+            underlyingSocket = osock;
+            s = new OpenSslSocket(osock.handle, osock.addressFamily, _sslOptions).connectSSL();
+            __isOpen = true;
+            __isConnected = true;
+            debug(requests) tracef("ssl stream created from another stream: %s", s);
+        }
+        override void close() {
+            super.close();
+            if ( underlyingSocket ) {
+                underlyingSocket.close();
+            }
+        }
         override void open(AddressFamily fa) {
             if ( s !is null ) {
                 s.close();
@@ -893,6 +913,29 @@ else {
             newstream.s = sslSocket;
             newstream.__isOpen = true;
             newstream.__isConnected = true;
+            return newstream;
+        }
+    }
+    public class TCPSocketStream : SocketStream {
+        override void open(AddressFamily fa) {
+            if ( s !is null ) {
+                s.close();
+            }
+            s = new Socket(fa, SocketType.STREAM, ProtocolType.TCP);
+            assert(s !is null, "Can't create socket");
+            __isOpen = true;
+            s.setOption(SocketOptionLevel.TCP, SocketOption.TCP_NODELAY, 1);
+        }
+        override TCPSocketStream accept() {
+            auto newso = s.accept();
+            if ( s is null ) {
+                return null;
+            }
+            auto newstream = new TCPSocketStream();
+            newstream.s = newso;
+            newstream.__isOpen = true;
+            newstream.__isConnected = true;
+            newstream.s.setOption(SocketOptionLevel.TCP, SocketOption.TCP_NODELAY, 1);
             return newstream;
         }
     }
@@ -916,7 +959,11 @@ public interface NetworkStream {
     @property void reuseAddr(bool);
     void bind(Address);
     void listen(int);
-
+    version(vibeD) {
+        TCPConnection so();
+    } else {
+        Socket so();
+    }
     ///
     /// Set timeout for receive calls. 0 means no timeout.
     ///
@@ -932,7 +979,7 @@ public abstract class SocketStream : NetworkStream {
     }
     void open(AddressFamily fa) {
     }
-    @property ref Socket so() @safe pure {
+    @property Socket so() @safe pure {
         return s;
     }
     @property bool isOpen() @safe @nogc pure const {
@@ -1043,30 +1090,6 @@ public abstract class SocketStream : NetworkStream {
     };
 }
 
-public class TCPSocketStream : SocketStream {
-    override void open(AddressFamily fa) {
-        if ( s !is null ) {
-            s.close();
-        }
-        s = new Socket(fa, SocketType.STREAM, ProtocolType.TCP);
-        assert(s !is null, "Can't create socket");
-        __isOpen = true;
-        s.setOption(SocketOptionLevel.TCP, SocketOption.TCP_NODELAY, 1);
-    }
-    override TCPSocketStream accept() {
-        auto newso = s.accept();
-        if ( s is null ) {
-            return null;
-        }
-        auto newstream = new TCPSocketStream();
-        newstream.s = newso;
-        newstream.__isOpen = true;
-        newstream.__isConnected = true;
-        newstream.s.setOption(SocketOptionLevel.TCP, SocketOption.TCP_NODELAY, 1);
-        return newstream;
-    }
-}
-
 version (vibeD) {
     import vibe.core.net, vibe.stream.tls;
 
@@ -1086,6 +1109,9 @@ version (vibeD) {
         void close() @trusted {
             _conn.close();
             _isOpen = false;
+        }
+        override TCPConnection so() {
+            return _conn;
         }
 
         NetworkStream connect(string host, ushort port, Duration timeout = 10.seconds) {
@@ -1149,43 +1175,58 @@ version (vibeD) {
         Stream _sslStream;
         bool   _isOpen = true;
         SSLOptions _sslOptions;
+        TCPConnection underlyingConnection;
+
+        void connectSSL(string host) {
+            auto sslctx = createTLSContext(TLSContextKind.client);
+            if ( _sslOptions.getVerifyPeer() ) {
+                if ( _sslOptions.getCaCert() == null ) {
+                    throw new ConnectError("With vibe.d you have to call setCaCert() before verify server certificate.");
+                }
+                sslctx.useTrustedCertificateFile(_sslOptions.getCaCert());
+                sslctx.peerValidationMode = TLSPeerValidationMode.trustedCert;
+            } else {
+                sslctx.peerValidationMode = TLSPeerValidationMode.none;
+            }
+            immutable keyFile = _sslOptions.getKeyFile();
+            immutable certFile = _sslOptions.getCertFile();
+            final switch(_sslOptions.haveFiles()) {
+                case 0b11:  // both files
+                    sslctx.usePrivateKeyFile(keyFile);
+                    sslctx.useCertificateChainFile(certFile);
+                    break;
+                case 0b01:  // key only
+                    sslctx.usePrivateKeyFile(keyFile);
+                    sslctx.useCertificateChainFile(keyFile);
+                    break;
+                case 0b10:  // cert only
+                    sslctx.usePrivateKeyFile(certFile);
+                    sslctx.useCertificateChainFile(certFile);
+                    break;
+                case 0b00:
+                    break;
+            }
+            _sslStream = createTLSStream(_conn, sslctx, host);
+        }
 
     public:
         this(SSLOptions opts) {
             _sslOptions = opts;
         }
+        override TCPConnection so() {
+            return _conn;
+        }
+        this(NetworkStream ostream, SSLOptions opts, string host = null) {
+            _sslOptions = opts;
+            auto oconn = ostream.so();
+            underlyingConnection = oconn;
+            _conn = oconn;
+            connectSSL(host);
+        }
         override NetworkStream connect(string host, ushort port, Duration timeout = 10.seconds) {
             try {
                 _conn = connectTCP(host, port);
-                auto sslctx = createTLSContext(TLSContextKind.client);
-                if ( _sslOptions.getVerifyPeer() ) {
-                    if ( _sslOptions.getCaCert() == null ) {
-                        throw new ConnectError("With vibe.d you have to call setCaCert() before verify server certificate.");
-                    }
-                    sslctx.useTrustedCertificateFile(_sslOptions.getCaCert());
-                    sslctx.peerValidationMode = TLSPeerValidationMode.trustedCert;
-                } else {
-                    sslctx.peerValidationMode = TLSPeerValidationMode.none;
-                }
-                immutable keyFile = _sslOptions.getKeyFile();
-                immutable certFile = _sslOptions.getCertFile();
-                final switch(_sslOptions.haveFiles()) {
-                    case 0b11:  // both files
-                        sslctx.usePrivateKeyFile(keyFile);
-                        sslctx.useCertificateChainFile(certFile);
-                        break;
-                    case 0b01:  // key only
-                        sslctx.usePrivateKeyFile(keyFile);
-                        sslctx.useCertificateChainFile(keyFile);
-                        break;
-                    case 0b10:  // cert only
-                        sslctx.usePrivateKeyFile(certFile);
-                        sslctx.useCertificateChainFile(certFile);
-                        break;
-                    case 0b00:
-                        break;
-                }
-                _sslStream = createTLSStream(_conn, sslctx, host);
+                connectSSL(host);
             }
             catch (ConnectError e) {
                 throw e;

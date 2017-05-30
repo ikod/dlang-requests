@@ -1149,10 +1149,10 @@ else {
     }
 
     
-    private unittest {
+    version(none) private unittest {
         import std.json;
         import std.conv;
-        import requests: HTTPRequest, TimeoutException, BasicAuthentication, postContent, queryParams, MultipartForm, formData;
+        import requests.http: HTTPRequest, TimeoutException, BasicAuthentication, queryParams, MultipartForm, formData;
         globalLogLevel(LogLevel.info);
 
         static auto buildReply(ref HTTPD_Request rq) {
@@ -1466,7 +1466,7 @@ else {
         rqJson = parseJSON(json.object["json"].str);
         assert(rqJson.object["a"].str == "b");
         assert(equal([1,2,3], rqJson.object["c"].array.map!"a.integer"));
-        
+
         rs = request.post(httpbin_url ~ "post", "0123456789".repeat(32));
         json = parseJSON(cast(string)rs.responseBody);
         assert(equal(json.object["data"].array.map!"a.integer", "0123456789".repeat(32).join));
@@ -1513,7 +1513,7 @@ else {
             ///
             /// Ok, files ready.
             /// Now we will prepare Form data
-            /// 
+            ///
             File f1 = File(tmpfname1, "rb");
             File f2 = File(tmpfname2, "rb");
             scope(exit) {
@@ -1522,7 +1522,7 @@ else {
             }
             ///
             /// for each part we have to set field name, source (ubyte array or opened file) and optional filename and content-type
-            /// 
+            ///
             MultipartForm form = MultipartForm().
                 add(formData("Field1", cast(ubyte[])"form field from memory")).
                     add(formData("Field2", cast(ubyte[])"file field from memory", ["filename":"data2"])).

@@ -2,11 +2,12 @@
 
 [![Build Status](https://travis-ci.org/ikod/dlang-requests.svg?branch=master)](https://travis-ci.org/ikod/dlang-requests)
 
-HTTP requests library with goals:
+HTTP client library, inspired by python-requests with goals:
 
 * small memory footprint
 * performance
 * simple, high level API
+* native D implementation
 
 API docs: [Wiki](https://github.com/ikod/dlang-requests/wiki)
 

@@ -25,6 +25,20 @@ import requests.buffer;
 static immutable ushort[] redirectCodes = [301, 302, 303];
 static immutable uint     defaultBufferSize = 12*1024;
 
+static immutable string[string] proxies;
+static this() {
+    import std.process;
+    proxies["http"] = environment.get("http_proxy", environment.get("HTTP_PROXY"));
+    proxies["https"] = environment.get("https_proxy", environment.get("HTTPS_PROXY"));
+    proxies["all"] = environment.get("all_proxy", environment.get("ALL_PROXY"));
+    foreach(p; proxies.byKey()) {
+        if (proxies[p] is null) {
+            continue;
+        }
+        URI u = URI(proxies[p]);
+    }
+}
+
 public class MaxRedirectsException: Exception {
     this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
         super(message, file, line, next);
@@ -309,7 +323,7 @@ public struct HTTPRequest {
     mixin(Getter_Setter!size_t     ("bufferSize"));
     mixin(Getter_Setter!uint       ("maxRedirects"));
     mixin(Getter_Setter!uint       ("verbosity"));
-    mixin(Getter_Setter!string     ("proxy"));
+    mixin(Getter!string            ("proxy"));
     mixin(Getter_Setter!Duration   ("timeout"));
     mixin(Setter!Auth              ("authenticator"));
     mixin(Getter_Setter!bool       ("useStreaming"));
@@ -332,7 +346,15 @@ public struct HTTPRequest {
     @property final void cookie(Cookie[] s) pure @safe @nogc nothrow {
         _cookie = s;
     }
-    
+    @property final void proxy(string v) {
+        if ( v != _proxy ) {
+            if ( _stream && _stream.isOpen() ) {
+                debug(requests) tracef("Close connection because we reset proxy");
+                _stream.close();
+            }
+        }
+        _proxy = v;
+    }
     @property final Cookie[] cookie() pure @safe @nogc nothrow {
         return _cookie;
     }    
@@ -389,6 +411,28 @@ public struct HTTPRequest {
             }
         }
         return a.data();
+    }
+    string select_proxy(string scheme) {
+        if ( _proxy is null && proxies.length == 0 ) {
+            debug(requests) tracef("proxy=null");
+            return null;
+        }
+        if ( _proxy ) {
+            debug(requests) tracef("proxy=%s", _proxy);
+            return _proxy;
+        }
+        auto p = scheme in proxies;
+        if ( p !is null && *p != "") {
+            debug(requests) tracef("proxy=%s", *p);
+            return *p;
+        }
+        p = "all" in proxies;
+        if ( p !is null && *p != "") {
+            debug(requests) tracef("proxy=%s", *p);
+            return *p;
+        }
+        debug(requests) tracef("proxy=null");
+        return null;
     }
     void clearHeaders() {
         _headers = null;
@@ -462,7 +506,8 @@ public struct HTTPRequest {
     /// Handle proxy and query parameters.
     /// 
     private @property string requestString(QueryParam[] params = null) {
-        if ( _proxy && _uri.scheme != "https" ) {
+        string actual_proxy = select_proxy(_uri.scheme);
+        if ( actual_proxy && _uri.scheme != "https" ) {
             return "%s %s HTTP/1.1\r\n".format(_method, _uri.uri);
         }
         auto query = _uri.query.dup;
@@ -663,18 +708,28 @@ public struct HTTPRequest {
         return true;
     }
     ///
-    /// If uri changed so that we have to change host or port, then we have to close socket stream
+    /// If uri changed so that we have to change host, port or proxy, then we have to close socket stream
     /// 
     private void handleURLChange(in URI from, in URI to) {
-        if ( _proxy !is null ) {
-            // we do not have to close proxy connection in any case
-            if ( _stream && _stream.isConnected && from.scheme != to.scheme ) {
+        if ( _stream is null || !_stream.isConnected ) {
+            return;
+        }
+        string proxy_from = select_proxy(from.scheme);
+        string proxy_to = select_proxy(to.scheme);
+        if ( proxy_from != proxy_to ) {
+            // we are switching proxies
+            _stream.close();
+            return;
+        }
+        if ( proxy_to !is null ) {
+            // we do not have to close proxy connection if we will not change proxy
+            if ( (from.scheme=="https" || to.scheme=="https")
+                 && (from.scheme != to.scheme) ) {
                 _stream.close();
             }
             return;
         }
-        if ( _stream !is null && _stream.isConnected && 
-            ( from.scheme != to.scheme || from.host != to.host || from.port != to.port) ) {
+        if ( from.scheme != to.scheme || from.host != to.host || from.port != to.port ) {
             debug tracef("Have to reopen stream, because of URI change");
             _stream.close();
         }
@@ -705,10 +760,11 @@ public struct HTTPRequest {
         debug(requests) tracef("Set up new connection");
 
         URI   uri; // this URI will be used temporarry if we need proxy
+        string actual_proxy = select_proxy(_uri.scheme);
         final switch (_uri.scheme) {
             case "http":
-                if ( _proxy ) {
-                    uri.uri_parse(_proxy);
+                if ( actual_proxy ) {
+                    uri.uri_parse(actual_proxy);
                 } else {
                     // use original uri
                     uri = _uri;
@@ -716,8 +772,8 @@ public struct HTTPRequest {
                 _stream = new TCPStream().connect(uri.host, uri.port, _timeout);
                 break;
             case "https":
-                if ( _proxy ) {
-                    uri.uri_parse(_proxy);
+                if ( actual_proxy ) {
+                    uri.uri_parse(actual_proxy);
                     _stream = new TCPStream().connect(uri.host, uri.port, _timeout);
                     if ( verbosity>=1 ) {
                         writeln("> CONNECT %s:%d HTTP/1.1".format(_uri.host, _uri.port));

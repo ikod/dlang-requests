@@ -4,7 +4,7 @@ version(vibeD) {
 } else
 version (httpbin) 
 {
-	import requests.server;
+	import requests.server.httpd;
 	import requests.utils;
 	import std.datetime;
 	import std.json;

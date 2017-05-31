@@ -469,7 +469,7 @@ public struct FTPRequest {
             }
         }
         scope (exit) {
-            if ( pwd && _controlChannel ) {
+            if ( pwd && _controlChannel && !_useStreaming ) {
                 sendCmdGetResponse("CWD " ~ pwd ~ "\r\n");
             }
         }
@@ -596,6 +596,7 @@ public struct FTPRequest {
                                 debug(requests) tracef("Successfully received %d bytes", _response._responseBody.length);
                             }
                             _response.code = code;
+                            sendCmdGetResponse("CWD " ~ pwd ~ "\r\n");
                             break;
                         }
                     }

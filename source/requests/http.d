@@ -1173,7 +1173,7 @@ public struct HTTPRequest {
         req.put(requestString());
 
         auto h = requestHeaders;
-        if ( contentType ) {
+        if ( contentType && "Content-Type" !in h ) {
             h["Content-Type"] = contentType;
         }
         static if ( rank!R == 1 ) {

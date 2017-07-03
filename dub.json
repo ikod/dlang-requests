@@ -8,11 +8,6 @@
     "importPaths": ["tests", "source"],
     "configurations": [
         {
-            "name": "std",
-            "libs-posix": ["ssl", "crypto"],
-            "libs-windows": ["libssl32", "libeay32"]
-        },
-        {
             "name": "application",
             "targetType": "executable",
             "sourceFiles": ["app/requested.d"],
@@ -20,7 +15,14 @@
             "libs-windows": ["libssl32", "libeay32"]
         },
         {
+            "name": "std",
+            "targetType": "library",
+            "libs-posix": ["ssl", "crypto"],
+            "libs-windows": ["libssl32", "libeay32"]
+        },
+        {
             "name": "vibed",
+            "targetType": "library",
             "versions": ["vibeD"],
             "dependencies": {
                 "vibe-d": "~>0.7.29"

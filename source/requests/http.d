@@ -328,9 +328,12 @@ public struct HTTPRequest {
     mixin(Setter!Auth              ("authenticator"));
     mixin(Getter_Setter!bool       ("useStreaming"));
     mixin(Getter!long              ("contentLength"));
-    mixin(Getter!long              ("contentReceived"));
     mixin(Getter_Setter!SSLOptions ("sslOptions"));
 
+
+    @property auto contentReceived() pure @safe nothrow @nogc const {
+        return _contentReceived;
+    }
     @property void sslSetVerifyPeer(bool v) pure @safe nothrow @nogc {
         _sslOptions.setVerifyPeer(v);
     }
@@ -358,6 +361,8 @@ public struct HTTPRequest {
     @property final Cookie[] cookie() pure @safe @nogc nothrow {
         return _cookie;
     }    
+
+    @disable this(this);
 
     this(string uri) {
         _uri = URI(uri);

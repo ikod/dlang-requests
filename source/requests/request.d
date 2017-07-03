@@ -99,7 +99,7 @@ public struct Request {
     /// get length og actually received content.
     /// this value increase over time, while we receive data
     /// 
-    @property long contentReceived() pure @nogc nothrow {
+    @property long contentReceived() pure @nogc nothrow const {
         final switch ( _uri.scheme ) {
             case "http", "https":
                 return _http.contentReceived;
@@ -108,7 +108,7 @@ public struct Request {
         }
     }
     /// get contentLength of the responce
-    @property long contentLength() pure @nogc nothrow {
+    @property long contentLength() pure @nogc nothrow const {
         final switch ( _uri.scheme ) {
             case "http", "https":
                 return _http.contentLength;

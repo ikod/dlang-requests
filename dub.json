@@ -11,14 +11,10 @@
             "name": "application",
             "targetType": "executable",
             "sourceFiles": ["app/requested.d"],
-            "libs-posix": ["ssl", "crypto"],
-            "libs-windows": ["libssl32", "libeay32"]
         },
         {
             "name": "std",
             "targetType": "library",
-            "libs-posix": ["ssl", "crypto"],
-            "libs-windows": ["libssl32", "libeay32"]
         },
         {
             "name": "vibed",

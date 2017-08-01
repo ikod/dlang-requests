@@ -1,0 +1,284 @@
+module requests.ssl_adapter;
+
+import std.stdio;
+import std.string;
+import std.format;
+import std.typecons;
+import core.stdc.stdlib;
+import core.sys.posix.dlfcn;
+
+version(Windows) {
+    import core.sys.windows.windows;
+    alias DLSYM = GetProcAddress;
+} else {
+    alias DLSYM = dlsym;
+}
+
+
+struct SSL {};
+struct SSL_CTX {};
+struct SSL_METHOD {};
+
+string SSL_Function_decl(string N, R, A...)() {
+    string F = "extern (C) %s function %s adapter_%s;".format(R.stringof, A.stringof, N);
+    return F;
+}
+string SSL_Function_set_i(string N, R, A...)() {
+    string F = "openssl.adapter_%s = cast(typeof(openssl.adapter_%s))DLSYM(cast(void*)openssl._libssl, \"%s\");".format(N, N, N);
+    return F;
+}
+string CRYPTO_Function_set_i(string N, R, A...)() {
+    string F = "openssl.adapter_%s = cast(typeof(openssl.adapter_%s))DLSYM(cast(void*)openssl._libcrypto, \"%s\");".format(N, N, N);
+    return F;
+}
+
+private alias Version = Tuple!(int, "major", int, "minor");
+
+immutable static OpenSSL openssl;
+
+static this() {
+    if ( openssl._libssl !is null ) {
+        return;
+    }
+    version(OSX) {
+        openssl._libssl = cast(typeof(openssl._libssl))dlopen("libssl.dylib", RTLD_LAZY);
+        openssl._libcrypto = cast(typeof(openssl._libcrypto))dlopen("libcrypto.dylib", RTLD_LAZY);
+    } else
+    version(linux) {
+        openssl._libssl = cast(typeof(openssl._libssl))dlopen("libssl.so", RTLD_LAZY);
+        openssl._libcrypto = cast(typeof(openssl._libcrypto))dlopen("libcrypto.so", RTLD_LAZY);
+    } else
+    version(Windows) {
+        openssl._libssl = cast(typeof(openssl._libssl))LoadLibrary("libssl32.dll");
+        openssl._libcrypto = cast(typeof(openssl._libcrypto))LoadLibrary("libeay32.dll");
+    } else {
+        throw new Exception("loading openssl: unsupported system");
+    }
+    if ( openssl._libssl is null ) {
+        version(Windows) {
+            throw new Exception("loading libssl: error %d".format(GetLastError()));
+        } else {
+            throw new Exception("loading openssl: %s",format(fromStringz(dlerror())));
+        }
+    }
+    if ( openssl._libcrypto is null ) {
+        version(Windows) {
+            throw new Exception("loading libcrypto: error %d".format(GetLastError()));
+        } else {
+            throw new Exception("loading libcrypto: %s",format(fromStringz(dlerror())));
+        }
+    }
+    openssl._ver = openssl.OpenSSL_version_detect();
+
+    mixin(SSL_Function_set_i!("SSL_library_init", int));
+    mixin(CRYPTO_Function_set_i!("OpenSSL_add_all_ciphers", void));
+    mixin(CRYPTO_Function_set_i!("OpenSSL_add_all_digests", void));
+    mixin(SSL_Function_set_i!("SSL_load_error_strings", void));
+
+    mixin(SSL_Function_set_i!("OPENSSL_init_ssl", int, ulong, void*));
+    mixin(CRYPTO_Function_set_i!("OPENSSL_init_crypto", int, ulong, void*));
+
+    mixin(SSL_Function_set_i!("TLSv1_client_method", SSL_METHOD*));
+    mixin(SSL_Function_set_i!("SSL_CTX_new", SSL_CTX*, SSL_METHOD*));
+    mixin(SSL_Function_set_i!("SSL_CTX_set_default_verify_paths", int, SSL_CTX*));
+    mixin(SSL_Function_set_i!("SSL_CTX_load_verify_locations", int, SSL_CTX*, char*, char*));
+    mixin(SSL_Function_set_i!("SSL_CTX_set_verify", void, SSL_CTX*, int, void*));
+    mixin(SSL_Function_set_i!("SSL_CTX_use_PrivateKey_file", int, SSL_CTX*, const char*, int));
+    mixin(SSL_Function_set_i!("SSL_CTX_use_certificate_file", int, SSL_CTX*, const char*, int));
+    mixin(SSL_Function_set_i!("SSL_new", SSL*, SSL_CTX*));
+    mixin(SSL_Function_set_i!("SSL_set_fd", int, SSL*, int));
+    mixin(SSL_Function_set_i!("SSL_connect", int, SSL*));
+    mixin(SSL_Function_set_i!("SSL_write", int, SSL*, const void*, int));
+    mixin(SSL_Function_set_i!("SSL_read", int, SSL*, void*, int));
+    mixin(SSL_Function_set_i!("SSL_free", void, SSL*));
+    mixin(SSL_Function_set_i!("SSL_CTX_free", void, SSL_CTX*));
+    mixin(SSL_Function_set_i!("SSL_get_error", int, SSL*, int));
+    mixin(SSL_Function_set_i!("ERR_reason_error_string", char*, ulong));
+    mixin(SSL_Function_set_i!("ERR_get_error", ulong));
+
+    void delegate()[Version] init_matrix;
+    init_matrix[Version(1,0)] = &openssl.init1_0;
+    init_matrix[Version(1,1)] = &openssl.init1_1;
+    auto init = init_matrix.get(openssl._ver, null);
+    if ( init is null ) {
+        throw new Exception("loading openssl: unknown version for init");
+    }
+    init();
+}
+
+struct OpenSSL {
+
+    private {
+        Version         _ver;
+        void*           _libssl;
+        void*           _libcrypto;
+
+        // openssl 1.0.x init functions
+        mixin(SSL_Function_decl!("SSL_library_init", int));
+        mixin(SSL_Function_decl!("OpenSSL_add_all_ciphers", void));
+        mixin(SSL_Function_decl!("OpenSSL_add_all_digests", void));
+        mixin(SSL_Function_decl!("SSL_load_error_strings", void));
+
+        // openssl 1.1.x init functions
+        mixin(SSL_Function_decl!("OPENSSL_init_ssl", int, ulong, void*));
+        mixin(SSL_Function_decl!("OPENSSL_init_crypto", int, ulong, void*));
+
+        // all other functions
+        mixin(SSL_Function_decl!("TLSv1_client_method", SSL_METHOD*));
+        mixin(SSL_Function_decl!("SSL_CTX_new", SSL_CTX*, SSL_METHOD*));
+        mixin(SSL_Function_decl!("SSL_CTX_set_default_verify_paths", int, SSL_CTX*));
+        mixin(SSL_Function_decl!("SSL_CTX_load_verify_locations", int, SSL_CTX*, char*, char*));
+        mixin(SSL_Function_decl!("SSL_CTX_set_verify", void, SSL_CTX*, int, void*));
+        mixin(SSL_Function_decl!("SSL_CTX_use_PrivateKey_file", int, SSL_CTX*, const char*, int));
+        mixin(SSL_Function_decl!("SSL_CTX_use_certificate_file", int, SSL_CTX*, const char*, int));
+        mixin(SSL_Function_decl!("SSL_new", SSL*, SSL_CTX*));
+        mixin(SSL_Function_decl!("SSL_set_fd", int, SSL*, int));
+        mixin(SSL_Function_decl!("SSL_connect", int, SSL*));
+        mixin(SSL_Function_decl!("SSL_write", int, SSL*, const void*, int));
+        mixin(SSL_Function_decl!("SSL_read", int, SSL*, void*, int));
+        mixin(SSL_Function_decl!("SSL_free", void, SSL*));
+        mixin(SSL_Function_decl!("SSL_CTX_free", void, SSL_CTX*));
+        mixin(SSL_Function_decl!("SSL_get_error", int, SSL*, int));
+        mixin(SSL_Function_decl!("ERR_reason_error_string", char*, ulong));
+        mixin(SSL_Function_decl!("ERR_get_error", ulong));
+    }
+
+    Version reportVersion() const @nogc nothrow pure {
+        return _ver;
+    };
+
+    private Version OpenSSL_version_detect() const {
+        long function() OpenSSL_version_num = cast(long function())DLSYM(cast(void*)_libssl, "OpenSSL_version_num".ptr);
+        if ( OpenSSL_version_num ) {
+            auto v = OpenSSL_version_num();
+            return Version((v>>>20) & 0xff, (v>>>28) & 0xff);
+        }
+        return Version(1, 0);
+    }
+
+    private void init1_0() const {
+        adapter_SSL_library_init();
+        adapter_OpenSSL_add_all_ciphers();
+        adapter_OpenSSL_add_all_digests();
+        adapter_SSL_load_error_strings();
+    }
+    private void init1_1() const {
+        /**
+        Standard initialisation options
+
+        #define OPENSSL_INIT_LOAD_SSL_STRINGS       0x00200000L
+
+        # define OPENSSL_INIT_LOAD_CRYPTO_STRINGS    0x00000002L
+        # define OPENSSL_INIT_ADD_ALL_CIPHERS        0x00000004L
+        # define OPENSSL_INIT_ADD_ALL_DIGESTS        0x00000008L
+        **/
+        enum OPENSSL_INIT_LOAD_SSL_STRINGS = 0x00200000L;
+        enum OPENSSL_INIT_LOAD_CRYPTO_STRINGS = 0x00000002L;
+        enum OPENSSL_INIT_ADD_ALL_CIPHERS = 0x00000004L;
+        enum OPENSSL_INIT_ADD_ALL_DIGESTS = 0x00000008L;
+        adapter_OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, null);
+        adapter_OPENSSL_init_crypto(OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, null);
+    }
+
+    SSL_METHOD* TLSv1_client_method() const {
+        return adapter_TLSv1_client_method();
+    }
+    SSL_CTX* SSL_CTX_new(SSL_METHOD* method) const {
+        return adapter_SSL_CTX_new(method);
+    }
+    int SSL_CTX_set_default_verify_paths(SSL_CTX* ctx) const {
+        return adapter_SSL_CTX_set_default_verify_paths(ctx);
+    }
+    int SSL_CTX_load_verify_locations(SSL_CTX* ctx, char* CAFile, char* CAPath) const {
+        return adapter_SSL_CTX_load_verify_locations(ctx, CAFile, CAPath);
+    }
+    void SSL_CTX_set_verify(SSL_CTX* ctx, int mode, void* callback) const {
+        adapter_SSL_CTX_set_verify(ctx, mode, callback);
+    }
+    int SSL_CTX_use_PrivateKey_file(SSL_CTX* ctx, const char* file, int type) const {
+        return adapter_SSL_CTX_use_PrivateKey_file(ctx, file, type);
+    }
+    int SSL_CTX_use_certificate_file(SSL_CTX* ctx, const char* file, int type) const {
+        return adapter_SSL_CTX_use_certificate_file(ctx, file, type);
+    }
+    SSL* SSL_new(SSL_CTX* ctx) const {
+        return adapter_SSL_new(ctx);
+    }
+    int SSL_set_fd(SSL* ssl, int fd) const {
+        return adapter_SSL_set_fd(ssl, fd);
+    }
+    int SSL_connect(SSL* ssl) const {
+        return adapter_SSL_connect(ssl);
+    }
+    int SSL_read(SSL* ssl, void *b, int n) const {
+        return adapter_SSL_read(ssl, b, n);
+    }
+    int SSL_write(SSL* ssl, const void *b, int n) const {
+        return adapter_SSL_write(ssl, b, n);
+    }
+    void SSL_free(SSL* ssl) const {
+        adapter_SSL_free(ssl);
+    }
+    void SSL_CTX_free(SSL_CTX* ctx) const {
+        adapter_SSL_CTX_free(ctx);
+    }
+    int SSL_get_error(SSL* ssl, int err) const {
+        return adapter_SSL_get_error(ssl, err);
+    }
+    char* ERR_reason_error_string(ulong code) const {
+        return adapter_ERR_reason_error_string(code);
+    }
+    ulong ERR_get_error() const {
+        return ERR_get_error();
+    }
+}
+/*
+int main() {
+    import std.socket;
+
+    auto v = openssl.reportVersion();
+    writefln("openSSL v.%s.%s", v.major, v.minor);
+    openssl.SSL_library_init();
+    writeln("InitSSL - ok");
+    SSL_CTX* ctx = openssl.SSL_CTX_new(openssl.TLSv1_client_method());
+    writefln("SSL_CTX_new = %x", ctx);
+    int r = openssl.adapter_SSL_CTX_set_default_verify_paths(ctx);
+    writefln("SSL_CTX_set_default_verify_paths = %d(%s)", r, r==1?"ok":"fail");
+    r = openssl.adapter_SSL_CTX_load_verify_locations(ctx, cast(char*)null, cast(char*)null);
+    writefln("SSL_CTX_load_verify_locations - ok");
+    openssl.SSL_CTX_set_verify(ctx, 0, null);
+    writefln("SSL_CTX_set_verify - ok");
+    //r = openssl.SSL_CTX_use_PrivateKey_file(ctx, null, 0);
+    //writefln("SSL_CTX_use_PrivateKey_file = %d(%s)", r, r==1?"ok":"fail");
+    //r = openssl.SSL_CTX_use_certificate_file(ctx, cast(char*), 0);
+    //writefln("SSL_CTX_use_certificate_file = %d(%s)", r, r==1?"ok":"fail");
+    SSL* ssl = openssl.SSL_new(ctx);
+    writefln("SSL_new = %x", ssl);
+    auto s = new Socket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+    Address[] a = getAddress("ns.od.ua", 443);
+    writeln(a[0]);
+    s.connect(a[0]);
+    r = openssl.SSL_set_fd(ssl, s.handle);
+    writefln("SSL_set_fd = %d(%s)", r, r==1?"ok":"fail");
+    r = openssl.SSL_connect(ssl);
+    writefln("SSL_connect = %d(%s)", r, r==1?"ok":"fail");
+    if ( r < 0 ) {
+        writefln("code: %d", openssl.SSL_get_error(ssl, r));
+    }
+    string req = "GET / HTTP/1.0\n\n";
+    r = openssl.SSL_write(ssl, cast(void*)req.ptr, cast(int)req.length);
+    writefln("SSL_write = %d", r);
+    do {
+        ubyte[]  resp = new ubyte[](1024);
+        r = openssl.SSL_read(ssl, cast(void*)resp.ptr, cast(int)1024);
+        writefln("SSL_read = %d", r);
+        if ( r > 0 ) {
+            writeln(cast(string)resp);
+        }
+    } while(r > 0);
+    openssl.SSL_free(ssl);
+    openssl.SSL_CTX_free(ctx);
+    s.close();
+    return 0;
+}
+*/

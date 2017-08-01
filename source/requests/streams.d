@@ -17,6 +17,8 @@ import std.datetime;
 import std.socket;
 import core.stdc.errno;
 
+import requests.ssl_adapter : openssl, SSL, SSL_CTX;
+
 alias InDataHandler = DataPipeIface!ubyte;
 
 public class ConnectError: Exception {
@@ -729,43 +731,43 @@ version(vibeD) {
 else {
     extern(C) {
         int SSL_library_init();
-        void OpenSSL_add_all_ciphers();
-        void OpenSSL_add_all_digests();
-        void SSL_load_error_strings();
-
-        struct SSL {}
-        struct SSL_CTX {}
-        struct SSL_METHOD {}
-
-        SSL_CTX* SSL_CTX_new(const SSL_METHOD* method);
-        SSL* SSL_new(SSL_CTX*);
-        int SSL_set_fd(SSL*, int);
-        int SSL_connect(SSL*);
-        int SSL_write(SSL*, const void*, int);
-        int SSL_read(SSL*, void*, int);
-        int SSL_shutdown(SSL*) @trusted @nogc nothrow;
-        void SSL_free(SSL*);
-        void SSL_CTX_free(SSL_CTX*);
-
-        long SSL_CTX_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg);
-
-        long SSL_CTX_set_mode(SSL_CTX *ctx, long mode);
-        int  SSL_CTX_set_default_verify_paths(SSL_CTX *ctx);
-        int SSL_CTX_load_verify_locations(SSL_CTX *ctx, const char *CAfile, const char *CApath);
-        void SSL_CTX_set_verify(SSL_CTX *ctx, int mode, void *);
-        long SSL_set_mode(SSL *ssl, long mode);
-        int  SSL_CTX_use_PrivateKey_file(SSL_CTX *ctx, const char *file, int type);
-        int  SSL_CTX_use_certificate_file(SSL_CTX *ctx, const char *file, int type);
-
-        long SSL_CTX_get_mode(SSL_CTX *ctx);
-        long SSL_get_mode(SSL *ssl);
-
-        long ERR_get_error();
-        char* ERR_reason_error_string(ulong e);
-
-        SSL_METHOD* SSLv3_client_method();
-        SSL_METHOD* TLSv1_2_client_method();
-        SSL_METHOD* TLSv1_client_method();
+//        void OpenSSL_add_all_ciphers();
+//        void OpenSSL_add_all_digests();
+//        void SSL_load_error_strings();
+//
+//        struct SSL {}
+//        struct SSL_CTX {}
+//        struct SSL_METHOD {}
+//
+//        SSL_CTX* SSL_CTX_new(const SSL_METHOD* method);
+//        SSL* SSL_new(SSL_CTX*);
+//        int SSL_set_fd(SSL*, int);
+//        int SSL_connect(SSL*);
+//        int SSL_write(SSL*, const void*, int);
+//        int SSL_read(SSL*, void*, int);
+//        int SSL_shutdown(SSL*) @trusted @nogc nothrow;
+//        void SSL_free(SSL*);
+//        void SSL_CTX_free(SSL_CTX*);
+//
+//        long SSL_CTX_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg);
+//
+//        long SSL_CTX_set_mode(SSL_CTX *ctx, long mode);
+//        int  SSL_CTX_set_default_verify_paths(SSL_CTX *ctx);
+//        int SSL_CTX_load_verify_locations(SSL_CTX *ctx, const char *CAfile, const char *CApath);
+//        void SSL_CTX_set_verify(SSL_CTX *ctx, int mode, void *);
+//        long SSL_set_mode(SSL *ssl, long mode);
+//        int  SSL_CTX_use_PrivateKey_file(SSL_CTX *ctx, const char *file, int type);
+//        int  SSL_CTX_use_certificate_file(SSL_CTX *ctx, const char *file, int type);
+//
+//        long SSL_CTX_get_mode(SSL_CTX *ctx);
+//        long SSL_get_mode(SSL *ssl);
+//
+//        long ERR_get_error();
+//        char* ERR_reason_error_string(ulong e);
+//
+//        SSL_METHOD* SSLv3_client_method();
+//        SSL_METHOD* TLSv1_2_client_method();
+//        SSL_METHOD* TLSv1_client_method();
     }
 
     enum SSL_VERIFY_PEER = 0x01;
@@ -775,10 +777,11 @@ else {
     immutable int[SSLOptions.filetype] ft2ssl;
 
     shared static this() {
-        SSL_library_init();
-        OpenSSL_add_all_ciphers();
-        OpenSSL_add_all_digests();
-        SSL_load_error_strings();
+//        SSL_library_init();
+//        OpenSSL_add_all_ciphers();
+//        OpenSSL_add_all_digests();
+//        SSL_load_error_strings();
+        //openssl.SSL_library_init();
         ft2ssl = [
             SSLOptions.filetype.pem: SSL_FILETYPE_PEM,
             SSLOptions.filetype.asn1: SSL_FILETYPE_ASN1,
@@ -792,14 +795,14 @@ else {
         private SSL_CTX* ctx;
         private void initSsl(SSLOptions opts) {
             //ctx = SSL_CTX_new(SSLv3_client_method());
-            ctx = SSL_CTX_new(TLSv1_client_method());
+            ctx = openssl.SSL_CTX_new(openssl.TLSv1_client_method());
             assert(ctx !is null);
             if ( opts.getVerifyPeer() ) {
-                SSL_CTX_set_default_verify_paths(ctx);
+                openssl.SSL_CTX_set_default_verify_paths(ctx);
                 if ( opts.getCaCert() ) {
-                    SSL_CTX_load_verify_locations(ctx, opts.getCaCert().toStringz(), null);
+                    openssl.SSL_CTX_load_verify_locations(ctx, cast(char*)opts.getCaCert().toStringz(), cast(char*)null);
                 }
-                SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, null);
+                openssl.SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, null);
             }
             immutable keyFile = opts.getKeyFile();
             immutable keyType = opts.getKeyType();
@@ -807,50 +810,50 @@ else {
             immutable certType = opts.getCertType();
             final switch(opts.haveFiles()) {
                 case 0b11:  // both files
-                    SSL_CTX_use_PrivateKey_file(ctx,  keyFile.toStringz(), ft2ssl[keyType]);
-                    SSL_CTX_use_certificate_file(ctx, certFile.toStringz(),ft2ssl[certType]);
+                    openssl.SSL_CTX_use_PrivateKey_file(ctx,  keyFile.toStringz(), ft2ssl[keyType]);
+                    openssl.SSL_CTX_use_certificate_file(ctx, certFile.toStringz(),ft2ssl[certType]);
                     break;
                 case 0b01:  // key only
-                    SSL_CTX_use_PrivateKey_file(ctx,  keyFile.toStringz(), ft2ssl[keyType]);
-                    SSL_CTX_use_certificate_file(ctx, keyFile.toStringz(), ft2ssl[keyType]);
+                    openssl.SSL_CTX_use_PrivateKey_file(ctx,  keyFile.toStringz(), ft2ssl[keyType]);
+                    openssl.SSL_CTX_use_certificate_file(ctx, keyFile.toStringz(), ft2ssl[keyType]);
                     break;
                 case 0b10:  // cert only
-                    SSL_CTX_use_PrivateKey_file(ctx,  certFile.toStringz(), ft2ssl[certType]);
-                    SSL_CTX_use_certificate_file(ctx, certFile.toStringz(), ft2ssl[certType]);
+                    openssl.SSL_CTX_use_PrivateKey_file(ctx,  certFile.toStringz(), ft2ssl[certType]);
+                    openssl.SSL_CTX_use_certificate_file(ctx, certFile.toStringz(), ft2ssl[certType]);
                     break;
                 case 0b00:
                     break;
             }
             //SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
             //SSL_CTX_ctrl(ctx, 33, SSL_MODE_RELEASE_BUFFERS, null);
-            ssl = SSL_new(ctx);
-            SSL_set_fd(ssl, this.handle);
+            ssl = openssl.SSL_new(ctx);
+            openssl.SSL_set_fd(ssl, this.handle);
         }
 
         @trusted
         override void connect(Address dest) {
             super.connect(dest);
-            if(SSL_connect(ssl) == -1) {
-                throw new Exception("ssl connect failed: %s".format(to!string(ERR_reason_error_string(ERR_get_error()))));
+            if(openssl.SSL_connect(ssl) == -1) {
+                throw new Exception("ssl connect failed: %s".format(to!string(openssl.ERR_reason_error_string(openssl.ERR_get_error()))));
             }
         }
         auto connectSSL() {
-            if(SSL_connect(ssl) == -1) {
-                throw new Exception("ssl connect failed: %s".format(to!string(ERR_reason_error_string(ERR_get_error()))));
+            if(openssl.SSL_connect(ssl) == -1) {
+                throw new Exception("ssl connect failed: %s".format(to!string(openssl.ERR_reason_error_string(openssl.ERR_get_error()))));
             }
             debug(requests) tracef("ssl socket connected");
             return this;
         }
         @trusted
         override ptrdiff_t send(const(void)[] buf, SocketFlags flags) {
-            return SSL_write(ssl, buf.ptr, cast(uint) buf.length);
+            return openssl.SSL_write(ssl, buf.ptr, cast(uint) buf.length);
         }
         override ptrdiff_t send(const(void)[] buf) {
             return send(buf, SocketFlags.NONE);
         }
         @trusted
         override ptrdiff_t receive(void[] buf, SocketFlags flags) {
-            return SSL_read(ssl, buf.ptr, cast(int)buf.length);
+            return openssl.SSL_read(ssl, buf.ptr, cast(int)buf.length);
         }
         override ptrdiff_t receive(void[] buf) {
             return receive(buf, SocketFlags.NONE);
@@ -868,8 +871,8 @@ else {
             super.close();
         }
         ~this() {
-            SSL_free(ssl);
-            SSL_CTX_free(ctx);
+            openssl.SSL_free(ssl);
+            openssl.SSL_CTX_free(ctx);
         }
     }
 

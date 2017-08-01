@@ -9,8 +9,6 @@
     "configurations": [
         {
             "name": "std",
-            "libs-posix": ["ssl", "crypto"],
-            "libs-windows": ["libssl32", "libeay32"]
         },
         {
             "name": "vibed",

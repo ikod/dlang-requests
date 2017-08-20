@@ -131,6 +131,10 @@ public struct Request {
     @property auto sslOptions() {
         return _http.sslOptions();
     }
+    @property auto bind(string v) {
+        _http.bind(v);
+        _ftp.bind(v);
+    }
     /// Add headers to request
     /// Params:
     /// headers = headers to send.

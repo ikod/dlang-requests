@@ -348,6 +348,7 @@ Here is a short description of some `Request` options you can set:
 | useStreaming        | `bool`           | receive data as lazy `InputRange`       | false      |
 | cookie              | `Cookie[]`       | cookies you will send to server         | null       |
 | authenticator       | `Auth`           | authenticatior                          | null       |
+| bind                | `string`         | use local address whan connect          | null       |
 
 *) Throws exception when limit is reached.
 
@@ -456,14 +457,15 @@ import std.parallelism;
 import std.algorithm;
 import std.string;
 import core.atomic;
+import requests;
 
 immutable auto urls = [
     "http://httpbin.org/stream/10",
-    "https://httpbin.org/stream/20",
+    "http://httpbin.org/stream/20",
     "http://httpbin.org/stream/30",
-    "https://httpbin.org/stream/40",
+    "http://httpbin.org/stream/40",
     "http://httpbin.org/stream/50",
-    "https://httpbin.org/stream/60",
+    "http://httpbin.org/stream/60",
     "http://httpbin.org/stream/70",
 ];
 
@@ -564,7 +566,7 @@ void main() {
     rq.sslSetVerifyPeer(true); // enable peer verification
     rq.sslSetKeyFile("client01.key"); // set key file
     rq.sslSetCertFile("client01.crt"); // set cert file
-    auto rs = rq.get("https://httpbin.org/");
+    auto rs = rq.get("https://dlang.org/");
     writeln(rs.code);
     writeln(rs.responseBody);
 }
@@ -640,7 +642,7 @@ void main()
 }
 ```
 
-Output:
+Output(please note that httpbin.org can change it's behaviour):
 
 ```
 > PUT /put?exampleTitle=PUT%20content HTTP/1.1
@@ -695,39 +697,45 @@ It is important to note that `pool` does not preserve result order. If you need 
 Here is an example usage:
 
 ```d
-Job[] jobs = [
-    Job("http://httpbin.org/get").addHeaders([
-                        "X-Header": "X-Value",
-                        "Y-Header": "Y-Value"
-                    ]),
-    Job("http://httpbin.org/gzip"),
-    Job("http://httpbin.org/deflate"),
-    Job("http://httpbin.org/absolute-redirect/3")
-            .maxRedirects(2),                   // limit redirects
-    Job("http://httpbin.org/range/1024"),
-    Job("http://httpbin.org/post")
-            .method("POST")                     // change default GET to POST
-            .data("test".representation())      // attach data for POST
-            .opaque("id".representation),       // opaque data - you will receive the same in Result
-    Job("http://httpbin.org/delay/3")
-            .timeout(1.seconds),                // set timeout to 1.seconds - this request will throw exception and fails
-    Job("http://httpbin.org/stream/1024"),
-    Job("ftp://speedtest.tele2.net/1KB.zip"),   // ftp requests too
-];
+import std.algorithm;
+import std.datetime;
+import std.string;
+import std.range;
+import requests;
 
-auto count = jobs.
-    pool(5).
-    filter!(r => r.code==200).
-    count();
+void main() {
+    Job[] jobs = [
+        Job("http://httpbin.org/get").addHeaders([
+                            "X-Header": "X-Value",
+                            "Y-Header": "Y-Value"
+                        ]),
+        Job("http://httpbin.org/gzip"),
+        Job("http://httpbin.org/deflate"),
+        Job("http://httpbin.org/range/1024"),
+        Job("http://httpbin.org/post")
+                .method("POST")                     // change default GET to POST
+                .data("test".representation())      // attach data for POST
+                .opaque("id".representation),       // opaque data - you will receive the same in Result
+        Job("http://httpbin.org/delay/3")
+                .timeout(1.seconds),                // set timeout to 1.seconds - this request will throw exception and fails
+        Job("http://httpbin.org/stream/1024"),
+        Job("ftp://speedtest.tele2.net/1KB.zip"),   // ftp requests too
+    ];
 
-assert(count == jobs.length - 2, "failed");
-// generate post data from input range
-// and process in 10 workers pool
-iota(20)
-    .map!(n => Job("http://httpbin.org/post")
-                    .data("%d".format(n).representation))
-    .pool(10)
-    .each!(r => assert(r.code==200));
+    auto count = jobs.
+        pool(5).
+        filter!(r => r.code==200).
+        count();
+
+    assert(count == jobs.length - 2, "failed");
+    // generate post data from input range
+    // and process in 10 workers pool
+    iota(20)
+        .map!(n => Job("http://httpbin.org/post")
+                        .data("%d".format(n).representation))
+        .pool(10)
+        .each!(r => assert(r.code==200));
+}
 ```
 
 One more example, with more features combined:

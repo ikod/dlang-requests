@@ -71,6 +71,7 @@ public struct FTPRequest {
         Auth           _authenticator;
         string        _method;
         string        _proxy;
+        string        _bind;
     }
     mixin(Getter_Setter!Duration("timeout"));
     mixin(Getter_Setter!uint("verbosity"));
@@ -81,6 +82,7 @@ public struct FTPRequest {
     mixin(Getter!long("contentReceived"));
     mixin(Setter!Auth("authenticator"));
     mixin(Getter_Setter!string("proxy"));
+    mixin(Getter_Setter!string("bind"));
 
     @property final string[] responseHistory() @safe @nogc nothrow {
         return _responseHistory;
@@ -420,6 +422,7 @@ public struct FTPRequest {
 
         if ( !_controlChannel ) {
             _controlChannel = new TCPStream();
+            _controlChannel.bind(_bind);
             _controlChannel.connect(_uri.host, _uri.port, _timeout);
             _response._connectedAt = Clock.currTime;
             response = serverResponse();
@@ -537,7 +540,7 @@ public struct FTPRequest {
                 dataStream.close();
             }
         }
-        
+        dataStream.bind(_bind);
         dataStream.connect(host, port, _timeout);
         
         code = sendCmdGetResponse("RETR " ~ baseName(_uri.path) ~ "\r\n");

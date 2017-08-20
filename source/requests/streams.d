@@ -495,43 +495,6 @@ version(vibeD) {
 else {
     extern(C) {
         int SSL_library_init();
-//        void OpenSSL_add_all_ciphers();
-//        void OpenSSL_add_all_digests();
-//        void SSL_load_error_strings();
-//
-//        struct SSL {}
-//        struct SSL_CTX {}
-//        struct SSL_METHOD {}
-//
-//        SSL_CTX* SSL_CTX_new(const SSL_METHOD* method);
-//        SSL* SSL_new(SSL_CTX*);
-//        int SSL_set_fd(SSL*, int);
-//        int SSL_connect(SSL*);
-//        int SSL_write(SSL*, const void*, int);
-//        int SSL_read(SSL*, void*, int);
-//        int SSL_shutdown(SSL*) @trusted @nogc nothrow;
-//        void SSL_free(SSL*);
-//        void SSL_CTX_free(SSL_CTX*);
-//
-//        long SSL_CTX_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg);
-//
-//        long SSL_CTX_set_mode(SSL_CTX *ctx, long mode);
-//        int  SSL_CTX_set_default_verify_paths(SSL_CTX *ctx);
-//        int SSL_CTX_load_verify_locations(SSL_CTX *ctx, const char *CAfile, const char *CApath);
-//        void SSL_CTX_set_verify(SSL_CTX *ctx, int mode, void *);
-//        long SSL_set_mode(SSL *ssl, long mode);
-//        int  SSL_CTX_use_PrivateKey_file(SSL_CTX *ctx, const char *file, int type);
-//        int  SSL_CTX_use_certificate_file(SSL_CTX *ctx, const char *file, int type);
-//
-//        long SSL_CTX_get_mode(SSL_CTX *ctx);
-//        long SSL_get_mode(SSL *ssl);
-//
-//        long ERR_get_error();
-//        char* ERR_reason_error_string(ulong e);
-//
-//        SSL_METHOD* SSLv3_client_method();
-//        SSL_METHOD* TLSv1_2_client_method();
-//        SSL_METHOD* TLSv1_client_method();
     }
 
     enum SSL_VERIFY_PEER = 0x01;
@@ -541,11 +504,6 @@ else {
     immutable int[SSLOptions.filetype] ft2ssl;
 
     shared static this() {
-//        SSL_library_init();
-//        OpenSSL_add_all_ciphers();
-//        OpenSSL_add_all_digests();
-//        SSL_load_error_strings();
-        //openssl.SSL_library_init();
         ft2ssl = [
             SSLOptions.filetype.pem: SSL_FILETYPE_PEM,
             SSLOptions.filetype.asn1: SSL_FILETYPE_ASN1,
@@ -724,6 +682,7 @@ public interface NetworkStream {
 
     NetworkStream accept();
     @property void reuseAddr(bool);
+    void bind(string);
     void bind(Address);
     void listen(int);
     version(vibeD) {
@@ -743,6 +702,7 @@ public abstract class SocketStream : NetworkStream {
         Socket   s;
         bool     __isOpen;
         bool     __isConnected;
+        string   _bind;
     }
     void open(AddressFamily fa) {
     }
@@ -764,7 +724,16 @@ public abstract class SocketStream : NetworkStream {
         }
         s = null;
     }
-    
+    /***
+    *  bind() just remember address. We will cal bind() at the time of connect as
+    *  we can have several connection trials.
+    ***/
+    override void bind(string to) {
+        _bind = to;
+    }
+    /***
+    *  Make connection to remote site. Bind, handle connection error, try several addresses, etc
+    ***/
     SocketStream connect(string host, ushort port, Duration timeout = 10.seconds) {
         debug(requests) tracef(format("Create connection to %s:%d", host, port));
         Address[] addresses;
@@ -778,6 +747,11 @@ public abstract class SocketStream : NetworkStream {
             debug(requests) tracef("Trying %s", a);
             try {
                 open(a.addressFamily);
+                if ( _bind !is null ) {
+                    auto ad = getAddress(_bind);
+                    debug(requests) tracef("bind to %s", ad[0]);
+                    s.bind(ad[0]);
+                }
                 s.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDTIMEO, timeout);
                 s.connect(a);
                 debug(requests) tracef("Connected to %s", a);
@@ -865,6 +839,7 @@ version (vibeD) {
         TCPConnection _conn;
         Duration _readTimeout = Duration.max;
         bool _isOpen = true;
+        string _bind;
 
     public:
         @property bool isConnected() const {
@@ -880,11 +855,13 @@ version (vibeD) {
         override TCPConnection so() {
             return _conn;
         }
-
+        override void bind(string to) {
+                _bind = to;
+        }
         NetworkStream connect(string host, ushort port, Duration timeout = 10.seconds) {
             // FIXME: timeout not supported in vibe.d
             try {
-                _conn = connectTCP(host, port);
+                _conn = connectTCP(host, port, _bind);
             }
             catch (Exception e)
                 throw new ConnectError("Can't connect to %s:%d".format(host, port), __FILE__, __LINE__, e);

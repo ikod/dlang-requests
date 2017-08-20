@@ -312,6 +312,7 @@ public struct HTTPRequest {
         long           _contentReceived;
         Cookie[]       _cookie;
         SSLOptions     _sslOptions;
+        string         _bind;
     }
     package HTTPResponse   _response;
 
@@ -329,6 +330,7 @@ public struct HTTPRequest {
     mixin(Getter!long              ("contentLength"));
     mixin(Getter!long              ("contentReceived"));
     mixin(Getter_Setter!SSLOptions ("sslOptions"));
+    mixin(Getter_Setter!string     ("bind"));
 
     @property void sslSetVerifyPeer(bool v) pure @safe nothrow @nogc {
         _sslOptions.setVerifyPeer(v);
@@ -780,12 +782,16 @@ public struct HTTPRequest {
                     // use original uri
                     uri = _uri;
                 }
-                _stream = new TCPStream().connect(uri.host, uri.port, _timeout);
+                _stream = new TCPStream();
+                _stream.bind(_bind);
+                _stream.connect(uri.host, uri.port, _timeout);
                 break;
             case "https":
                 if ( actual_proxy ) {
                     uri.uri_parse(actual_proxy);
-                    _stream = new TCPStream().connect(uri.host, uri.port, _timeout);
+                    _stream = new TCPStream();
+                    _stream.bind(_bind);
+                    _stream.connect(uri.host, uri.port, _timeout);
                     if ( verbosity>=1 ) {
                         writeln("> CONNECT %s:%d HTTP/1.1".format(_uri.host, _uri.port));
                     }
@@ -808,7 +814,9 @@ public struct HTTPRequest {
                     }
                 } else {
                     uri = _uri;
-                    _stream = new SSLStream(_sslOptions).connect(uri.host, uri.port, _timeout);
+                    _stream = new SSLStream(_sslOptions);
+                    _stream.bind(_bind);
+                    _stream.connect(uri.host, uri.port, _timeout);
                     debug(requests) tracef("ssl connection to origin server ready");
                 }
                 break;

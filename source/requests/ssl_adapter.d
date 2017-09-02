@@ -229,7 +229,7 @@ struct OpenSSL {
         return adapter_ERR_reason_error_string(code);
     }
     ulong ERR_get_error() const {
-        return ERR_get_error();
+        return adapter_ERR_get_error();
     }
 }
 /*

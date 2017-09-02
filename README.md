@@ -25,6 +25,23 @@ This library can either use standard `std.socket` library or [`vibe.d`](http://v
 }
 ```
 
+### Three levels of API ###
+* At the highest API level you interested only in retrieving or posting document content.
+Use it when you don't need to add headers, set timeouts, or change any other defaults, 
+if you don't interested in result codes or any details of request and/or
+response. This level propose only two calls: `getContent` and `postContent`.
+What you receive is a Buffer, which you can use as range, but you can easily 
+convert it to `ubyte[]` using `.data` property.
+
+* At the next level we have `Request` structure, which encapsulate all details and settings 
+required for http(s)/ftp transfer. Operating on `Request` instance you can 
+change many aspects of interaction with http/ftp server. Most important API 
+calls are `Request.get()`, `Reuest.post` or `Request.exec!"method"` and so 
+on (you will find examples below). You will receive `Response` with all available
+details -document body, status code, headers, timings, etc.
+
+* At the lowest level you will find `HTTPRequest` and `FTPRequest`, which have some specific setting. You will almost never need this level.
+
 
 ### Make a simple request ###
 

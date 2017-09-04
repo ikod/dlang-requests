@@ -6,6 +6,7 @@ import std.format;
 import std.typecons;
 import core.stdc.stdlib;
 import core.sys.posix.dlfcn;
+import std.experimental.logger;
 
 version(Windows) {
     import core.sys.windows.windows;
@@ -55,18 +56,12 @@ static this() {
         throw new Exception("loading openssl: unsupported system");
     }
     if ( openssl._libssl is null ) {
-        version(Windows) {
-            throw new Exception("loading libssl: error %d".format(GetLastError()));
-        } else {
-            throw new Exception("loading openssl: %s",format(fromStringz(dlerror())));
-        }
+        error("warning: failed to load libssl - first access over https will fail");
+        return;
     }
     if ( openssl._libcrypto is null ) {
-        version(Windows) {
-            throw new Exception("loading libcrypto: error %d".format(GetLastError()));
-        } else {
-            throw new Exception("loading libcrypto: %s",format(fromStringz(dlerror())));
-        }
+        error("warning: failed to load libcrypto - first access over https will fail");
+        return;
     }
     openssl._ver = openssl.OpenSSL_version_detect();
 
@@ -187,12 +182,21 @@ struct OpenSSL {
     }
 
     SSL_METHOD* TLSv1_client_method() const {
+        if ( adapter_TLSv1_client_method is null ) {
+            throw new Exception("openssl not initialized - is it installed?");
+        }
         return adapter_TLSv1_client_method();
     }
     SSL_METHOD* TLSv1_2_client_method() const {
+        if ( adapter_TLSv1_2_client_method is null ) {
+            throw new Exception("openssl not initialized - is it installed?");
+        }
         return adapter_TLSv1_2_client_method();
     }
     SSL_CTX* SSL_CTX_new(SSL_METHOD* method) const {
+        if ( adapter_SSL_CTX_new is null ) {
+            throw new Exception("openssl not initialized - is it installed?");
+        }
         return adapter_SSL_CTX_new(method);
     }
     int SSL_CTX_set_default_verify_paths(SSL_CTX* ctx) const {

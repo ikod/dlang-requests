@@ -515,6 +515,7 @@ else {
         //enum SSL_MODE_RELEASE_BUFFERS = 0x00000010L;
         private SSL* ssl;
         private SSL_CTX* ctx;
+
         private void initSsl(SSLOptions opts) {
             //ctx = SSL_CTX_new(SSLv3_client_method());
             ctx = openssl.SSL_CTX_new(openssl.TLSv1_client_method());
@@ -596,25 +597,39 @@ else {
             openssl.SSL_free(ssl);
             openssl.SSL_CTX_free(ctx);
         }
+        void SSL_set_tlsext_host_name(string host) {
+
+        }
     }
 
     public class SSLSocketStream: SocketStream {
-        SSLOptions _sslOptions;
-        Socket underlyingSocket;
+        private SSLOptions _sslOptions;
+        private Socket underlyingSocket;
+        private SSL* ssl;
+        private string host;
 
         this(SSLOptions opts) {
             _sslOptions = opts;
         }
         this(NetworkStream ostream, SSLOptions opts, string host = null) {
             _sslOptions = opts;
+            this.host = host;
             auto osock = ostream.so();
             underlyingSocket = osock;
-            s = new OpenSslSocket(osock.handle, osock.addressFamily, _sslOptions).connectSSL();
+            auto ss = new OpenSslSocket(osock.handle, osock.addressFamily, _sslOptions);
+            ssl = ss.ssl;
+            if ( host !is null ) {
+                openssl.SSL_set_tlsext_host_name(ssl, toStringz(host));
+            }
+            ss.connectSSL();
             __isOpen = true;
             __isConnected = true;
+            s = ss;
             debug(requests) tracef("ssl stream created from another stream: %s", s);
         }
         override void close() {
+            ssl = null;
+            host = null;
             super.close();
             if ( underlyingSocket ) {
                 underlyingSocket.close();
@@ -624,9 +639,18 @@ else {
             if ( s !is null ) {
                 s.close();
             }
-            s = new OpenSslSocket(fa, SocketType.STREAM, _sslOptions);
-            assert(s !is null, "Can't create socket");
+            auto ss = new OpenSslSocket(fa, SocketType.STREAM, _sslOptions);
+            assert(ss !is null, "Can't create socket");
+            ssl = ss.ssl;
+            if ( host !is null ) {
+                openssl.SSL_set_tlsext_host_name(ssl, toStringz(host));
+            }
+            s = ss;
             __isOpen = true;
+        }
+        override SocketStream connect(string h, ushort p, Duration timeout = 10.seconds) {
+            host = h;
+            return super.connect(h, p, timeout);
         }
         override SSLSocketStream accept() {
             auto newso = s.accept();

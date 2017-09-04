@@ -25,6 +25,23 @@ This library can either use standard `std.socket` library or [`vibe.d`](http://v
 }
 ```
 
+### Three levels of API ###
+* At the highest API level you interested only in retrieving or posting document content.
+Use it when you don't need to add headers, set timeouts, or change any other defaults, 
+if you don't interested in result codes or any details of request and/or
+response. This level propose only two calls: `getContent` and `postContent`.
+What you receive is a Buffer, which you can use as range, but you can easily 
+convert it to `ubyte[]` using `.data` property.
+
+* At the next level we have `Request` structure, which encapsulate all details and settings 
+required for http(s)/ftp transfer. Operating on `Request` instance you can 
+change many aspects of interaction with http/ftp server. Most important API 
+calls are `Request.get()`, `Reuest.post` or `Request.exec!"method"` and so 
+on (you will find examples below). You will receive `Response` with all available
+details -document body, status code, headers, timings, etc.
+
+* At the lowest level you will find `HTTPRequest` and `FTPRequest`, which have some specific setting. You will almost never need this level.
+
 
 ### Make a simple request ###
 
@@ -480,6 +497,45 @@ void main() {
     assert(lines == 287);
 }
 ```
+
+##### File download example #####
+
+Note: use "wb" and `rawWrite` with file.
+
+```d
+import requests;
+import std.stdio;
+
+void main() {
+    Request rq = Request();
+    Response rs = rq.get("http://geoserver.readthedocs.io/en/latest/_images/imagemosaiccreate1.png");
+    File f = File("123.png", "wb"); // do not forget to use both "w" and "b" modes when open file.
+    f.rawWrite(rs.responseBody.data);
+    f.close();
+}
+```
+Loading whole document to memory and then save it might be impractical or impossible.
+Use streams in this case:
+```d
+import requests;
+import std.stdio;
+
+void main() {
+    Request rq = Request();
+
+    rq.useStreaming = true;
+    auto rs = rq.get("http://geoserver.readthedocs.io/en/latest/_images/imagemosaiccreate1.png");
+    auto stream = rs.receiveAsRange();
+    File file = File("123.png", "wb");
+
+    while(!stream.empty)  {
+        file.rawWrite(stream.front);
+        stream.popFront;
+    }
+    file.close();
+}
+```
+
 
 #### vibe.d ####
 

@@ -498,6 +498,45 @@ void main() {
 }
 ```
 
+##### File download example #####
+
+Note: use "wb" and `rawWrite` with file.
+
+```d
+import requests;
+import std.stdio;
+
+void main() {
+    Request rq = Request();
+    Response rs = rq.get("http://geoserver.readthedocs.io/en/latest/_images/imagemosaiccreate1.png");
+    File f = File("123.png", "wb"); // do not forget to use both "w" and "b" modes when open file.
+    f.rawWrite(rs.responseBody.data);
+    f.close();
+}
+```
+Loading whole document to memory and then save it might be impractical or impossible.
+Use streams in this case:
+```d
+import requests;
+import std.stdio;
+
+void main() {
+    Request rq = Request();
+
+    rq.useStreaming = true;
+    auto rs = rq.get("http://geoserver.readthedocs.io/en/latest/_images/imagemosaiccreate1.png");
+    auto stream = rs.receiveAsRange();
+    File file = File("123.png", "wb");
+
+    while(!stream.empty)  {
+        file.rawWrite(stream.front);
+        stream.popFront;
+    }
+    file.close();
+}
+```
+
+
 #### vibe.d ####
 
 You can safely use `dlang-requests` with `vibe.d`. When `dlang-requests` is compiled with support for `vibe.d` sockets (`--config=vibed`), each call to `dlang-requests` API can block only the current fiber, not the thread:

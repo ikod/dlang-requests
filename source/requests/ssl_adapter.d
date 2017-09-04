@@ -79,12 +79,14 @@ static this() {
     mixin(CRYPTO_Function_set_i!("OPENSSL_init_crypto", int, ulong, void*));
 
     mixin(SSL_Function_set_i!("TLSv1_client_method", SSL_METHOD*));
+    mixin(SSL_Function_set_i!("TLSv1_2_client_method", SSL_METHOD*));
     mixin(SSL_Function_set_i!("SSL_CTX_new", SSL_CTX*, SSL_METHOD*));
     mixin(SSL_Function_set_i!("SSL_CTX_set_default_verify_paths", int, SSL_CTX*));
     mixin(SSL_Function_set_i!("SSL_CTX_load_verify_locations", int, SSL_CTX*, char*, char*));
     mixin(SSL_Function_set_i!("SSL_CTX_set_verify", void, SSL_CTX*, int, void*));
     mixin(SSL_Function_set_i!("SSL_CTX_use_PrivateKey_file", int, SSL_CTX*, const char*, int));
     mixin(SSL_Function_set_i!("SSL_CTX_use_certificate_file", int, SSL_CTX*, const char*, int));
+    mixin(SSL_Function_set_i!("SSL_CTX_set_cipher_list", int, SSL_CTX*, const char*));
     mixin(SSL_Function_set_i!("SSL_new", SSL*, SSL_CTX*));
     mixin(SSL_Function_set_i!("SSL_set_fd", int, SSL*, int));
     mixin(SSL_Function_set_i!("SSL_connect", int, SSL*));
@@ -93,6 +95,7 @@ static this() {
     mixin(SSL_Function_set_i!("SSL_free", void, SSL*));
     mixin(SSL_Function_set_i!("SSL_CTX_free", void, SSL_CTX*));
     mixin(SSL_Function_set_i!("SSL_get_error", int, SSL*, int));
+    mixin(SSL_Function_set_i!("SSL_ctrl", long, SSL*, int, long, void*));
     mixin(SSL_Function_set_i!("ERR_reason_error_string", char*, ulong));
     mixin(SSL_Function_set_i!("ERR_get_error", ulong));
 
@@ -125,12 +128,14 @@ struct OpenSSL {
 
         // all other functions
         mixin(SSL_Function_decl!("TLSv1_client_method", SSL_METHOD*));
+        mixin(SSL_Function_decl!("TLSv1_2_client_method", SSL_METHOD*));
         mixin(SSL_Function_decl!("SSL_CTX_new", SSL_CTX*, SSL_METHOD*));
         mixin(SSL_Function_decl!("SSL_CTX_set_default_verify_paths", int, SSL_CTX*));
         mixin(SSL_Function_decl!("SSL_CTX_load_verify_locations", int, SSL_CTX*, char*, char*));
         mixin(SSL_Function_decl!("SSL_CTX_set_verify", void, SSL_CTX*, int, void*));
         mixin(SSL_Function_decl!("SSL_CTX_use_PrivateKey_file", int, SSL_CTX*, const char*, int));
         mixin(SSL_Function_decl!("SSL_CTX_use_certificate_file", int, SSL_CTX*, const char*, int));
+        mixin(SSL_Function_decl!("SSL_CTX_set_cipher_list", int, SSL_CTX*, const char*));
         mixin(SSL_Function_decl!("SSL_new", SSL*, SSL_CTX*));
         mixin(SSL_Function_decl!("SSL_set_fd", int, SSL*, int));
         mixin(SSL_Function_decl!("SSL_connect", int, SSL*));
@@ -139,6 +144,7 @@ struct OpenSSL {
         mixin(SSL_Function_decl!("SSL_free", void, SSL*));
         mixin(SSL_Function_decl!("SSL_CTX_free", void, SSL_CTX*));
         mixin(SSL_Function_decl!("SSL_get_error", int, SSL*, int));
+        mixin(SSL_Function_decl!("SSL_ctrl", long, SSL*, int, long, void*));
         mixin(SSL_Function_decl!("ERR_reason_error_string", char*, ulong));
         mixin(SSL_Function_decl!("ERR_get_error", ulong));
     }
@@ -183,6 +189,9 @@ struct OpenSSL {
     SSL_METHOD* TLSv1_client_method() const {
         return adapter_TLSv1_client_method();
     }
+    SSL_METHOD* TLSv1_2_client_method() const {
+        return adapter_TLSv1_2_client_method();
+    }
     SSL_CTX* SSL_CTX_new(SSL_METHOD* method) const {
         return adapter_SSL_CTX_new(method);
     }
@@ -200,6 +209,9 @@ struct OpenSSL {
     }
     int SSL_CTX_use_certificate_file(SSL_CTX* ctx, const char* file, int type) const {
         return adapter_SSL_CTX_use_certificate_file(ctx, file, type);
+    }
+    int SSL_CTX_set_cipher_list(SSL_CTX* ssl_ctx, const char* c) const {
+        return adapter_SSL_CTX_set_cipher_list(ssl_ctx, c);
     }
     SSL* SSL_new(SSL_CTX* ctx) const {
         return adapter_SSL_new(ctx);
@@ -224,6 +236,11 @@ struct OpenSSL {
     }
     int SSL_get_error(SSL* ssl, int err) const {
         return adapter_SSL_get_error(ssl, err);
+    }
+    long SSL_set_tlsext_host_name(SSL* ssl, const char* host) const {
+        enum int SSL_CTRL_SET_TLSEXT_HOSTNAME = 55;
+        enum long TLSEXT_NAMETYPE_host_name = 0;
+        return adapter_SSL_ctrl(ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME,TLSEXT_NAMETYPE_host_name, cast(void*)host);
     }
     char* ERR_reason_error_string(ulong code) const {
         return adapter_ERR_reason_error_string(code);

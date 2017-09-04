@@ -473,7 +473,7 @@ public struct Buffer(T) {
     @property auto opDollar() const pure @safe {
         return __repr.__length;
     }
-    @property auto length() const pure @safe {
+    @property size_t length() const pure @safe {
         if ( !__repr ) {
             return 0;
         }

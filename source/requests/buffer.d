@@ -190,7 +190,7 @@ struct Buffer {
         _end_pos = s.length;
     }
 
-    @property auto length() const pure @safe @nogc nothrow {
+    @property size_t length() const pure @safe @nogc nothrow {
         return _length;
     }
 

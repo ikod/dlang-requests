@@ -3,7 +3,7 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <title>requests.http</title>
+    <title>requests.request</title>
     <style type="text/css" media="screen">
       html, body, div, span, object, iframe, h1, h2, h3, h4, h5, h6, p,
       blockquote, pre, a, abbr, address, cite, code, del, dfn, em, figure,
@@ -463,7 +463,7 @@
   <body id="ddoc_main" class="ddoc dlang">
     <div class="content_wrapper">
       <article class="module">
-        <h1 class="module_name">requests.http</h1>
+        <h1 class="module_name">requests.request</h1>
         <section id="module_content">
 <section class="section ddoc_module_members_section">
   <div class="ddoc_module_members">
@@ -471,7 +471,7 @@
   <li class="ddoc_member">
   <div class="ddoc_member_header">
   <div class="ddoc_header_anchor">
-  <a href="#BasicAuthentication" id="BasicAuthentication"><code class="code">BasicAuthentication</code></a>
+  <a href="#Request" id="Request"><code class="code">Request</code></a>
 </div>
 </div><div class="ddoc_decl">
   <section class="section">
@@ -480,7 +480,7 @@
       <div class="dlang">
         <p class="para">
           <code class="code">
-            <span class="ddoc_anchor" id="BasicAuthentication"></span>class <code class="code">BasicAuthentication</code>: <span class="ddoc_psuper_symbol">requests.base.Auth</span>;
+            <span class="ddoc_anchor" id="Request"></span>struct <code class="code">Request</code>;
 
           </code>
         </p>
@@ -492,8 +492,9 @@
   <section class="section ddoc_sections">
   <div class="ddoc_summary">
   <p class="para">
-    Basic authentication.
- Adds <b>Authorization: Basic</b> header to request.
+    This is simplest interface to both http and ftp protocols.
+   <code class="code">Request</code> has methods get, post and exec which routed to proper concrete handler (http or ftp, etc).
+   To enable some protocol-specific featutes you have to use protocol interface directly (see docs for HTTPRequest or FTPRequest)
   </p>
 </div>
 
@@ -502,7 +503,7 @@
   <li class="ddoc_member">
   <div class="ddoc_member_header">
   <div class="ddoc_header_anchor">
-  <a href="#BasicAuthentication.this" id="BasicAuthentication.this"><code class="code">this</code></a>
+  <a href="#Request.timeout" id="Request.timeout"><code class="code">timeout</code></a>
 </div>
 </div><div class="ddoc_decl">
   <section class="section">
@@ -511,7 +512,7 @@
       <div class="dlang">
         <p class="para">
           <code class="code">
-            <span class="ddoc_anchor" id="BasicAuthentication.this"></span>this(string <code class="code">username</code>, string <code class="code">password</code>, string[] <code class="code">domains</code> = []);
+            <span class="ddoc_anchor" id="Request.timeout"></span>pure nothrow @nogc @property void <code class="code">timeout</code>(Duration <code class="code">v</code>);
 
           </code>
         </p>
@@ -523,74 +524,20 @@
   <section class="section ddoc_sections">
   <div class="ddoc_summary">
   <p class="para">
-    Constructor.
-
+    Set <code class="code">timeout</code> on connection and IO operation.
+<b><code class="code">v</code></b> - <code class="code">timeout</code> value
+If <code class="code">timeout</code> expired Request operation will throw <b>TimeoutException</b>.
   </p>
-</div>
-<div class="ddoc_params">
-  <h4>Parameters</h4>
-  <table cellspacing="0" cellpadding="5" border="0" class="graybox">
-    <tbody>
-      <tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">string <code class="code">username</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      <code class="code">username</code>
-    </p>
-  </div>
-</td>
-</tr>
-<tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">string <code class="code">password</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      <code class="code">password</code>
-    </p>
-  </div>
-</td>
-</tr>
-<tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">string[] <code class="code">domains</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      not used now
-    </p>
-  </div>
-</td>
-</tr>
-
-    </tbody>
-  </table>
 </div>
 
 </section>
 
 </div>
 
-</li>
-</ul>
-
-</div>
-
 </li><li class="ddoc_member">
   <div class="ddoc_member_header">
   <div class="ddoc_header_anchor">
-  <a href="#queryParams" id="queryParams"><code class="code">queryParams</code></a>
+  <a href="#Request.keepAlive" id="Request.keepAlive"><code class="code">keepAlive</code></a>
 </div>
 </div><div class="ddoc_decl">
   <section class="section">
@@ -599,32 +546,7 @@
       <div class="dlang">
         <p class="para">
           <code class="code">
-            <span class="ddoc_anchor" id="queryParams"></span>pure nothrow @safe auto <code class="code">queryParams</code>(T...)(T <code class="code">params</code>);
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#HTTPResponse" id="HTTPResponse"><code class="code">HTTPResponse</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="HTTPResponse"></span>class <code class="code">HTTPResponse</code>: <span class="ddoc_psuper_symbol">requests.base.Response</span>;
+            <span class="ddoc_anchor" id="Request.keepAlive"></span>pure nothrow @nogc @property void <code class="code">keepAlive</code>(bool <code class="code">v</code>);
 
           </code>
         </p>
@@ -636,18 +558,275 @@
   <section class="section ddoc_sections">
   <div class="ddoc_summary">
   <p class="para">
-    Response - result of request execution.
+    Set http <code class="code">keepAlive</code> value
+<b><code class="code">v</code></b> - use keepalive requests - <b><code class="code">true</code></b>, or not - <b><code class="code">false</code></b>
+Request will automatically reopen connection when host, protocol
+or port change (so it is safe to send different requests through
+single instance of Request).
+It also recovers if server prematurely close keep-alive connection.
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.maxRedirects" id="Request.maxRedirects"><code class="code">maxRedirects</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.maxRedirects"></span>pure nothrow @nogc @property void <code class="code">maxRedirects</code>(uint <code class="code">v</code>);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    Set limit on HTTP redirects
+<b><code class="code">v</code></b> - limit on redirect depth
+Throws <b>MaxRedirectsException</b> when limit is reached.
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.maxContentLength" id="Request.maxContentLength"><code class="code">maxContentLength</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.maxContentLength"></span>pure nothrow @nogc @property void <code class="code">maxContentLength</code>(size_t <code class="code">v</code>);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    Set maximum content lenth both for http and ftp requests
+<b><code class="code">v</code></b> - maximum content length in bytes. When limit reached - throws <b>RequestException</b>
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.maxHeadersLength" id="Request.maxHeadersLength"><code class="code">maxHeadersLength</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.maxHeadersLength"></span>pure nothrow @nogc @property void <code class="code">maxHeadersLength</code>(size_t <code class="code">v</code>);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    Set maximum length for HTTP headers
+<b><code class="code">v</code></b> - maximum length of the HTTP response. When limit reached - throws <b>RequestException</b>
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.bufferSize" id="Request.bufferSize"><code class="code">bufferSize</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.bufferSize"></span>@property void <code class="code">bufferSize</code>(size_t <code class="code">v</code>);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    Set IO buffer size for http and ftp requests
+<b><code class="code">v</code></b> - buffer size in bytes.
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.verbosity" id="Request.verbosity"><code class="code">verbosity</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.verbosity"></span>@property void <code class="code">verbosity</code>(uint <code class="code">v</code>);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    Set <code class="code">verbosity</code> for HTTP or FTP requests.
+<b><code class="code">v</code></b> - <code class="code">verbosity</code> level (0 - no output, 1 - headers to stdout, 2 - headers and data hexdump to stdout). default = 0.
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.authenticator" id="Request.authenticator"><code class="code">authenticator</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.authenticator"></span>@property void <code class="code">authenticator</code>(Auth <code class="code">v</code>);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    Set <code class="code">authenticator</code> for http requests.
+   <b><code class="code">v</code></b> - Auth instance.
+
+  </p>
+</div>
+<div class="ddoc_section">
+  <p class="para">
+    <span class="ddoc_section_h">Example:</span>
+
+<section class="code_listing">
+  <div class="code_sample">
+    <div class="dlang">
+      <ol class="code_lines">
+        <li><code class="code"><span class="keyword">import</span> requests;
+<span class="keyword">void</span> main() {
+    rq = Request();
+    rq.<span class="psymbol">authenticator</span> = <span class="keyword">new</span> BasicAuthentication(<span class="string_literal">"user"</span>, <span class="string_literal">"passwd"</span>);
+    rs = rq.get(<span class="string_literal">"http://httpbin.org/basic-auth/user/passwd"</span>);
+}
+</code></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.proxy" id="Request.proxy"><code class="code">proxy</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.proxy"></span>@property void <code class="code">proxy</code>(string <code class="code">v</code>);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    set <code class="code">proxy</code> property.
+<b><code class="code">v</code></b> - full url to <code class="code">proxy</code>.
 
   </p>
 </div>
 <div class="ddoc_description">
   <h4>Discussion</h4>
   <p class="para">
-    Response.code - response HTTP code.
-Response.status_line - received HTTP status line.
-Response.responseHeaders - received headers.
-Response.responseBody - container for received body
-Response.history - for redirected responses contain all history
+    Note that we recognize <code class="code">proxy</code> settings from process environment (see <a href="https://github.com/ikod/dlang-requests/issues/46">https://github.com/ikod/dlang-requests/issues/46</a>):
+you can use http_proxy, https_proxy, all_proxy (as well as uppercase names).
   </p>
 </div>
 
@@ -658,7 +837,7 @@ Response.history - for redirected responses contain all history
 </li><li class="ddoc_member">
   <div class="ddoc_member_header">
   <div class="ddoc_header_anchor">
-  <a href="#PostFile" id="PostFile"><code class="code">PostFile</code></a>
+  <a href="#Request.cookie" id="Request.cookie"><code class="code">cookie</code></a>
 </div>
 </div><div class="ddoc_decl">
   <section class="section">
@@ -667,7 +846,7 @@ Response.history - for redirected responses contain all history
       <div class="dlang">
         <p class="para">
           <code class="code">
-            <span class="ddoc_anchor" id="PostFile"></span>struct <code class="code">PostFile</code>;
+            <span class="ddoc_anchor" id="Request.cookie"></span>pure nothrow @nogc @property void <code class="code">cookie</code>(Cookie[] <code class="code">v</code>);
 
           </code>
         </p>
@@ -679,406 +858,48 @@ Response.history - for redirected responses contain all history
   <section class="section ddoc_sections">
   <div class="ddoc_summary">
   <p class="para">
-    Struct to send multiple files in POST request.
+    Set Cookie for http requests.
+        <b><code class="code">v</code></b> - array of <code class="code">cookie</code>.
+
   </p>
 </div>
-
-</section>
-<ul class="ddoc_members">
-  <li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#PostFile.fileName" id="PostFile.fileName"><code class="code">fileName</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="PostFile.fileName"></span>string <code class="code">fileName</code>;
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
+<div class="ddoc_description">
+  <h4>Discussion</h4>
   <p class="para">
-    Path to the file to send.
+    You can set and read cookies. In the next example server set <code class="code">cookie</code> and we read it.
+
   </p>
 </div>
-
-</section>
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#PostFile.fieldName" id="PostFile.fieldName"><code class="code">fieldName</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="PostFile.fieldName"></span>string <code class="code">fieldName</code>;
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
+<div class="ddoc_section">
   <p class="para">
-    Name of the field (if empty - send file base name)
-  </p>
-</div>
+    <span class="ddoc_section_h">Example:</span>
 
-</section>
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#PostFile.contentType" id="PostFile.contentType"><code class="code">contentType</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="PostFile.contentType"></span>string <code class="code">contentType</code>;
-
-          </code>
-        </p>
-      </div>
+<section class="code_listing">
+  <div class="code_sample">
+    <div class="dlang">
+      <ol class="code_lines">
+        <li><code class="code"><span class="keyword">void</span> main() {
+   rs = rq.get(<span class="string_literal">"http://httpbin.org/cookies/set?A=abcd&amp;b=cdef"</span>);
+   <span class="keyword">assert</span>(rs.code == 200);
+   <span class="keyword">auto</span> json = parseJSON(<span class="keyword">cast</span>(string)rs.responseBody.data).object[<span class="string_literal">"cookies"</span>].object;
+   <span class="keyword">assert</span>(json[<span class="string_literal">"A"</span>].str == <span class="string_literal">"abcd"</span>);
+   <span class="keyword">assert</span>(json[<span class="string_literal">"b"</span>].str == <span class="string_literal">"cdef"</span>);
+   <span class="keyword">foreach</span>(c; rq.<span class="psymbol">cookie</span>) {
+       <span class="keyword">final</span> <span class="keyword">switch</span>(c.attr) {
+           <span class="keyword">case</span> <span class="string_literal">"A"</span>:
+                <span class="keyword">assert</span>(c.value == <span class="string_literal">"abcd"</span>);
+                <span class="keyword">break</span>;
+           <span class="keyword">case</span> <span class="string_literal">"b"</span>:
+                <span class="keyword">assert</span>(c.value == <span class="string_literal">"cdef"</span>);
+                <span class="keyword">break</span>;
+        }
+    }
+}
+</code></li>
+      </ol>
     </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
-  <p class="para">
-    <code class="code">contentType</code> of the file if not empty
-  </p>
-</div>
-
-</section>
-
-</div>
-
-</li>
-</ul>
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#FiniteReadable" id="FiniteReadable"><code class="code">FiniteReadable</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="FiniteReadable"></span>interface <code class="code">FiniteReadable</code>;
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
-  <p class="para">
-    This is File-like interface for sending data to multipart fotms
-
-  </p>
-</div>
-
-</section>
-<ul class="ddoc_members">
-  <li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#FiniteReadable.getSize" id="FiniteReadable.getSize"><code class="code">getSize</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="FiniteReadable.getSize"></span>abstract ulong <code class="code">getSize</code>();
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
-  <p class="para">
-    size of the content
-  </p>
-</div>
-
-</section>
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#FiniteReadable.read" id="FiniteReadable.read"><code class="code">read</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="FiniteReadable.read"></span>abstract ubyte[] <code class="code">read</code>();
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
-  <p class="para">
-    file-like <code class="code">read</code>()
-  </p>
-</div>
-
-</section>
-
-</div>
-
-</li>
-</ul>
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#formData" id="formData"><code class="code">formData</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="formData"></span>auto <code class="code">formData</code>(string <code class="code">name</code>, File <code class="code">f</code>, string[string] <code class="code">parameters</code> = null);
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
-  <p class="para">
-    Helper to create form elements from File.
-
-  </p>
-</div>
-<div class="ddoc_params">
-  <h4>Parameters</h4>
-  <table cellspacing="0" cellpadding="5" border="0" class="graybox">
-    <tbody>
-      <tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">string <code class="code">name</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      <code class="code">name</code> of the field in form
-    </p>
   </div>
-</td>
-</tr>
-<tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">File <code class="code">f</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      opened std.stio.File to send to server
-    </p>
-  </div>
-</td>
-</tr>
-<tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">string[string] <code class="code">parameters</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      optional <code class="code">parameters</code> (most important are "filename" and "Content-Type")
-    </p>
-  </div>
-</td>
-</tr>
-
-    </tbody>
-  </table>
-</div>
-
 </section>
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#formData" id="formData"><code class="code">formData</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="formData"></span>auto <code class="code">formData</code>(string <code class="code">name</code>, ubyte[] <code class="code">b</code>, string[string] <code class="code">parameters</code> = null);
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
-  <p class="para">
-    Helper to create form elements from ubyte[].
-
-  </p>
-</div>
-<div class="ddoc_params">
-  <h4>Parameters</h4>
-  <table cellspacing="0" cellpadding="5" border="0" class="graybox">
-    <tbody>
-      <tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">string <code class="code">name</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      <code class="code">name</code> of the field in form
-    </p>
-  </div>
-</td>
-</tr>
-<tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">ubyte[] <code class="code">b</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      data to send to server
-    </p>
-  </div>
-</td>
-</tr>
-<tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">string[string] <code class="code">parameters</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      optional <code class="code">parameters</code> (can be "filename" and "Content-Type")
-    </p>
-  </div>
-</td>
-</tr>
-
-    </tbody>
-  </table>
-</div>
-
-</section>
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#MultipartForm" id="MultipartForm"><code class="code">MultipartForm</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="MultipartForm"></span>struct <code class="code">MultipartForm</code>;
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
-  <p class="para">
-    This struct used to bulld POST's to forms.
-Each part have name and data. data is something that can be read-ed and have size.
-For example this can be string-like object (wrapped for reading) or opened File.
 
   </p>
 </div>
@@ -1090,7 +911,7 @@ For example this can be string-like object (wrapped for reading) or opened File.
 </li><li class="ddoc_member">
   <div class="ddoc_member_header">
   <div class="ddoc_header_anchor">
-  <a href="#HTTPRequest" id="HTTPRequest"><code class="code">HTTPRequest</code></a>
+  <a href="#Request.cookie" id="Request.cookie"><code class="code">cookie</code></a>
 </div>
 </div><div class="ddoc_decl">
   <section class="section">
@@ -1099,7 +920,7 @@ For example this can be string-like object (wrapped for reading) or opened File.
       <div class="dlang">
         <p class="para">
           <code class="code">
-            <span class="ddoc_anchor" id="HTTPRequest"></span>struct <code class="code">HTTPRequest</code>;
+            <span class="ddoc_anchor" id="Request.cookie.2"></span>pure nothrow @nogc @property Cookie[] <code class="code">cookie</code>();
 
           </code>
         </p>
@@ -1111,30 +932,18 @@ For example this can be string-like object (wrapped for reading) or opened File.
   <section class="section ddoc_sections">
   <div class="ddoc_summary">
   <p class="para">
-    Request.
-Configurable parameters:
-<b>method</b> - string, method to use (GET, POST, ...)
-<b>headers</b> - string[string], add any additional headers you'd like to send.
-<b>authenticator</b> - class Auth, class to send auth headers.
-<b>keepAlive</b> - bool, set <code class="code">true</code> for keepAlive requests. default <code class="code">true</code>.
-<b>maxRedirects</b> - uint, maximum number of redirects. default 10.
-<b>maxHeadersLength</b> - size_t, maximum length of server response headers. default = 32KB.
-<b>maxContentLength</b> - size_t, maximun content length. delault - 0 = unlimited.
-<b>bufferSize</b> - size_t, send and receive buffer size. default = 16KB.
-<b>verbosity</b> - uint, level of verbosity(0 - nothing, 1 - headers, 2 - headers and body progress). default = 0.
-<b>proxy</b> - string, set proxy url if needed. default - <code class="code">null</code>.
-<b>cookie</b> - Tuple Cookie, Read/Write cookie You can get cookie setted by server, or set cookies before doing request.
-<b>timeout</b> - Duration, Set timeout value for connect/receive/send.
-
+    Get Cookie for http requests.
   </p>
 </div>
 
 </section>
-<ul class="ddoc_members">
-  <li class="ddoc_member">
+
+</div>
+
+</li><li class="ddoc_member">
   <div class="ddoc_member_header">
   <div class="ddoc_header_anchor">
-  <a href="#HTTPRequest.addHeaders" id="HTTPRequest.addHeaders"><code class="code">addHeaders</code></a>
+  <a href="#Request.useStreaming" id="Request.useStreaming"><code class="code">useStreaming</code></a>
 </div>
 </div><div class="ddoc_decl">
   <section class="section">
@@ -1143,7 +952,418 @@ Configurable parameters:
       <div class="dlang">
         <p class="para">
           <code class="code">
-            <span class="ddoc_anchor" id="HTTPRequest.addHeaders"></span>void <code class="code">addHeaders</code>(in string[string] <code class="code">headers</code>);
+            <span class="ddoc_anchor" id="Request.useStreaming"></span>pure nothrow @nogc @property void <code class="code">useStreaming</code>(bool <code class="code">v</code>);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    set "streaming" property
+     <b><code class="code">v</code></b> = value to set (<code class="code">true</code> - use streaming).
+
+  </p>
+</div>
+<div class="ddoc_description">
+  <h4>Discussion</h4>
+  <p class="para">
+    Use streaming when you do not want to keep whole response in memory.
+
+  </p>
+</div>
+<div class="ddoc_section">
+  <p class="para">
+    <span class="ddoc_section_h">Example:</span>
+
+<section class="code_listing">
+  <div class="code_sample">
+    <div class="dlang">
+      <ol class="code_lines">
+        <li><code class="code"><span class="keyword">import</span> requests;
+<span class="keyword">import</span> std.stdio;
+
+<span class="keyword">void</span> main() {
+    Request rq = Request();
+
+    rq.<span class="psymbol">useStreaming</span> = <span class="keyword">true</span>;
+    <span class="keyword">auto</span> rs = rq.get(<span class="string_literal">"http://example.com/SomeHugePicture.png"</span>);
+    <span class="keyword">auto</span> stream = rs.receiveAsRange();
+    File file = File(<span class="string_literal">"SomeHugePicture.png"</span>, <span class="string_literal">"wb"</span>);
+
+    <span class="keyword">while</span>(!stream.empty)  {
+        file.rawWrite(stream.front);
+        stream.popFront;
+    }
+    file.close();
+}
+</code></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.contentReceived" id="Request.contentReceived"><code class="code">contentReceived</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.contentReceived"></span>pure nothrow @nogc @property long <code class="code">contentReceived</code>();
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    get length og actually received content.
+this value increase over time, while we receive data
+
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.contentLength" id="Request.contentLength"><code class="code">contentLength</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.contentLength"></span>pure nothrow @nogc @property long <code class="code">contentLength</code>();
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    get <code class="code">contentLength</code> of the responce
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.sslSetVerifyPeer" id="Request.sslSetVerifyPeer"><code class="code">sslSetVerifyPeer</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.sslSetVerifyPeer"></span>@property void <code class="code">sslSetVerifyPeer</code>(bool <code class="code">v</code>);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    Enable or disable ssl peer verification.
+ <b><code class="code">v</code></b> - enable if <code class="code">true</code>, disable if <code class="code">false</code>.
+
+  </p>
+</div>
+<div class="ddoc_description">
+  <h4>Discussion</h4>
+  <p class="para">
+    Default - <code class="code">false</code>.
+
+  </p>
+</div>
+<div class="ddoc_section">
+  <p class="para">
+    <span class="ddoc_section_h">Example:</span>
+
+<section class="code_listing">
+  <div class="code_sample">
+    <div class="dlang">
+      <ol class="code_lines">
+        <li><code class="code">    <span class="keyword">auto</span> rq = Request();
+    rq.<span class="psymbol">sslSetVerifyPeer</span>(<span class="keyword">true</span>);
+    <span class="keyword">auto</span> rs = rq.get(<span class="string_literal">"https://localhost:4443/"</span>);
+</code></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.sslSetKeyFile" id="Request.sslSetKeyFile"><code class="code">sslSetKeyFile</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.sslSetKeyFile"></span>pure nothrow @nogc @property @safe void <code class="code">sslSetKeyFile</code>(string <code class="code">path</code>, SSLOptions.filetype <code class="code">type</code> = SSLOptions.filetype.pem);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    Set <code class="code">path</code> to ssl key file.
+
+  </p>
+</div>
+<div class="ddoc_description">
+  <h4>Discussion</h4>
+  <p class="para">
+    file <code class="code">type</code> can be SSLOptions.filetype.pem (default) or SSLOptions.filetype.der or SSLOptions.filetype.asn1.
+<br><br>
+
+ if you configured only key file or only cert file, we will try to load counterpart from the same file.
+
+
+  </p>
+</div>
+<div class="ddoc_section">
+  <p class="para">
+    <span class="ddoc_section_h">Example:</span>
+
+<section class="code_listing">
+  <div class="code_sample">
+    <div class="dlang">
+      <ol class="code_lines">
+        <li><code class="code">    <span class="keyword">auto</span> rq = Request();
+    rq.<span class="psymbol">sslSetKeyFile</span>(<span class="string_literal">"client01.key"</span>);
+    <span class="keyword">auto</span> rs = rq.get(<span class="string_literal">"https://localhost:4443/"</span>);
+</code></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.sslSetCertFile" id="Request.sslSetCertFile"><code class="code">sslSetCertFile</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.sslSetCertFile"></span>pure nothrow @nogc @property @safe void <code class="code">sslSetCertFile</code>(string <code class="code">path</code>, SSLOptions.filetype <code class="code">type</code> = SSLOptions.filetype.pem);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    Set <code class="code">path</code> to ssl cert file.
+
+  </p>
+</div>
+<div class="ddoc_description">
+  <h4>Discussion</h4>
+  <p class="para">
+    file <code class="code">type</code> can be SSLOptions.filetype.pem (default) or SSLOptions.filetype.der or SSLOptions.filetype.asn1.
+<br><br>
+
+ if you configured only key file or only cert file, we will try to load counterpart from the same file.
+
+
+  </p>
+</div>
+<div class="ddoc_section">
+  <p class="para">
+    <span class="ddoc_section_h">Example:</span>
+
+<section class="code_listing">
+  <div class="code_sample">
+    <div class="dlang">
+      <ol class="code_lines">
+        <li><code class="code">    <span class="keyword">auto</span> rq = Request();
+    rq.<span class="psymbol">sslSetCertFile</span>(<span class="string_literal">"client01.crt"</span>);
+    <span class="keyword">auto</span> rs = rq.get(<span class="string_literal">"https://localhost:4443/"</span>);
+</code></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.sslSetCaCert" id="Request.sslSetCaCert"><code class="code">sslSetCaCert</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.sslSetCaCert"></span>pure nothrow @nogc @property @safe void <code class="code">sslSetCaCert</code>(string <code class="code">path</code>);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    Set <code class="code">path</code> to ssl ca cert file.
+
+  </p>
+</div>
+<div class="ddoc_section">
+  <p class="para">
+    <span class="ddoc_section_h">Example:</span>
+
+<section class="code_listing">
+  <div class="code_sample">
+    <div class="dlang">
+      <ol class="code_lines">
+        <li><code class="code">    <span class="keyword">auto</span> rq = Request();
+    rq.<span class="psymbol">sslSetCaCert</span>(<span class="string_literal">"/opt/local/etc/openssl/cert.pem"</span>);
+    <span class="keyword">auto</span> rs = rq.get(<span class="string_literal">"https://localhost:4443/"</span>);
+</code></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.bind" id="Request.bind"><code class="code">bind</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.bind"></span>@property auto <code class="code">bind</code>(string <code class="code">v</code>);
+
+          </code>
+        </p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="ddoc_decl">
+  <section class="section ddoc_sections">
+  <div class="ddoc_summary">
+  <p class="para">
+    Set local address for any outgoing requests.
+ <b><code class="code">v</code></b> can be string with hostname or ip address.
+  </p>
+</div>
+
+</section>
+
+</div>
+
+</li><li class="ddoc_member">
+  <div class="ddoc_member_header">
+  <div class="ddoc_header_anchor">
+  <a href="#Request.addHeaders" id="Request.addHeaders"><code class="code">addHeaders</code></a>
+</div>
+</div><div class="ddoc_decl">
+  <section class="section">
+    <div class="declaration">
+      <h4>Declaration</h4>
+      <div class="dlang">
+        <p class="para">
+          <code class="code">
+            <span class="ddoc_anchor" id="Request.addHeaders"></span>void <code class="code">addHeaders</code>(in string[string] <code class="code">headers</code>);
 
           </code>
         </p>
@@ -1181,337 +1401,6 @@ Configurable parameters:
     </tbody>
   </table>
 </div>
-
-</section>
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#HTTPRequest.removeHeaders" id="HTTPRequest.removeHeaders"><code class="code">removeHeaders</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="HTTPRequest.removeHeaders"></span>pure void <code class="code">removeHeaders</code>(in string[] <code class="code">headers</code>);
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
-  <p class="para">
-    Remove <code class="code">headers</code> from request
-
-  </p>
-</div>
-<div class="ddoc_params">
-  <h4>Parameters</h4>
-  <table cellspacing="0" cellpadding="5" border="0" class="graybox">
-    <tbody>
-      <tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">string[] <code class="code">headers</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      <code class="code">headers</code> to remove.
-    </p>
-  </div>
-</td>
-</tr>
-
-    </tbody>
-  </table>
-</div>
-
-</section>
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#HTTPRequest.exec" id="HTTPRequest.exec"><code class="code">exec</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="HTTPRequest.exec"></span>HTTPResponse <code class="code">exec</code>(string method = "POST")(string <code class="code">url</code>, MultipartForm <code class="code">sources</code>);
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
-  <p class="para">
-    Send multipart for request.
-You would like to use this method for sending large portions of mixed data or uploading files to forms.
-Content of the posted form consist of <code class="code">sources</code>. Each source have at least name and value (can be string-like object or opened file, see more docs for MultipartForm struct)
-
-  </p>
-</div>
-<div class="ddoc_params">
-  <h4>Parameters</h4>
-  <table cellspacing="0" cellpadding="5" border="0" class="graybox">
-    <tbody>
-      <tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">string <code class="code">url</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      <code class="code">url</code>
-    </p>
-  </div>
-</td>
-</tr>
-<tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">MultipartForm <code class="code">sources</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      array of <code class="code">sources</code>.
-    </p>
-  </div>
-</td>
-</tr>
-
-    </tbody>
-  </table>
-</div>
-
-</section>
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#HTTPRequest.exec" id="HTTPRequest.exec"><code class="code">exec</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="HTTPRequest.exec.2"></span>HTTPResponse <code class="code">exec</code>(string method = "POST", R)(string <code class="code">url</code>, R <code class="code">content</code>, string <code class="code">contentType</code> = "application/octet-stream") if (rank!R == 1 || rank!R == 2 &amp;&amp; isSomeChar!(Unqual!(typeof(<code class="code">content</code>.front.front))) || rank!R == 2 &amp;&amp; is(Unqual!(typeof(<code class="code">content</code>.front.front)) == ubyte));
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
-  <p class="para">
-    POST/PUT/... data from some string(with Content-Length), or from range of strings/bytes (use Transfer-Encoding: chunked).
-When rank 1 (flat array) used as <code class="code">content</code> it must have length. In that case "<code class="code">content</code>" will be sent directly to network, and Content-Length headers will be added.
-If you are goung to send some range and do not know length at the moment when you start to send request, then you can send chunks of chars or ubyte.
-Try not to send too short chunks as this will put additional load on client and server. Chunks of length 2048 or 4096 are ok.
-
-  </p>
-</div>
-<div class="ddoc_section">
-  <p class="para">
-    <span class="ddoc_section_h">Parameters:</span>
-<code class="code">url</code> = <code class="code">url</code>
-<code class="code">content</code> = string or input range
-<code class="code">contentType</code> = <code class="code">content</code> type
-
-  </p>
-</div>
-<div class="ddoc_returns">
-  <h4>Return Value</h4>
-  <p class="para">
-    Response
-
-  </p>
-</div>
-<div class="ddoc_examples">
-  <h4>Examples</h4>
-  <p class="para">
-    
-<section class="code_listing">
-  <div class="code_sample">
-    <div class="dlang">
-      <ol class="code_lines">
-        <li><code class="code">rs = rq.<span class="psymbol">exec</span>!<span class="string_literal">"POST"</span>(<span class="string_literal">"http://httpbin.org/post"</span>, <span class="string_literal">"привiт, свiт!"</span>, <span class="string_literal">"application/octet-stream"</span>);
-
-<span class="keyword">auto</span> s = lineSplitter(<span class="string_literal">"one,\ntwo,\nthree."</span>);
-rs = rq.<span class="psymbol">exec</span>!<span class="string_literal">"POST"</span>(<span class="string_literal">"http://httpbin.org/post"</span>, s, <span class="string_literal">"application/octet-stream"</span>);
-
-<span class="keyword">auto</span> s = <span class="string_literal">"ABCDEFGHIJKLMNOPQRSTUVWXYZ"</span>;
-rs = rq.<span class="psymbol">exec</span>!<span class="string_literal">"POST"</span>(<span class="string_literal">"http://httpbin.org/post"</span>, s.representation.chunks(10), <span class="string_literal">"application/octet-stream"</span>);
-
-<span class="keyword">auto</span> f = File(<span class="string_literal">"tests/test.txt"</span>, <span class="string_literal">"rb"</span>);
-rs = rq.<span class="psymbol">exec</span>!<span class="string_literal">"POST"</span>(<span class="string_literal">"http://httpbin.org/post"</span>, f.byChunk(3), <span class="string_literal">"application/octet-stream"</span>);
-</code></li>
-      </ol>
-    </div>
-  </div>
-</section>
-
-  </p>
-</div>
-
-</section>
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#HTTPRequest.exec" id="HTTPRequest.exec"><code class="code">exec</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="HTTPRequest.exec.3"></span>HTTPResponse <code class="code">exec</code>(string method = "GET")(string <code class="code">url</code> = null, QueryParam[] <code class="code">params</code> = null);
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
-  <p class="para">
-    Send request with pameters.
-If used for POST or PUT requests then application/x-www-form-urlencoded used.
-Request parameters will be encoded into request string or placed in request body for POST/PUT
-requests.
-
-  </p>
-</div>
-<div class="ddoc_section">
-  <p class="para">
-    <span class="ddoc_section_h">Parameters:</span>
-<code class="code">url</code> = <code class="code">url</code>
-<code class="code">params</code> = request parameters
-
-  </p>
-</div>
-<div class="ddoc_returns">
-  <h4>Return Value</h4>
-  <p class="para">
-    Response
-
-  </p>
-</div>
-<div class="ddoc_examples">
-  <h4>Examples</h4>
-  <p class="para">
-    
-<section class="code_listing">
-  <div class="code_sample">
-    <div class="dlang">
-      <ol class="code_lines">
-        <li><code class="code">rs = Request().<span class="psymbol">exec</span>!<span class="string_literal">"GET"</span>(<span class="string_literal">"http://httpbin.org/get"</span>, [<span class="string_literal">"c"</span>:<span class="string_literal">"d"</span>, <span class="string_literal">"a"</span>:<span class="string_literal">"b"</span>]);
-</code></li>
-      </ol>
-    </div>
-  </div>
-</section>
-
-  </p>
-</div>
-
-</section>
-
-</div>
-
-</li><li class="ddoc_member">
-  <div class="ddoc_member_header">
-  <div class="ddoc_header_anchor">
-  <a href="#HTTPRequest.exec" id="HTTPRequest.exec"><code class="code">exec</code></a>
-</div>
-</div><div class="ddoc_decl">
-  <section class="section">
-    <div class="declaration">
-      <h4>Declaration</h4>
-      <div class="dlang">
-        <p class="para">
-          <code class="code">
-            <span class="ddoc_anchor" id="HTTPRequest.exec.4"></span>HTTPResponse <code class="code">exec</code>(string method = "POST")(string <code class="code">url</code>, PostFile[] <code class="code">files</code>) if (method == "POST");
-
-          </code>
-        </p>
-      </div>
-    </div>
-  </section>
-</div>
-<div class="ddoc_decl">
-  <section class="section ddoc_sections">
-  <div class="ddoc_summary">
-  <p class="para">
-    WRAPPERS
-
-  </p>
-</div>
-<div class="ddoc_description">
-  <h4>Discussion</h4>
-  <p class="para">
-    send file(s) using POST and multipart form.
-This wrapper will be deprecated, use post with MultipartForm - it is more general and clear.
-
-  </p>
-</div>
-<div class="ddoc_section">
-  <p class="para">
-    <span class="ddoc_section_h">Parameters:</span>
-<code class="code">url</code> = <code class="code">url</code>
-<code class="code">files</code> = array of PostFile structures
-
-  </p>
-</div>
-<div class="ddoc_returns">
-  <h4>Return Value</h4>
-  <p class="para">
-    Response
-Each PostFile structure contain path to file, and optional field name and content type.
-If no field name provided, then basename of the file will be used.
-application/octet-stream is default when no content type provided.
-
-  </p>
-</div>
 <div class="ddoc_section">
   <p class="para">
     <span class="ddoc_section_h">Example:</span>
@@ -1520,11 +1409,9 @@ application/octet-stream is default when no content type provided.
   <div class="code_sample">
     <div class="dlang">
       <ol class="code_lines">
-        <li><code class="code">PostFile[] <span class="param">files</span> = [
-{fileName:<span class="string_literal">"tests/abc.txt"</span>, fieldName:<span class="string_literal">"abc"</span>, contentType:<span class="string_literal">"application/octet-stream"</span>},
-{fileName:<span class="string_literal">"tests/test.txt"</span>}
-];
-rs = rq.<span class="psymbol">exec</span>!<span class="string_literal">"POST"</span>(<span class="string_literal">"http://httpbin.org/post"</span>, <span class="param">files</span>);
+        <li><code class="code">   rq = Request();
+   rq.keepAlive = <span class="keyword">true</span>;
+   rq.<span class="psymbol">addHeaders</span>([<span class="string_literal">"X-Header"</span>: <span class="string_literal">"test"</span>]);
 </code></li>
       </ol>
     </div>
@@ -1541,7 +1428,7 @@ rs = rq.<span class="psymbol">exec</span>!<span class="string_literal">"POST"</s
 </li><li class="ddoc_member">
   <div class="ddoc_member_header">
   <div class="ddoc_header_anchor">
-  <a href="#HTTPRequest.exec" id="HTTPRequest.exec"><code class="code">exec</code></a>
+  <a href="#Request.get" id="Request.get"><code class="code">get</code></a>
 </div>
 </div><div class="ddoc_decl">
   <section class="section">
@@ -1550,7 +1437,7 @@ rs = rq.<span class="psymbol">exec</span>!<span class="string_literal">"POST"</s
       <div class="dlang">
         <p class="para">
           <code class="code">
-            <span class="ddoc_anchor" id="HTTPRequest.exec.5"></span>HTTPResponse <code class="code">exec</code>(string method = "GET")(string <code class="code">url</code>, string[string] <code class="code">params</code>);
+            <span class="ddoc_anchor" id="Request.get"></span>Response <code class="code">get</code>(A...)(string <code class="code">uri</code>, A <code class="code">args</code>);
 
           </code>
         </p>
@@ -1562,23 +1449,11 @@ rs = rq.<span class="psymbol">exec</span>!<span class="string_literal">"POST"</s
   <section class="section ddoc_sections">
   <div class="ddoc_summary">
   <p class="para">
-    <code class="code">exec</code> request with parameters when you can use dictionary (when you have no duplicates in parameter names)
-Consider switch to <code class="code">exec</code>(<code class="code">url</code>, QueryParams) as it more generic and clear.
+    Execute GET for http and retrieve file for FTP.
+You have to provide at least <b><code class="code">uri</code></b>. All other arguments should conform to HTTPRequest.<code class="code">get</code> or FTPRequest.<code class="code">get</code> depending on the URI scheme.
+When arguments do not conform scheme (for example you try to call <code class="code">get</code>("ftp://somehost.net/pub/README", {"a":"b"}) which doesn't make sense)
+you will receive Exception("Operation not supported for ftp")
 
-  </p>
-</div>
-<div class="ddoc_section">
-  <p class="para">
-    <span class="ddoc_section_h">Parameters:</span>
-<code class="code">url</code> = <code class="code">url</code>
-<code class="code">params</code> = dictionary with field names as keys and field values as values.
-
-  </p>
-</div>
-<div class="ddoc_returns">
-  <h4>Return Value</h4>
-  <p class="para">
-    Response
   </p>
 </div>
 
@@ -1589,7 +1464,7 @@ Consider switch to <code class="code">exec</code>(<code class="code">url</code>,
 </li><li class="ddoc_member">
   <div class="ddoc_member_header">
   <div class="ddoc_header_anchor">
-  <a href="#HTTPRequest.get" id="HTTPRequest.get"><code class="code">get</code></a>
+  <a href="#Request.post" id="Request.post"><code class="code">post</code></a>
 </div>
 </div><div class="ddoc_decl">
   <section class="section">
@@ -1598,7 +1473,7 @@ Consider switch to <code class="code">exec</code>(<code class="code">url</code>,
       <div class="dlang">
         <p class="para">
           <code class="code">
-            <span class="ddoc_anchor" id="HTTPRequest.get"></span>HTTPResponse <code class="code">get</code>(A...)(A <code class="code">args</code>);
+            <span class="ddoc_anchor" id="Request.post"></span>Response <code class="code">post</code>(A...)(string <code class="code">uri</code>, A <code class="code">args</code>);
 
           </code>
         </p>
@@ -1610,31 +1485,11 @@ Consider switch to <code class="code">exec</code>(<code class="code">url</code>,
   <section class="section ddoc_sections">
   <div class="ddoc_summary">
   <p class="para">
-    GET request. Simple wrapper over exec!"GET"
+    Execute POST for http and STOR file for FTP.
+You have to provide  <b><code class="code">uri</code></b> and data. Data should conform to HTTPRequest.<code class="code">post</code> or FTPRequest.<code class="code">post</code> depending on the URI scheme.
+When arguments do not conform scheme you will receive Exception("Operation not supported for ftp")
 
   </p>
-</div>
-<div class="ddoc_params">
-  <h4>Parameters</h4>
-  <table cellspacing="0" cellpadding="5" border="0" class="graybox">
-    <tbody>
-      <tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">A <code class="code">args</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      request parameters. see exec docs.
-    </p>
-  </div>
-</td>
-</tr>
-
-    </tbody>
-  </table>
 </div>
 
 </section>
@@ -1644,7 +1499,7 @@ Consider switch to <code class="code">exec</code>(<code class="code">url</code>,
 </li><li class="ddoc_member">
   <div class="ddoc_member_header">
   <div class="ddoc_header_anchor">
-  <a href="#HTTPRequest.post" id="HTTPRequest.post"><code class="code">post</code></a>
+  <a href="#Request.exec" id="Request.exec"><code class="code">exec</code></a>
 </div>
 </div><div class="ddoc_decl">
   <section class="section">
@@ -1653,7 +1508,7 @@ Consider switch to <code class="code">exec</code>(<code class="code">url</code>,
       <div class="dlang">
         <p class="para">
           <code class="code">
-            <span class="ddoc_anchor" id="HTTPRequest.post"></span>HTTPResponse <code class="code">post</code>(A...)(string <code class="code">uri</code>, A <code class="code">args</code>);
+            <span class="ddoc_anchor" id="Request.exec"></span>Response <code class="code">exec</code>(string method = "GET", A...)(string <code class="code">uri</code>, A <code class="code">args</code>);
 
           </code>
         </p>
@@ -1665,45 +1520,8 @@ Consider switch to <code class="code">exec</code>(<code class="code">url</code>,
   <section class="section ddoc_sections">
   <div class="ddoc_summary">
   <p class="para">
-    POST request. Simple wrapper over exec!"POST"
-
+    Execute request with method
   </p>
-</div>
-<div class="ddoc_params">
-  <h4>Parameters</h4>
-  <table cellspacing="0" cellpadding="5" border="0" class="graybox">
-    <tbody>
-      <tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">string <code class="code">uri</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      endpoint <code class="code">uri</code>
-    </p>
-  </div>
-</td>
-</tr>
-<tr class="ddoc_param_row">
-  <td scope="ddoc_param_id">
-  <code class="code">
-    <em class="term">A <code class="code">args</code></em>
-  </code>
-</td>
-<td>
-  <div class="ddoc_param_desc">
-    <p class="para">
-      request parameters. see exec docs.
-    </p>
-  </div>
-</td>
-</tr>
-
-    </tbody>
-  </table>
 </div>
 
 </section>

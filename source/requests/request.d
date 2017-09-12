@@ -24,31 +24,36 @@ public struct Request {
         FTPRequest  _ftp;   // route all ftp requests here
         string      _method;
     }
-    /// Set timeout on IO operation.
+    /// Set timeout on connection and IO operation.
     /// $(B v) - timeout value
-    /// 
+    /// If timeout expired Request operation will throw $(B TimeoutException).
     @property void timeout(Duration v) pure @nogc nothrow {
         _http.timeout = v;
         _ftp.timeout = v;
     }
     /// Set http keepAlive value
     /// $(B v) - use keepalive requests - $(B true), or not - $(B false)
+    /// Request will automatically reopen connection when host, protocol
+    /// or port change (so it is safe to send different requests through
+    /// single instance of Request).
+    /// It also recovers if server prematurely close keep-alive connection.
     @property void keepAlive(bool v) pure @nogc nothrow {
         _http.keepAlive = v;
     }
     /// Set limit on HTTP redirects
     /// $(B v) - limit on redirect depth
+    /// Throws $(B MaxRedirectsException) when limit is reached.
     @property void maxRedirects(uint v) pure @nogc nothrow {
         _http.maxRedirects = v;
     }
     /// Set maximum content lenth both for http and ftp requests
-    /// $(B v) - maximum content length in bytes. When limit reached - throw RequestException
+    /// $(B v) - maximum content length in bytes. When limit reached - throws $(B RequestException)
     @property void maxContentLength(size_t v) pure @nogc nothrow {
         _http.maxContentLength = v;
         _ftp.maxContentLength = v;
     }
     /// Set maximum length for HTTP headers
-    /// $(B v) - maximum length of the HTTP response. When limit reached - throw RequestException
+    /// $(B v) - maximum length of the HTTP response. When limit reached - throws $(B RequestException)
     @property void maxHeadersLength(size_t v) pure @nogc nothrow {
         _http.maxHeadersLength = v;
     }
@@ -59,38 +64,95 @@ public struct Request {
         _ftp.bufferSize = v;
     }
     /// Set verbosity for HTTP or FTP requests.
-    /// $(B v) - verbosity level (0 - no output, 1 - headers to stdout, 2 - headers and body progress to stdout). default = 0.
+    /// $(B v) - verbosity level (0 - no output, 1 - headers to stdout, 2 - headers and data hexdump to stdout). default = 0.
     @property void verbosity(uint v) {
         _http.verbosity = v;
         _ftp.verbosity = v;
     }
-    /// Set authenticator for http requests.
-    /// $(B v) - Auth instance.
+    /++ Set authenticator for http requests.
+     +   $(B v) - Auth instance.
+     +   Example:
+     +   ---
+     +   import requests;
+     +   void main() {
+     +       rq = Request();
+     +       rq.authenticator = new BasicAuthentication("user", "passwd");
+     +       rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
+     +   }
+     +   ---
+     +/
     @property void authenticator(Auth v) {
         _http.authenticator = v;
         _ftp.authenticator = v;
     }
     /// set proxy property.
     /// $(B v) - full url to proxy.
+    ///
+    /// Note that we recognize proxy settings from process environment (see $(LINK https://github.com/ikod/dlang-requests/issues/46)):
+    /// you can use http_proxy, https_proxy, all_proxy (as well as uppercase names).
     @property void proxy(string v) {
         _http.proxy = v;
         _ftp.proxy = v;
     }
-    /// Set Cookie for http requests.
-    /// $(B v) - array of cookie.
+    /++ Set Cookie for http requests.
+        $(B v) - array of cookie.
+
+        You can set and read cookies. In the next example server set cookie and we read it.
+        Example:
+        ---
+        void main() {
+           rs = rq.get("http://httpbin.org/cookies/set?A=abcd&b=cdef");
+           assert(rs.code == 200);
+           auto json = parseJSON(cast(string)rs.responseBody.data).object["cookies"].object;
+           assert(json["A"].str == "abcd");
+           assert(json["b"].str == "cdef");
+           foreach(c; rq.cookie) {
+               final switch(c.attr) {
+                   case "A":
+                        assert(c.value == "abcd");
+                        break;
+                   case "b":
+                        assert(c.value == "cdef");
+                        break;
+                }
+            }
+        }
+        ---
+    +/
     @property void cookie(Cookie[] v) pure @nogc nothrow {
         _http.cookie = v;
     }
     /// Get Cookie for http requests.
-    /// $(B v) - array of cookie.
     @property Cookie[] cookie()  pure @nogc nothrow {
         return _http.cookie;
     }
-    ///
-    /// set "streaming" property
-    /// Params:
-    /// v = value to set (true - use streaming)
-    /// 
+    /++
+     set "streaming" property
+     $(B v) = value to set (true - use streaming).
+
+     Use streaming when you do not want to keep whole response in memory.
+     Example:
+     ---
+     import requests;
+     import std.stdio;
+
+     void main() {
+         Request rq = Request();
+
+         rq.useStreaming = true;
+         auto rs = rq.get("http://example.com/SomeHugePicture.png");
+         auto stream = rs.receiveAsRange();
+         File file = File("SomeHugePicture.png", "wb");
+
+         while(!stream.empty)  {
+             file.rawWrite(stream.front);
+             stream.popFront;
+         }
+         file.close();
+     }
+     ---
+    +/
+
     @property void useStreaming(bool v) pure @nogc nothrow {
         _http.useStreaming = v;
         _ftp.useStreaming = v;
@@ -116,28 +178,95 @@ public struct Request {
                 return _ftp.contentLength;
         }
     }
+    /++
+     + Enable or disable ssl peer verification.
+     + $(B v) - enable if `true`, disable if `false`.
+     +
+     + Default - false.
+     + Example:
+     + ---
+     +     auto rq = Request();
+     +     rq.sslSetVerifyPeer(true);
+     +     auto rs = rq.get("https://localhost:4443/");
+     + ---
+     +/
     @property void sslSetVerifyPeer(bool v) {
         _http.sslSetVerifyPeer(v);
     }
+
+    /++
+     + Set path to ssl key file.
+     +
+     + file type can be SSLOptions.filetype.pem (default) or SSLOptions.filetype.der or SSLOptions.filetype.asn1.
+     +
+     + if you configured only key file or only cert file, we will try to load counterpart from the same file.
+     +
+     + Example:
+     + ---
+     +     auto rq = Request();
+     +     rq.sslSetKeyFile("client01.key");
+     +     auto rs = rq.get("https://localhost:4443/");
+     + ---
+     +/
     @property void sslSetKeyFile(string path, SSLOptions.filetype type = SSLOptions.filetype.pem) pure @safe nothrow @nogc {
         _http.sslSetKeyFile(path, type);
     }
+
+    /++
+     + Set path to ssl cert file.
+     +
+     + file type can be SSLOptions.filetype.pem (default) or SSLOptions.filetype.der or SSLOptions.filetype.asn1.
+     +
+     + if you configured only key file or only cert file, we will try to load counterpart from the same file.
+     +
+     + Example:
+     + ---
+     +     auto rq = Request();
+     +     rq.sslSetCertFile("client01.crt");
+     +     auto rs = rq.get("https://localhost:4443/");
+     + ---
+     +/
     @property void sslSetCertFile(string path, SSLOptions.filetype type = SSLOptions.filetype.pem) pure @safe nothrow @nogc {
         _http.sslSetCertFile(path, type);
     }
+
+    /++
+     + Set path to ssl ca cert file.
+     + Example:
+     + ---
+     +     auto rq = Request();
+     +     rq.sslSetCaCert("/opt/local/etc/openssl/cert.pem");
+     +     auto rs = rq.get("https://localhost:4443/");
+     + ---
+     +/
     @property void sslSetCaCert(string path) pure @safe nothrow @nogc {
         _http.sslSetCaCert(path);
     }
+
     @property auto sslOptions() {
         return _http.sslOptions();
     }
+
+    /++
+     + Set local address for any outgoing requests.
+     + $(B v) can be string with hostname or ip address.
+     +/
     @property auto bind(string v) {
         _http.bind(v);
         _ftp.bind(v);
     }
-    /// Add headers to request
-    /// Params:
-    /// headers = headers to send.
+
+    /++
+     + Add headers to request
+     + Params:
+     + headers = headers to send.
+     + Example:
+     + ---
+     +    rq = Request();
+     +    rq.keepAlive = true;
+     +    rq.addHeaders(["X-Header": "test"]);
+     + ---
+     +/
     void addHeaders(in string[string] headers) {
         _http.addHeaders(headers);
     }
@@ -195,6 +324,9 @@ public struct Request {
                 }
         }
     }
+    /++
+     + Execute request with method
+     +/
     Response exec(string method="GET", A...)(string uri, A args) {
         _method = method;
         _uri = URI(uri);

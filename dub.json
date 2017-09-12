@@ -27,7 +27,7 @@
         },
         "docs": {
             "buildOptions": ["syntaxOnly"],
-            "dflags" : ["-c", "-Dddocs", "source/requests/viola.ddoc"]
+            "dflags" : ["-c", "-Dddocs"]
         },
         "unittest": {
             "buildOptions": ["unittests", "debugMode", "debugInfo"],

@@ -149,7 +149,12 @@ struct OpenSSL {
     };
 
     private Version OpenSSL_version_detect() const {
-        long function() OpenSSL_version_num = cast(long function())DLSYM(cast(void*)_libssl, "OpenSSL_version_num".ptr);
+        version(ARM) {
+            uint function() OpenSSL_version_num = cast(uint function())DLSYM(cast(void*)_libssl, "OpenSSL_version_num".ptr);
+        } else {
+            ulong function() OpenSSL_version_num = cast(ulong function())DLSYM(cast(void*)_libssl, "OpenSSL_version_num".ptr);
+        }
+        
         if ( OpenSSL_version_num ) {
             auto v = OpenSSL_version_num();
             return Version((v>>>20) & 0xff, (v>>>28) & 0xff);

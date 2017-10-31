@@ -149,9 +149,9 @@ struct OpenSSL {
     };
 
     private Version OpenSSL_version_detect() const {
-        long function() OpenSSL_version_num = cast(long function())DLSYM(cast(void*)_libssl, "OpenSSL_version_num".ptr);
+        ulong function() OpenSSL_version_num = cast(ulong function())DLSYM(cast(void*)_libcrypto, "OpenSSL_version_num".ptr);
         if ( OpenSSL_version_num ) {
-            auto v = OpenSSL_version_num();
+            auto v = OpenSSL_version_num() & 0xffffffff;
             return Version((v>>>20) & 0xff, (v>>>28) & 0xff);
         }
         return Version(1, 0);

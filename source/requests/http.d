@@ -22,7 +22,7 @@ import requests.utils;
 import requests.base;
 import requests.buffer;
 
-static immutable ushort[] redirectCodes = [301, 302, 303];
+static immutable ushort[] redirectCodes = [301, 302, 303, 307, 308];
 static immutable uint     defaultBufferSize = 12*1024;
 
 static immutable string[string] proxies;
@@ -59,7 +59,7 @@ public class BasicAuthentication: Auth {
     /// username = username
     /// password = password
     /// domains = not used now
-    /// 
+    ///
     this(string username, string password, string[] domains = []) {
         _username = username;
         _password = password;
@@ -84,10 +84,10 @@ public class BasicAuthentication: Auth {
 public auto queryParams(T...)(T params) pure nothrow @safe
 {
     static assert (T.length % 2 == 0, "wrong args count");
-    
+
     QueryParam[] output;
     output.reserve = T.length / 2;
-    
+
     void queryParamsHelper(T...)(T params, ref QueryParam[] output)
     {
         static if (T.length > 0)
@@ -109,7 +109,7 @@ public auto queryParams(T...)(T params) pure nothrow @safe
 /// Response.responseHeaders - received headers.
 /// Response.responseBody - container for received body
 /// Response.history - for redirected responses contain all history
-/// 
+///
 public class HTTPResponse : Response {
     private {
         string         _status_line;
@@ -156,7 +156,7 @@ public struct PostFile {
 }
 ///
 /// This is File-like interface for sending data to multipart fotms
-/// 
+///
 public interface FiniteReadable {
     /// size of the content
     abstract ulong  getSize();
@@ -169,7 +169,7 @@ public interface FiniteReadable {
 /// name = name of the field in form
 /// f = opened std.stio.File to send to server
 /// parameters = optional parameters (most important are "filename" and "Content-Type")
-/// 
+///
 public auto formData(string name, File f, string[string] parameters = null) {
     return MultipartForm.FormData(name, new FormDataFile(f), parameters);
 }
@@ -179,7 +179,7 @@ public auto formData(string name, File f, string[string] parameters = null) {
 /// name = name of the field in form
 /// b = data to send to server
 /// parameters = optional parameters (can be "filename" and "Content-Type")
-/// 
+///
 public auto formData(string name, ubyte[] b, string[string] parameters = null) {
     return MultipartForm.FormData(name, new FormDataBytes(b), parameters);
 }
@@ -243,7 +243,7 @@ public class FormDataFile : FiniteReadable {
 /// This struct used to bulld POST's to forms.
 /// Each part have name and data. data is something that can be read-ed and have size.
 /// For example this can be string-like object (wrapped for reading) or opened File.
-/// 
+///
 public struct MultipartForm {
     package struct FormData {
         FiniteReadable  input;
@@ -283,7 +283,7 @@ public struct MultipartForm {
 /// $(B proxy) - string, set proxy url if needed. default - null.
 /// $(B cookie) - Tuple Cookie, Read/Write cookie You can get cookie setted by server, or set cookies before doing request.
 /// $(B timeout) - Duration, Set timeout value for connect/receive/send.
-/// 
+///
 public struct HTTPRequest {
     private {
         enum           _preHeaders = [
@@ -362,7 +362,7 @@ public struct HTTPRequest {
     }
     @property final Cookie[] cookie() pure @safe @nogc nothrow {
         return _cookie;
-    }    
+    }
 
     @disable this(this);
 
@@ -476,7 +476,7 @@ public struct HTTPRequest {
     }
     ///
     /// compose headers to send
-    /// 
+    ///
     private string[string] requestHeaders() {
         string[string] generatedHeaders = _preHeaders;
 
@@ -488,10 +488,13 @@ public struct HTTPRequest {
         }
 
         generatedHeaders["Connection"] = _keepAlive?"Keep-Alive":"Close";
-        generatedHeaders["Host"] = _uri.host;
 
-        if ( _uri.scheme !in standard_ports || _uri.port != standard_ports[_uri.scheme] ) {
-            generatedHeaders["Host"] ~= ":%d".format(_uri.port);
+        if ( "Host" !in _headers ) {
+            generatedHeaders["Host"] = _uri.host;
+
+            if ( _uri.scheme !in standard_ports || _uri.port != standard_ports[_uri.scheme] ) {
+                generatedHeaders["Host"] ~= ":%d".format(_uri.port);
+            }
         }
 
         _headers.byKey.each!(h => generatedHeaders[h] = _headers[h]);
@@ -511,7 +514,7 @@ public struct HTTPRequest {
     ///
     /// Build request string.
     /// Handle proxy and query parameters.
-    /// 
+    ///
     private @property string requestString(QueryParam[] params = null) {
         string actual_proxy = select_proxy(_uri.scheme);
         if ( actual_proxy && _uri.scheme != "https" ) {
@@ -528,7 +531,7 @@ public struct HTTPRequest {
     }
     ///
     /// encode parameters and build query part of the url
-    /// 
+    ///
     private static string params2query(in QueryParam[] params) pure @safe {
         return params.
                 map!(a => "%s=%s".format(a.key.urlEncoded, a.value.urlEncoded)).
@@ -541,7 +544,7 @@ public struct HTTPRequest {
     ///
     /// Analyze received headers, take appropriate actions:
     /// check content length, attach unchunk and uncompress
-    /// 
+    ///
     private void analyzeHeaders(in string[string] headers) {
 
         _contentLength = -1;
@@ -583,11 +586,11 @@ public struct HTTPRequest {
     /// 2. store status line, store response code
     /// 3. unfold headers if needed
     /// 4. store headers
-    /// 
+    ///
     private void parseResponseHeaders(in ubyte[] input) {
         string lastHeader;
         auto buffer = cast(string)input;
- 
+
         foreach(line; buffer.split('\n').map!(l => l.stripRight)) {
             if ( ! _response.status_line.length ) {
                 debug (requests) tracef("statusLine: %s", line);
@@ -633,7 +636,7 @@ public struct HTTPRequest {
 
     ///
     /// Process Set-Cookie header from server response
-    /// 
+    ///
     private Cookie[] processCookie(string value ) pure {
         // cookie processing
         //
@@ -716,7 +719,7 @@ public struct HTTPRequest {
     }
     ///
     /// If uri changed so that we have to change host, port or proxy, then we have to close socket stream
-    /// 
+    ///
     private void handleURLChange(in URI from, in URI to) {
         if ( _stream is null || !_stream.isConnected ) {
             return;
@@ -743,12 +746,12 @@ public struct HTTPRequest {
     }
     ///
     /// if we have new uri, then we need to check if we have to reopen existent connection
-    /// 
+    ///
     private void checkURL(string url, string file=__FILE__, size_t line=__LINE__) {
         if (url is null && _uri.uri == "" ) {
             throw new RequestException("No url configured", file, line);
         }
-        
+
         if ( url !is null ) {
             URI newURI = URI(url);
             handleURLChange(_uri, newURI);
@@ -757,7 +760,7 @@ public struct HTTPRequest {
     }
     ///
     /// Setup connection. Handle proxy and https case
-    /// 
+    ///
     private void setupConnection() {
         if ( _stream && _stream.isConnected ) {
             debug(requests) tracef("Use old connection");
@@ -819,7 +822,7 @@ public struct HTTPRequest {
     ///
     /// Request sent, now receive response.
     /// Find headers, split on headers and body, continue to receive body
-    /// 
+    ///
     private void receiveResponse() {
 
         _stream.readTimeout = timeout;
@@ -840,7 +843,7 @@ public struct HTTPRequest {
         auto buffer = Buffer();
         Buffer partialBody;
         ptrdiff_t read;
-        
+
         while(true) {
 
             auto b = new ubyte[_bufferSize];
@@ -884,7 +887,7 @@ public struct HTTPRequest {
                 break;
             }
         }
-        
+
         analyzeHeaders(_response._responseHeaders);
 
         if ( !partialBody.empty ) {
@@ -915,7 +918,7 @@ public struct HTTPRequest {
                         // check if we received everything we need
                         if ( ( _unChunker && _unChunker.done )
                             || !_stream.isConnected()
-                            || (_contentLength > 0 && _contentReceived >= _contentLength) ) 
+                            || (_contentLength > 0 && _contentReceived >= _contentLength) )
                         {
                             debug(requests) trace("streaming_in receive completed");
                             _bodyDecoder.flush();
@@ -1021,9 +1024,9 @@ public struct HTTPRequest {
         // application/json
         //
         bool restartedRequest = false;
-        
+
         _method = method;
-        
+
         _response = new HTTPResponse;
         checkURL(url);
         _response.uri = _uri;
@@ -1033,19 +1036,19 @@ public struct HTTPRequest {
         _contentReceived = 0;
         _response._startedAt = Clock.currTime;
         setupConnection();
-        
+
         if ( !_stream.isConnected() ) {
             return _response;
         }
         _response._connectedAt = Clock.currTime;
-        
+
         Appender!string req;
         req.put(requestString());
-        
+
         string   boundary = randomUUID().toString;
         string[] partHeaders;
         size_t   contentLength;
-        
+
         foreach(ref part; sources._sources) {
             string h = "--" ~ boundary ~ "\r\n";
             string disposition = `form-data; name="%s"`.format(part.name);
@@ -1067,7 +1070,7 @@ public struct HTTPRequest {
             contentLength += h.length + part.input.getSize() + "\r\n".length;
         }
         contentLength += "--".length + boundary.length + "--\r\n".length;
-        
+
         auto h = requestHeaders();
         h["Content-Type"] = "multipart/form-data; boundary=" ~ boundary;
         h["Content-Length"] = to!string(contentLength);
@@ -1075,7 +1078,7 @@ public struct HTTPRequest {
             map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
                 each!(h => req.put(h));
         req.put("\r\n");
-        
+
         debug(requests) trace(req.data);
         if ( _verbosity >= 1 ) req.data.splitLines.each!(a => writeln("> " ~ a));
 
@@ -1117,7 +1120,7 @@ public struct HTTPRequest {
             _stream.close();
         }
         if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
-            if ( _method != "GET" ) {
+            if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
                 return this.get();
             }
             goto connect;
@@ -1131,7 +1134,7 @@ public struct HTTPRequest {
     /// When rank 1 (flat array) used as content it must have length. In that case "content" will be sent directly to network, and Content-Length headers will be added.
     /// If you are goung to send some range and do not know length at the moment when you start to send request, then you can send chunks of chars or ubyte.
     /// Try not to send too short chunks as this will put additional load on client and server. Chunks of length 2048 or 4096 are ok.
-    /// 
+    ///
     /// Parameters:
     ///    url = url
     ///    content = string or input range
@@ -1141,10 +1144,10 @@ public struct HTTPRequest {
     ///  Examples:
     ///  ---------------------------------------------------------------------------------------------------------
     ///      rs = rq.exec!"POST"("http://httpbin.org/post", "привiт, свiт!", "application/octet-stream");
-    ///      
+    ///
     ///      auto s = lineSplitter("one,\ntwo,\nthree.");
     ///      rs = rq.exec!"POST"("http://httpbin.org/post", s, "application/octet-stream");
-    ///      
+    ///
     ///      auto s = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     ///      rs = rq.exec!"POST"("http://httpbin.org/post", s.representation.chunks(10), "application/octet-stream");
     ///
@@ -1156,7 +1159,7 @@ public struct HTTPRequest {
     }
     HTTPResponse execute(R)(string method, string url, R content, string contentType="application/octet-stream")
         if ( (rank!R == 1)
-            || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front)))) 
+            || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front))))
             || (rank!R == 2 && (is(Unqual!(typeof(content.front.front)) == ubyte)))
         ) {
         if ( _response && _response._receiveAsRange.activated && _stream && _stream.isConnected ) {
@@ -1168,7 +1171,7 @@ public struct HTTPRequest {
         bool restartedRequest = false;
 
         _method = method;
-        
+
         _response = new HTTPResponse;
         checkURL(url);
         _response.uri = _uri;
@@ -1178,7 +1181,7 @@ public struct HTTPRequest {
         _contentReceived = 0;
         _response._startedAt = Clock.currTime;
         setupConnection();
-        
+
         if ( !_stream.isConnected() ) {
             return _response;
         }
@@ -1247,7 +1250,7 @@ public struct HTTPRequest {
             _stream.close();
         }
         if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
-            if ( _method != "GET" ) {
+            if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
                 return this.get();
             }
             goto connect;
@@ -1270,7 +1273,7 @@ public struct HTTPRequest {
     ///  ---------------------------------------------------------------------------------
     ///     rs = Request().exec!"GET"("http://httpbin.org/get", ["c":"d", "a":"b"]);
     ///  ---------------------------------------------------------------------------------
-    ///     
+    ///
     HTTPResponse exec(string method="GET")(string url = null, QueryParam[] params = null) {
         return execute(method, url, params);
     }
@@ -1306,8 +1309,12 @@ public struct HTTPRequest {
         switch (_method) {
             case "POST","PUT":
                 encoded = params2query(params);
-                h["Content-Type"] = "application/x-www-form-urlencoded";
-                h["Content-Length"] = to!string(encoded.length);
+                if ( "Content-Type" !in h ) {
+                    h["Content-Type"] = "application/x-www-form-urlencoded";
+                }
+                if ( "Content-Length" !in h && encoded.length > 0 ) {
+                    h["Content-Length"] = to!string(encoded.length);
+                }
                 req.put(requestString());
                 break;
             default:
@@ -1340,7 +1347,7 @@ public struct HTTPRequest {
             // We have to restart request if possible.
 
             // On RECEIVE - if we received something - then this exception is real and unexpected error.
-            // If we didn't receive anything - we can restart request again as it can be 
+            // If we didn't receive anything - we can restart request again as it can be
             if ( _response._responseHeaders.length != 0 ) {
                 _stream.close();
                 throw new RequestException("Unexpected network error");
@@ -1361,7 +1368,7 @@ public struct HTTPRequest {
             restartedRequest = true;
             goto connect;
         }
-        
+
         if ( _useStreaming ) {
             if ( _response._receiveAsRange.activated ) {
                 debug(requests) trace("streaming_in activated");
@@ -1383,7 +1390,7 @@ public struct HTTPRequest {
             writeln(">> Response recv time: ", _response._finishedAt - _response._requestSentAt);
         }
         if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
-            if ( _method != "GET" ) {
+            if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
                 return this.get();
             }
             goto connect;
@@ -1408,12 +1415,12 @@ public struct HTTPRequest {
     /// Example:
     /// ---------------------------------------------------------------
     ///    PostFile[] files = [
-    ///                   {fileName:"tests/abc.txt", fieldName:"abc", contentType:"application/octet-stream"}, 
+    ///                   {fileName:"tests/abc.txt", fieldName:"abc", contentType:"application/octet-stream"},
     ///                   {fileName:"tests/test.txt"}
     ///               ];
     ///    rs = rq.exec!"POST"("http://httpbin.org/post", files);
     /// ---------------------------------------------------------------
-    /// 
+    ///
     HTTPResponse exec(string method="POST")(string url, PostFile[] files) if (method=="POST") {
         MultipartForm multipart;
         File[]        toClose;
@@ -1528,7 +1535,7 @@ package unittest {
         f.close();
         // files
         PostFile[] files = [
-            {fileName: tmpfname, fieldName:"abc", contentType:"application/octet-stream"}, 
+            {fileName: tmpfname, fieldName:"abc", contentType:"application/octet-stream"},
             {fileName: tmpfname}
         ];
         rs = rq.post(httpbinUrl ~ "post", files);
@@ -1705,7 +1712,7 @@ package unittest {
         ///
         /// Ok, files ready.
         /// Now we will prepare Form data
-        /// 
+        ///
         File f1 = File(tmpfname1, "rb");
         File f2 = File(tmpfname2, "rb");
         scope(exit) {
@@ -1714,7 +1721,7 @@ package unittest {
         }
         ///
         /// for each part we have to set field name, source (ubyte array or opened file) and optional filename and content-type
-        /// 
+        ///
         MultipartForm mForm = MultipartForm().
             add(formData("Field1", cast(ubyte[])"form field from memory")).
                 add(formData("Field2", cast(ubyte[])"file field from memory", ["filename":"data2"])).

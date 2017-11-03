@@ -50,7 +50,7 @@ package unittest {
     auto json = parseJSON(cast(string)rs.responseBody.data).object["args"].object;
     assert(json["c"].str == " d");
     assert(json["a"].str == "b");
-    
+
     rq = Request();
     rq.keepAlive = true;
     // handmade json
@@ -73,7 +73,7 @@ package unittest {
         // files
         info("Check POST files");
         PostFile[] files = [
-            {fileName: tmpfname, fieldName:"abc", contentType:"application/octet-stream"}, 
+            {fileName: tmpfname, fieldName:"abc", contentType:"application/octet-stream"},
             {fileName: tmpfname}
         ];
         rs = rq.post(httpbinUrl ~ "post", files);
@@ -137,7 +137,7 @@ package unittest {
     info("Check PATCH");
     rs = rq.exec!"PATCH"(httpbinUrl ~ "patch", "привiт, свiт!", "application/octet-stream");
     assert(rs.code==200);
-    
+
     info("Check compressed content");
     rq = Request();
     rq.keepAlive = true;
@@ -148,7 +148,7 @@ package unittest {
     rs = rq.get(httpbinUrl ~ "deflate");
     assert(rs.code==200);
     info("deflate - ok");
-    
+
     info("Check redirects");
     rq = Request();
     rq.keepAlive = true;
@@ -189,13 +189,13 @@ package unittest {
     rs = rq.get(httpbinUrl ~ "range/1024");
     assert(rs.code==200);
     assert(rs.responseBody.length==1024);
-    
+
     info("Check basic auth");
     rq = Request();
     rq.authenticator = new BasicAuthentication("user", "passwd");
     rs = rq.get(httpbinUrl ~ "basic-auth/user/passwd");
     assert(rs.code==200);
-    
+
     info("Check limits");
     rq = Request();
     rq.maxContentLength = 1;
@@ -235,13 +235,13 @@ package unittest {
     /// posting query parameters using "application/x-www-form-urlencoded"
     info("Test postContent using query params");
     postContent(httpbinUrl ~ "post", queryParams("first", "a", "second", 2));
-    
+
     /// posting using multipart/form-data (large data and files). See docs fot HTTPRequest
     info("Test postContent form");
     MultipartForm mpform;
     mpform.add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
     postContent(httpbinUrl ~ "post", mpform);
-    
+
     /// put content using multipart/form-data (large data and files). See docs fot HTTPRequest
     info("Test putContent form");
     mpform = MultipartForm();
@@ -257,18 +257,18 @@ package unittest {
     mpform = MultipartForm().add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
     rs = rq.post(httpbinUrl ~ "post", mpform);
     assert(rs.code == 200);
-    
+
     info("Test put form via Request()");
     rq = Request();
     mpform = MultipartForm().add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
     rs = rq.put(httpbinUrl ~ "put", mpform);
     assert(rs.code == 200);
-    
+
     info("Test del via Request()");
     rq = Request();
     rs = rq.del(httpbinUrl ~ "delete");
     assert(rs.code == 200);
-    
+
     info("Test receiveAsRange with POST");
     streamedContent.length = 0;
     rq = Request();
@@ -291,7 +291,7 @@ package unittest {
         import std.algorithm;
         import std.string;
         import core.atomic;
-        
+
         immutable auto urls = [
             "stream/10",
             "stream/20",
@@ -301,16 +301,16 @@ package unittest {
             "stream/60",
             "stream/70",
         ].map!(a => httpbinUrl ~ a).array.idup;
-        
+
         defaultPoolThreads(4);
-        
+
         shared short lines;
-        
+
         foreach(url; parallel(urls)) {
             atomicOp!"+="(lines, getContent(url).splitter("\n").count);
         }
         assert(lines == 287);
-        
+
     }
 }
 
@@ -406,7 +406,7 @@ package unittest {
     info("Test getContent(ftp)");
     auto r = getContent("ftp://speedtest.tele2.net/1KB.zip");
     assert(r.length == 1024);
-    
+
     info("Test postContent ftp");
     r = postContent("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
     assert(r.length == 0);

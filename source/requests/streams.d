@@ -114,7 +114,7 @@ public class DataPipe : DataPipeIface {
             throw new DecodingException(e.msg);
         }
     }
-    /// Get what was collected in internal buffer and clear it. 
+    /// Get what was collected in internal buffer and clear it.
     /// Returns:
     /// data collected.
     final BufferChunk get() {
@@ -128,7 +128,7 @@ public class DataPipe : DataPipeIface {
     alias getNoCopy = getChunks;
     ///
     /// get without datamove. but user receive [][]
-    /// 
+    ///
     final immutable(BufferChunk)[] getChunks() @safe pure nothrow {
         auto res = buffer.dataChunks();
         buffer = Buffer();
@@ -234,12 +234,12 @@ public class DecodeChunked : DataPipeIface {
     //                      last-chunk
     //                      trailer
     //                      CRLF
-    //            
+    //
     //    chunk          = chunk-size [ chunk-extension ] CRLF
     //                     chunk-data CRLF
     //                     chunk-size     = 1*HEX
     //                     last-chunk     = 1*("0") [ chunk-extension ] CRLF
-    //        
+    //
     //    chunk-extension= *( ";" chunk-ext-name [ "=" chunk-ext-val ] )
     //    chunk-ext-name = token
     //    chunk-ext-val  = token | quoted-string
@@ -550,7 +550,7 @@ else {
             //SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
             //SSL_CTX_ctrl(ctx, 33, SSL_MODE_RELEASE_BUFFERS, null);
             ssl = openssl.SSL_new(ctx);
-            openssl.SSL_set_fd(ssl, this.handle);
+            openssl.SSL_set_fd(ssl, cast(int)this.handle);
         }
 
         @trusted
@@ -791,7 +791,7 @@ public abstract class SocketStream : NetworkStream {
         }
         return this;
     }
-    
+
     ptrdiff_t send(const(void)[] buff) @safe
     in {assert(isConnected);}
     body {
@@ -802,7 +802,7 @@ public abstract class SocketStream : NetworkStream {
         }
         return rc;
     }
-    
+
     ptrdiff_t receive(void[] buff) @safe {
         while (true) {
             auto r = s.receive(buff);

@@ -100,7 +100,7 @@ public class DataPipe(E) : DataPipeIface!E {
             throw new DecodingException(e.msg);
         }
     }
-    /// Get what was collected in internal buffer and clear it. 
+    /// Get what was collected in internal buffer and clear it.
     /// Returns:
     /// data collected.
     final E[] get() {
@@ -113,7 +113,7 @@ public class DataPipe(E) : DataPipeIface!E {
     }
     ///
     /// get without datamove. but user receive [][]
-    /// 
+    ///
     final E[][] getNoCopy()  {
         if ( buffer.empty ) {
             return E[][].init;
@@ -213,12 +213,12 @@ public class DecodeChunked : DataPipeIface!ubyte {
     //                      last-chunk
     //                      trailer
     //                      CRLF
-    //            
+    //
     //    chunk          = chunk-size [ chunk-extension ] CRLF
     //                     chunk-data CRLF
     //                     chunk-size     = 1*HEX
     //                     last-chunk     = 1*("0") [ chunk-extension ] CRLF
-    //        
+    //
     //    chunk-extension= *( ";" chunk-ext-name [ "=" chunk-ext-val ] )
     //    chunk-ext-name = token
     //    chunk-ext-val  = token | quoted-string
@@ -418,9 +418,9 @@ public struct Buffer(T) {
         }
         Repr __repr;
     }
-    
+
     alias toString = data!string;
-    
+
     this(this) {
         if ( !__repr ) {
             return;
@@ -598,7 +598,7 @@ public unittest {
     static assert(hasSlicing!(Buffer!ubyte));
     static assert(isBidirectionalRange!(Buffer!ubyte));
     static assert(isRandomAccessRange!(Buffer!ubyte));
-    
+
     auto b = Buffer!ubyte();
     b.put("abc".representation.dup);
     b.put("def".representation.dup);
@@ -786,7 +786,7 @@ else {
             //SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
             //SSL_CTX_ctrl(ctx, 33, SSL_MODE_RELEASE_BUFFERS, null);
             ssl = openssl.SSL_new(ctx);
-            openssl.SSL_set_fd(ssl, this.handle);
+            openssl.SSL_set_fd(ssl, cast(int)this.handle);
         }
 
         @trusted
@@ -1027,7 +1027,7 @@ public abstract class SocketStream : NetworkStream {
         }
         return this;
     }
-    
+
     ptrdiff_t send(const(void)[] buff) @safe
     in {assert(isConnected);}
     body {
@@ -1038,7 +1038,7 @@ public abstract class SocketStream : NetworkStream {
         }
         return rc;
     }
-    
+
     ptrdiff_t receive(void[] buff) @safe {
         while (true) {
             auto r = s.receive(buff);

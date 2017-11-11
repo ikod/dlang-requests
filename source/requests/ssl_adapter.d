@@ -15,6 +15,13 @@ version(Windows) {
     alias DLSYM = dlsym;
 }
 
+/*
+ * /usr/include/openssl/tls1.h:# define TLS_ANY_VERSION 0x10000
+ */
+
+immutable int TLS_ANY_VERSION = 0x10000;
+immutable int TLS1_VERSION = 0x0301;
+immutable int TLS1_2_VERSION = 0x0303;
 
 struct SSL {};
 struct SSL_CTX {};
@@ -75,6 +82,8 @@ static this() {
 
     mixin(SSL_Function_set_i!("TLSv1_client_method", SSL_METHOD*));
     mixin(SSL_Function_set_i!("TLSv1_2_client_method", SSL_METHOD*));
+    mixin(SSL_Function_set_i!("TLS_method", SSL_METHOD*));
+    mixin(SSL_Function_set_i!("SSLv23_client_method", SSL_METHOD*));
     mixin(SSL_Function_set_i!("SSL_CTX_new", SSL_CTX*, SSL_METHOD*));
     mixin(SSL_Function_set_i!("SSL_CTX_set_default_verify_paths", int, SSL_CTX*));
     mixin(SSL_Function_set_i!("SSL_CTX_load_verify_locations", int, SSL_CTX*, char*, char*));
@@ -82,6 +91,7 @@ static this() {
     mixin(SSL_Function_set_i!("SSL_CTX_use_PrivateKey_file", int, SSL_CTX*, const char*, int));
     mixin(SSL_Function_set_i!("SSL_CTX_use_certificate_file", int, SSL_CTX*, const char*, int));
     mixin(SSL_Function_set_i!("SSL_CTX_set_cipher_list", int, SSL_CTX*, const char*));
+    mixin(SSL_Function_set_i!("SSL_CTX_ctrl", long, SSL_CTX*, int, long, void*));
     mixin(SSL_Function_set_i!("SSL_new", SSL*, SSL_CTX*));
     mixin(SSL_Function_set_i!("SSL_set_fd", int, SSL*, int));
     mixin(SSL_Function_set_i!("SSL_connect", int, SSL*));
@@ -124,6 +134,8 @@ struct OpenSSL {
         // all other functions
         mixin(SSL_Function_decl!("TLSv1_client_method", SSL_METHOD*));
         mixin(SSL_Function_decl!("TLSv1_2_client_method", SSL_METHOD*));
+        mixin(SSL_Function_decl!("TLS_method", SSL_METHOD*));
+        mixin(SSL_Function_decl!("SSLv23_client_method", SSL_METHOD*));
         mixin(SSL_Function_decl!("SSL_CTX_new", SSL_CTX*, SSL_METHOD*));
         mixin(SSL_Function_decl!("SSL_CTX_set_default_verify_paths", int, SSL_CTX*));
         mixin(SSL_Function_decl!("SSL_CTX_load_verify_locations", int, SSL_CTX*, char*, char*));
@@ -131,6 +143,7 @@ struct OpenSSL {
         mixin(SSL_Function_decl!("SSL_CTX_use_PrivateKey_file", int, SSL_CTX*, const char*, int));
         mixin(SSL_Function_decl!("SSL_CTX_use_certificate_file", int, SSL_CTX*, const char*, int));
         mixin(SSL_Function_decl!("SSL_CTX_set_cipher_list", int, SSL_CTX*, const char*));
+        mixin(SSL_Function_decl!("SSL_CTX_ctrl", long, SSL_CTX*, int, long, void*));
         mixin(SSL_Function_decl!("SSL_new", SSL*, SSL_CTX*));
         mixin(SSL_Function_decl!("SSL_set_fd", int, SSL*, int));
         mixin(SSL_Function_decl!("SSL_connect", int, SSL*));
@@ -193,6 +206,18 @@ struct OpenSSL {
         }
         return adapter_TLSv1_2_client_method();
     }
+    SSL_METHOD* TLS_method() const {
+        if ( adapter_TLS_method !is null ) {
+            return adapter_TLS_method();
+        }
+        if ( adapter_TLSv1_2_client_method !is null ) {
+            return adapter_TLSv1_2_client_method();
+        }
+        if ( adapter_TLSv1_client_method !is null ) {
+            return adapter_TLSv1_client_method();
+        }
+        throw new Exception("can't complete call to TLS_method");
+    }
     SSL_CTX* SSL_CTX_new(SSL_METHOD* method) const {
         if ( adapter_SSL_CTX_new is null ) {
             throw new Exception("openssl not initialized - is it installed?");
@@ -216,6 +241,21 @@ struct OpenSSL {
     }
     int SSL_CTX_set_cipher_list(SSL_CTX* ssl_ctx, const char* c) const {
         return adapter_SSL_CTX_set_cipher_list(ssl_ctx, c);
+    }
+    /*
+     *
+     * # define SSL_CTRL_SET_MIN_PROTO_VERSION          123
+     * # define SSL_CTRL_SET_MAX_PROTO_VERSION          124
+    */
+    enum int SSL_CTRL_SET_MIN_PROTO_VERSION = 123;
+    enum int SSL_CTRL_SET_MAX_PROTO_VERSION = 124;
+    int SSL_CTX_set_min_proto_version(SSL_CTX* ctx, int v) const {
+        int r = cast(int)adapter_SSL_CTX_ctrl(ctx, SSL_CTRL_SET_MIN_PROTO_VERSION, cast(long)v, null);
+        return r;
+    }
+    int SSL_CTX_set_max_proto_version(SSL_CTX* ctx, int v) const {
+        int r = cast(int)adapter_SSL_CTX_ctrl(ctx, SSL_CTRL_SET_MAX_PROTO_VERSION, cast(long)v, null);
+        return r;
     }
     SSL* SSL_new(SSL_CTX* ctx) const {
         return adapter_SSL_new(ctx);

@@ -206,15 +206,18 @@ struct OpenSSL {
         }
         return adapter_TLSv1_2_client_method();
     }
+    SSL_METHOD* SSLv23_client_method() const {
+        if ( adapter_SSLv23_client_method is null ) {
+            throw new Exception("can't complete call to SSLv23_client_method");
+        }
+        return adapter_SSLv23_client_method();
+    }
     SSL_METHOD* TLS_method() const {
         if ( adapter_TLS_method !is null ) {
             return adapter_TLS_method();
         }
-        if ( adapter_TLSv1_2_client_method !is null ) {
-            return adapter_TLSv1_2_client_method();
-        }
-        if ( adapter_TLSv1_client_method !is null ) {
-            return adapter_TLSv1_client_method();
+        if ( adapter_SSLv23_client_method !is null ) {
+            return adapter_SSLv23_client_method();
         }
         throw new Exception("can't complete call to TLS_method");
     }

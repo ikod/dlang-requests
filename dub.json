@@ -8,13 +8,13 @@
     "importPaths": ["tests", "source"],
     "configurations": [
         {
+            "name": "std",
+            "targetType": "library",
+        },
+        {
             "name": "application",
             "targetType": "executable",
             "sourceFiles": ["app/requested.d"],
-        },
-        {
-            "name": "std",
-            "targetType": "library",
         },
         {
             "name": "vibed",

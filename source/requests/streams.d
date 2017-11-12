@@ -518,7 +518,7 @@ else {
 
         private void initSsl(SSLOptions opts) {
             //ctx = SSL_CTX_new(SSLv3_client_method());
-            ctx = openssl.SSL_CTX_new(openssl.TLSv1_client_method());
+            ctx = openssl.SSL_CTX_new(openssl.TLS_method());
             assert(ctx !is null);
             if ( opts.getVerifyPeer() ) {
                 openssl.SSL_CTX_set_default_verify_paths(ctx);

@@ -15,6 +15,13 @@ version(Windows) {
     alias DLSYM = dlsym;
 }
 
+/*
+ * /usr/include/openssl/tls1.h:# define TLS_ANY_VERSION 0x10000
+ */
+
+immutable int TLS_ANY_VERSION = 0x10000;
+immutable int TLS1_VERSION = 0x0301;
+immutable int TLS1_2_VERSION = 0x0303;
 
 struct SSL {};
 struct SSL_CTX {};
@@ -75,6 +82,8 @@ static this() {
 
     mixin(SSL_Function_set_i!("TLSv1_client_method", SSL_METHOD*));
     mixin(SSL_Function_set_i!("TLSv1_2_client_method", SSL_METHOD*));
+    mixin(SSL_Function_set_i!("TLS_method", SSL_METHOD*));
+    mixin(SSL_Function_set_i!("SSLv23_client_method", SSL_METHOD*));
     mixin(SSL_Function_set_i!("SSL_CTX_new", SSL_CTX*, SSL_METHOD*));
     mixin(SSL_Function_set_i!("SSL_CTX_set_default_verify_paths", int, SSL_CTX*));
     mixin(SSL_Function_set_i!("SSL_CTX_load_verify_locations", int, SSL_CTX*, char*, char*));
@@ -82,6 +91,7 @@ static this() {
     mixin(SSL_Function_set_i!("SSL_CTX_use_PrivateKey_file", int, SSL_CTX*, const char*, int));
     mixin(SSL_Function_set_i!("SSL_CTX_use_certificate_file", int, SSL_CTX*, const char*, int));
     mixin(SSL_Function_set_i!("SSL_CTX_set_cipher_list", int, SSL_CTX*, const char*));
+    mixin(SSL_Function_set_i!("SSL_CTX_ctrl", long, SSL_CTX*, int, long, void*));
     mixin(SSL_Function_set_i!("SSL_new", SSL*, SSL_CTX*));
     mixin(SSL_Function_set_i!("SSL_set_fd", int, SSL*, int));
     mixin(SSL_Function_set_i!("SSL_connect", int, SSL*));
@@ -102,6 +112,11 @@ static this() {
         throw new Exception("loading openssl: unknown version for init");
     }
     init();
+    debug(requests) {
+        if ( openssl.adapter_TLSv1_2_client_method is null ) {
+            warning("WARNING: your SSL library do not support TLS1.2");
+        }
+    }
 }
 
 struct OpenSSL {
@@ -124,6 +139,8 @@ struct OpenSSL {
         // all other functions
         mixin(SSL_Function_decl!("TLSv1_client_method", SSL_METHOD*));
         mixin(SSL_Function_decl!("TLSv1_2_client_method", SSL_METHOD*));
+        mixin(SSL_Function_decl!("TLS_method", SSL_METHOD*));
+        mixin(SSL_Function_decl!("SSLv23_client_method", SSL_METHOD*));
         mixin(SSL_Function_decl!("SSL_CTX_new", SSL_CTX*, SSL_METHOD*));
         mixin(SSL_Function_decl!("SSL_CTX_set_default_verify_paths", int, SSL_CTX*));
         mixin(SSL_Function_decl!("SSL_CTX_load_verify_locations", int, SSL_CTX*, char*, char*));
@@ -131,6 +148,7 @@ struct OpenSSL {
         mixin(SSL_Function_decl!("SSL_CTX_use_PrivateKey_file", int, SSL_CTX*, const char*, int));
         mixin(SSL_Function_decl!("SSL_CTX_use_certificate_file", int, SSL_CTX*, const char*, int));
         mixin(SSL_Function_decl!("SSL_CTX_set_cipher_list", int, SSL_CTX*, const char*));
+        mixin(SSL_Function_decl!("SSL_CTX_ctrl", long, SSL_CTX*, int, long, void*));
         mixin(SSL_Function_decl!("SSL_new", SSL*, SSL_CTX*));
         mixin(SSL_Function_decl!("SSL_set_fd", int, SSL*, int));
         mixin(SSL_Function_decl!("SSL_connect", int, SSL*));
@@ -193,6 +211,21 @@ struct OpenSSL {
         }
         return adapter_TLSv1_2_client_method();
     }
+    SSL_METHOD* TLS_method() const {
+        if ( adapter_TLS_method !is null ) {
+            return adapter_TLS_method();
+        }
+        if ( adapter_SSLv23_client_method !is null ) {
+            return adapter_SSLv23_client_method();
+        }
+        throw new Exception("can't complete call to TLS_method");
+    }
+    SSL_METHOD* SSLv23_client_method() const {
+        if ( adapter_SSLv23_client_method is null ) {
+            throw new Exception("can't complete call to SSLv23_client_method");
+        }
+        return adapter_SSLv23_client_method();
+    }
     SSL_CTX* SSL_CTX_new(SSL_METHOD* method) const {
         if ( adapter_SSL_CTX_new is null ) {
             throw new Exception("openssl not initialized - is it installed?");
@@ -216,6 +249,22 @@ struct OpenSSL {
     }
     int SSL_CTX_set_cipher_list(SSL_CTX* ssl_ctx, const char* c) const {
         return adapter_SSL_CTX_set_cipher_list(ssl_ctx, c);
+    }
+    /*
+     *
+     * # define SSL_CTRL_SET_MIN_PROTO_VERSION          123
+     * # define SSL_CTRL_SET_MAX_PROTO_VERSION          124
+    */
+    enum int SSL_CTRL_SET_MIN_PROTO_VERSION = 123;
+    enum int SSL_CTRL_SET_MAX_PROTO_VERSION = 124;
+    int SSL_CTX_set_min_proto_version(SSL_CTX* ctx, int v) const {
+        int r = cast(int)adapter_SSL_CTX_ctrl(ctx, SSL_CTRL_SET_MIN_PROTO_VERSION, cast(long)v, null);
+        tracef("min v: %d", r);
+        return r;
+    }
+    int SSL_CTX_set_max_proto_version(SSL_CTX* ctx, int v) const {
+        int r = cast(int)adapter_SSL_CTX_ctrl(ctx, SSL_CTRL_SET_MAX_PROTO_VERSION, cast(long)v, null);
+        return r;
     }
     SSL* SSL_new(SSL_CTX* ctx) const {
         return adapter_SSL_new(ctx);
@@ -259,9 +308,8 @@ int main() {
 
     auto v = openssl.reportVersion();
     writefln("openSSL v.%s.%s", v.major, v.minor);
-    openssl.SSL_library_init();
     writeln("InitSSL - ok");
-    SSL_CTX* ctx = openssl.SSL_CTX_new(openssl.TLSv1_client_method());
+    SSL_CTX* ctx = openssl.SSL_CTX_new(openssl.SSLv23_client_method());
     writefln("SSL_CTX_new = %x", ctx);
     int r = openssl.adapter_SSL_CTX_set_default_verify_paths(ctx);
     writefln("SSL_CTX_set_default_verify_paths = %d(%s)", r, r==1?"ok":"fail");
@@ -276,7 +324,7 @@ int main() {
     SSL* ssl = openssl.SSL_new(ctx);
     writefln("SSL_new = %x", ssl);
     auto s = new Socket(AddressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-    Address[] a = getAddress("ns.od.ua", 443);
+    Address[] a = getAddress("datagroup.ua", 443);
     writeln(a[0]);
     s.connect(a[0]);
     r = openssl.SSL_set_fd(ssl, s.handle);
@@ -284,7 +332,9 @@ int main() {
     r = openssl.SSL_connect(ssl);
     writefln("SSL_connect = %d(%s)", r, r==1?"ok":"fail");
     if ( r < 0 ) {
-        writefln("code: %d", openssl.SSL_get_error(ssl, r));
+        auto err = openssl.SSL_get_error(ssl, r);
+        writefln("code: %d", err);
+        writefln("text: %s", openssl.ERR_reason_error_string(err));
     }
     string req = "GET / HTTP/1.0\n\n";
     r = openssl.SSL_write(ssl, cast(void*)req.ptr, cast(int)req.length);

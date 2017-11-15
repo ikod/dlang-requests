@@ -599,7 +599,7 @@ public struct HTTPRequest {
                     writefln("< %s", line);
                 }
                 auto parsed = line.split(" ");
-                if ( parsed.length >= 3 ) {
+                if ( parsed.length >= 2 ) {
                     _response.code = parsed[1].to!ushort;
                 }
                 continue;

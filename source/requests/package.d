@@ -53,6 +53,13 @@ package unittest {
 
     rq = Request();
     rq.keepAlive = true;
+    {
+        info("Check handling incomplete status line");
+        rs = rq.get(httpbinUrl ~ "incomplete");
+        if (httpbinUrl != "http://httpbin.org/") {
+            assert(rs.code==600);
+        }
+    }
     // handmade json
     info("Check POST json");
     rs = rq.post(httpbinUrl ~ "post?b=x", `{"a":"b ", "c":[1,2,3]}`, "application/json");

@@ -60,6 +60,12 @@ version (httpbin)
 			rs.headers["Content-Type"] = "application/json";
 			return rs;
 		}
+		auto incomplete(in App app, ref HTTPD_Request rq, RequestArgs args) {
+			debug (httpd) trace("handler /incomplete called");
+			auto rs = response(rq, buildReply(rq), 600);
+			rs._status_reason = "";
+			return rs;
+		}
 		auto del(in App app, ref HTTPD_Request rq, RequestArgs args) {
 			if ( rq.method != "DELETE") {
 				auto rs = response(rq, "Illegal method %s".format(rq.method), 405);
@@ -190,6 +196,7 @@ version (httpbin)
 				addRoute(exactRoute(r"/cookies/set", &cookiesSet)).
 				addRoute(exactRoute(r"/gzip",        &gzip)).
 				addRoute(exactRoute(r"/deflate",     &deflate)).
+				addRoute(exactRoute(r"/incomplete",  &incomplete)).
 				addRoute(regexRoute(r"/delay/(?P<delay>\d+)",  &delay)).
 				addRoute(regexRoute(r"/stream/(?P<lines>\d+)", &stream)).
 				addRoute(regexRoute(r"/range/(?P<size>\d+)",   &range)).

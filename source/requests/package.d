@@ -50,9 +50,17 @@ package unittest {
     auto json = parseJSON(cast(string)rs.responseBody.data).object["args"].object;
     assert(json["c"].str == " d");
     assert(json["a"].str == "b");
+
     
     rq = Request();
     rq.keepAlive = true;
+    {
+        info("Check handling incomplete status line");
+        rs = rq.get(httpbinUrl ~ "incomplete");
+        if (httpbinUrl != "http://httpbin.org/") {
+            assert(rs.code==600);
+        }
+    }
     // handmade json
     info("Check POST json");
     rs = rq.post(httpbinUrl ~ "post?b=x", `{"a":"b ", "c":[1,2,3]}`, "application/json");

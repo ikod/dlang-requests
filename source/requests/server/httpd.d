@@ -561,6 +561,7 @@ else {
 
     class HTTPD_Response(C) : _Response {
         ushort          _status = 200;
+        string          _status_reason = "Unspecified";
         string[string]  _headers;
         C               _content;
         Compression     _compression = Compression.no;
@@ -608,7 +609,7 @@ else {
         }
         final override void send(NetworkStream stream) {
             import std.zlib;
-            auto    statusLine = "HTTP/1.1 " ~ to!string(_status) ~ " " ~ codes.get(_status, "Unspecified") ~ " \r\n";
+            auto    statusLine = "HTTP/1.1 " ~ to!string(_status) ~ " " ~ codes.get(_status, _status_reason) ~ " \r\n";
 
             if ( !stream.isOpen || !stream.isConnected ) {
                 debug(httpd) tracef("Will not send to closed connection");

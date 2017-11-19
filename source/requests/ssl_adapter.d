@@ -259,7 +259,6 @@ struct OpenSSL {
     enum int SSL_CTRL_SET_MAX_PROTO_VERSION = 124;
     int SSL_CTX_set_min_proto_version(SSL_CTX* ctx, int v) const {
         int r = cast(int)adapter_SSL_CTX_ctrl(ctx, SSL_CTRL_SET_MIN_PROTO_VERSION, cast(long)v, null);
-        tracef("min v: %d", r);
         return r;
     }
     int SSL_CTX_set_max_proto_version(SSL_CTX* ctx, int v) const {

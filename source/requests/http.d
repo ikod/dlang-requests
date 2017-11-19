@@ -489,14 +489,12 @@ public struct HTTPRequest {
 
         generatedHeaders["Connection"] = _keepAlive?"Keep-Alive":"Close";
 
-        if ( "Host" !in _headers ) {
+        if ( "Host" !in _headers && "Host" !in generatedHeaders ) {
             generatedHeaders["Host"] = _uri.host;
-
             if ( _uri.scheme !in standard_ports || _uri.port != standard_ports[_uri.scheme] ) {
                 generatedHeaders["Host"] ~= ":%d".format(_uri.port);
             }
         }
-
         _headers.byKey.each!(h => generatedHeaders[h] = _headers[h]);
 
         if ( _cookie.length ) {

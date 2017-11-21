@@ -272,6 +272,16 @@ package unittest {
     rq = Request();
     rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
     assert(streamedContent == rs.responseBody.data);
+
+
+    info("Test POST'ing from Rank(2) range with user-provided Content-Length");
+    rq = Request();
+    rq.addHeaders(["content-length": to!string(s.length)]);
+    rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
+    auto chunked_content = parseJSON(cast(string)streamedContent).object["data"].array;
+    auto flat_content = parseJSON(cast(string)rs.responseBody().data).object["data"].array;
+    assert(chunked_content == flat_content);
+
     info("Test get in parallel");
     {
         import std.stdio;

@@ -278,8 +278,14 @@ package unittest {
     rq = Request();
     rq.addHeaders(["content-length": to!string(s.length)]);
     rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
-    auto flat_content = parseJSON(cast(string)rs.responseBody().data).object["data"].array;
-    assert(s.representation == flat_content.map!(i => i.integer).array);
+    auto flat_content = parseJSON(cast(string)rs.responseBody().data).object["data"];
+    if ( flat_content.type == JSON_TYPE.STRING ) {
+        // httpbin.org returns string in "data"
+        assert(s == flat_content.str);
+    } else {
+        // internal httpbin server return array ob bytes
+        assert(s.representation == flat_content.array.map!(i => i.integer).array);
+    }
 
     info("Test get in parallel");
     {

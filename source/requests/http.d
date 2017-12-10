@@ -1127,6 +1127,30 @@ public struct HTTPRequest {
         ///
         return _response;
     }
+
+    // we use this if we send from ubyte[][] and user provided Content-Length
+    private void sendFlattenContent(T)(NetworkStream _stream, T content) {
+        while ( !content.empty ) {
+            auto chunk = content.front;
+            _stream.send(chunk);
+            content.popFront;
+        }
+        debug(requests) tracef("sent");
+    }
+    // we use this if we send from ubyte[][] as chunked content
+    private void sendChunkedContent(T)(NetworkStream _stream, T content) {
+        while ( !content.empty ) {
+            auto chunk = content.front;
+            auto chunkHeader = "%x\r\n".format(chunk.length);
+            debug(requests) tracef("sending %s%s", chunkHeader, chunk);
+            _stream.send(chunkHeader);
+            _stream.send(chunk);
+            _stream.send("\r\n");
+            content.popFront;
+        }
+        debug(requests) tracef("sent");
+        _stream.send("0\r\n\r\n");
+    }
     ///
     /// POST/PUT/... data from some string(with Content-Length), or from range of strings/bytes (use Transfer-Encoding: chunked).
     /// When rank 1 (flat array) used as content it must have length. In that case "content" will be sent directly to network, and Content-Length headers will be added.
@@ -1167,6 +1191,7 @@ public struct HTTPRequest {
         // application/json
         //
         bool restartedRequest = false;
+        bool send_flat;
 
         _method = method;
 
@@ -1195,7 +1220,13 @@ public struct HTTPRequest {
         static if ( rank!R == 1 ) {
             h["Content-Length"] = to!string(content.length);
         } else {
-            h["Transfer-Encoding"] = "chunked";
+            if ("Content-Length" in _headers ) {
+                debug(requests) tracef("User provided content-length for chunked content");
+                send_flat = true;
+            } else {
+                h["Transfer-Encoding"] = "chunked";
+                send_flat = false;
+            }
         }
         h.byKeyValue.
             map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
@@ -1214,17 +1245,11 @@ public struct HTTPRequest {
             static if ( rank!R == 1) {
                 _stream.send(content);
             } else {
-                while ( !content.empty ) {
-                    auto chunk = content.front;
-                    auto chunkHeader = "%x\r\n".format(chunk.length);
-                    debug(requests) tracef("sending %s%s", chunkHeader, chunk);
-                    _stream.send(chunkHeader);
-                    _stream.send(chunk);
-                    _stream.send("\r\n");
-                    content.popFront;
+                if ( send_flat ) {
+                    sendFlattenContent(_stream, content);
+                } else {
+                    sendChunkedContent(_stream, content);
                 }
-                debug(requests) tracef("sent");
-                _stream.send("0\r\n\r\n");
             }
             _response._requestSentAt = Clock.currTime;
             receiveResponse();

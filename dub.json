@@ -9,12 +9,16 @@
     "configurations": [
         {
             "name": "std",
+            "dependencies": {
+                "idna": "~>0.0"
+            }
         },
         {
             "name": "vibed",
             "versions": ["vibeD"],
             "dependencies": {
-                "vibe-d": "~>0.7"
+                "vibe-d": "~>0.7",
+                "idna": "~>0.0"
             },
         }
     ],

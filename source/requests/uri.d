@@ -6,6 +6,7 @@ import std.format;
 import std.algorithm;
 import std.conv;
 import requests.utils;
+import idna;
 
 class UriException: Exception {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
@@ -24,6 +25,7 @@ struct URI {
         string _host;
         string _path="/";
         string _query;
+        string _original_host;      // can differ from _host if host is unicode
     }
     this(string uri) @safe pure {
         _uri = uri;
@@ -59,6 +61,7 @@ struct URI {
         }
 
         i = hp.findSplit(":");
+        _original_host = i[0];
         _host = i[0];
         _port = i[2].length ? to!ushort(i[2]) : standard_ports[_scheme];
 
@@ -132,6 +135,9 @@ struct URI {
         //        }
         //        traverseTree(parsed);
     }
+    void idn_encode() @safe {
+        _host = idna.idn_encode(_original_host);
+    }
 }
 unittest {
     import std.exception;
@@ -158,5 +164,8 @@ unittest {
     auto expected = "https://igor:pass;word@example.com:345/abc?x=y";
     assert(a.uri == expected, "Expected '%s', got '%s'".format(expected, a.uri));
     assertThrown!UriException(URI("@unparsable"));
+    a = URI("http://registrera-domän.se");
+    a.idn_encode();
+    assert(a.host == "xn--registrera-domn-elb.se");
 }
 

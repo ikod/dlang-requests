@@ -303,6 +303,7 @@ public struct Request {
     Response get(A...)(string uri, A args) {
         if ( uri ) {
             _uri = URI(uri);
+            _uri.idn_encode();
         }
         _method = "GET";
         final switch ( _uri.scheme ) {
@@ -328,6 +329,7 @@ public struct Request {
     Response post(A...)(string uri, A args) {
         if ( uri ) {
             _uri = URI(uri);
+            _uri.idn_encode();
         }
         _method = "POST";
         final switch ( _uri.scheme ) {
@@ -397,6 +399,7 @@ public struct Request {
     Response exec(string method="GET", A...)(string uri, A args) {
         _method = method;
         _uri = URI(uri);
+        _uri.idn_encode();
         _http.uri = _uri;
         return _http.exec!(method)(null, args);
     }

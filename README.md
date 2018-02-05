@@ -907,3 +907,8 @@ Exception: 2 redirects reached maxRedirects 2.
 1. Currently it doesn't work under `vibe.d` - use `vibe.d` parallelisation.
 1. It limits you in tuning request (e.g. you can add authorization only through `addHeaders()`, you can't tune SSL parameters, etc).
 1. `Job`'s' and `Result`'s' `data` are immutable byte arrays (as it uses send/receive for data exchange).
+
+#### International Domain names ####
+
+dlang-requests supports IDNA through `idna` package.
+It provide correct conversion between unicode domain names and punycode, but have limited ability to check names for standard compliance.

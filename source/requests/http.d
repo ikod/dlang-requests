@@ -773,6 +773,7 @@ public struct HTTPRequest {
             case "http":
                 if ( actual_proxy ) {
                     uri.uri_parse(actual_proxy);
+                    uri.idn_encode();
                 } else {
                     // use original uri
                     uri = _uri;
@@ -784,6 +785,7 @@ public struct HTTPRequest {
             case "https":
                 if ( actual_proxy ) {
                     uri.uri_parse(actual_proxy);
+                    uri.idn_encode();
                     _stream = new TCPStream();
                     _stream.bind(_bind);
                     _stream.connect(uri.host, uri.port, _timeout);

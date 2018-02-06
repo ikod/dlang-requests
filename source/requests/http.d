@@ -13,6 +13,7 @@ import std.range;
 import std.string;
 import std.traits;
 import std.typecons;
+import std.bitmanip;
 import std.experimental.logger;
 import core.thread;
 
@@ -285,10 +286,17 @@ public struct MultipartForm {
 ///
 public struct HTTPRequest {
     private {
-        enum           _preHeaders = [
-                            "Accept-Encoding": "gzip, deflate",
-                            "User-Agent":      "dlang-requests"
-                        ];
+        struct _UH {
+            // flags for each important header, added by user using addHeaders
+            mixin(bitfields!(
+                bool, "Host", 1,
+                bool, "UserAgent", 1,
+                bool, "ContentLength", 1,
+                bool, "Connection", 1,
+                bool, "AcceptEncoding", 1,
+                uint, "", 3
+            ));
+        }
         string         _method = "GET";
         URI            _uri;
         string[string] _headers;
@@ -313,6 +321,7 @@ public struct HTTPRequest {
         Cookie[]       _cookie;
         SSLOptions     _sslOptions;
         string         _bind;
+        _UH            _userHeaders;
     }
     package HTTPResponse   _response;
 
@@ -442,24 +451,29 @@ public struct HTTPRequest {
         handleURLChange(_uri, newURI);
         _uri = newURI;
     }
-    string normalizeHeader(string h) {
-        auto s = h.split("-");
-        if ( s.all!(word => word.length && isUpper(word[0])) ) {
-            // no need for transformation and copy
-            return h;
-        }
-        return s.map!(w => w.length ?
-                                toUpper(w[0..1]) ~ w[1..$]
-                                :
-                                "")
-                .join("-");
-    }
     /// Add headers to request
     /// Params:
     /// headers = headers to send.
     void addHeaders(in string[string] headers) {
         foreach(pair; headers.byKeyValue) {
-            _headers[normalizeHeader(pair.key)] = pair.value;
+            string _h = pair.key;
+            switch(toLower(_h)) {
+            case "host":
+                _userHeaders.Host = true;
+                break;
+            case "user-agent":
+                _userHeaders.UserAgent = true;
+                break;
+            case "content-length":
+                _userHeaders.ContentLength = true;
+                break;
+            case "connection":
+                _userHeaders.Connection = true;
+                break;
+            default:
+                break;
+            }
+            _headers[pair.key] = pair.value;
         }
     }
     /// Remove headers from request
@@ -472,7 +486,8 @@ public struct HTTPRequest {
     /// compose headers to send
     ///
     private string[string] requestHeaders() {
-        string[string] generatedHeaders = _preHeaders;
+
+        string[string] generatedHeaders;
 
         if ( _authenticator ) {
             _authenticator.
@@ -481,14 +496,28 @@ public struct HTTPRequest {
                 each!(pair => generatedHeaders[pair.key] = pair.value);
         }
 
-        generatedHeaders["Connection"] = _keepAlive?"Keep-Alive":"Close";
-        if ( "Host" !in generatedHeaders ) {
+        _headers.byKey.each!(h => generatedHeaders[h] = _headers[h]);
+
+        if ( !_userHeaders.AcceptEncoding )
+        {
+            generatedHeaders["Accept-Encoding"] = "gzip,deflate";
+        }
+        if ( !_userHeaders.UserAgent )
+        {
+            generatedHeaders["User-Agent"] = "dlang-requests";
+        }
+        if ( !_userHeaders.Connection)
+        {
+            generatedHeaders["Connection"] = _keepAlive?"Keep-Alive":"Close";
+        }
+
+        if ( !_userHeaders.Host )
+        {
             generatedHeaders["Host"] = _uri.host;
             if ( _uri.scheme !in standard_ports || _uri.port != standard_ports[_uri.scheme] ) {
                 generatedHeaders["Host"] ~= ":%d".format(_uri.port);
             }
         }
-        _headers.byKey.each!(h => generatedHeaders[h] = _headers[h]);
 
         if ( _cookie.length ) {
             auto cs = _cookie.
@@ -1215,7 +1244,7 @@ public struct HTTPRequest {
         static if ( rank!R == 1 ) {
             h["Content-Length"] = to!string(content.length);
         } else {
-            if ("Content-Length" in _headers ) {
+            if ( _userHeaders.ContentLength ) {
                 debug(requests) tracef("User provided content-length for chunked content");
                 send_flat = true;
             } else {

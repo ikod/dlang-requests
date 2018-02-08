@@ -1,7 +1,7 @@
 language: d
 
 d:
-    - dmd-2.072.2
+    - dmd
     - ldc
 os:
     - linux
@@ -9,6 +9,4 @@ os:
 before_install:
     - sudo apt-get install -y libevent-dev
 
-script:
-    - dub test --config=std
-    - dub test --config=vibed
+script: ./scripts/travis.sh

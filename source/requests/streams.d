@@ -1136,7 +1136,7 @@ version (vibeD) {
 
         ptrdiff_t receive(void[] buff) {
             if (!_conn.waitForData(_readTimeout)) {
-                if (!_conn.connected) {
+                if (!_conn.connected || _conn.empty ) {
                     return 0;
                 }
                 throw new TimeoutException("Timeout receiving data");
@@ -1176,7 +1176,7 @@ version (vibeD) {
 
     public class SSLVibeStream : TCPVibeStream {
     private:
-        Stream _sslStream;
+        TLSStream _sslStream;
         bool   _isOpen = true;
         SSLOptions _sslOptions;
         TCPConnection underlyingConnection;

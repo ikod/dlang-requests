@@ -294,7 +294,9 @@ public struct HTTPRequest {
                 bool, "ContentLength", 1,
                 bool, "Connection", 1,
                 bool, "AcceptEncoding", 1,
-                uint, "", 3
+                bool, "ContentType", 1,
+                bool, "Cookie", 1,
+                uint, "", 1
             ));
         }
         string         _method = "GET";
@@ -467,13 +469,24 @@ public struct HTTPRequest {
             case "content-length":
                 _userHeaders.ContentLength = true;
                 break;
+            case "content-type":
+                _userHeaders.ContentType = true;
+                break;
             case "connection":
                 _userHeaders.Connection = true;
+                break;
+            case "cookie":
+                _userHeaders.Cookie = true;
                 break;
             default:
                 break;
             }
             _headers[pair.key] = pair.value;
+        }
+    }
+    private void safeSetHeader(ref string[string] headers, bool userAdded, string h, string v) pure @safe {
+        if ( !userAdded ) {
+            headers[h] = v;
         }
     }
     /// Remove headers from request
@@ -498,18 +511,9 @@ public struct HTTPRequest {
 
         _headers.byKey.each!(h => generatedHeaders[h] = _headers[h]);
 
-        if ( !_userHeaders.AcceptEncoding )
-        {
-            generatedHeaders["Accept-Encoding"] = "gzip,deflate";
-        }
-        if ( !_userHeaders.UserAgent )
-        {
-            generatedHeaders["User-Agent"] = "dlang-requests";
-        }
-        if ( !_userHeaders.Connection)
-        {
-            generatedHeaders["Connection"] = _keepAlive?"Keep-Alive":"Close";
-        }
+        safeSetHeader(generatedHeaders, _userHeaders.AcceptEncoding, "Accept-Encoding", "gzip,deflate");
+        safeSetHeader(generatedHeaders, _userHeaders.UserAgent, "User-Agent", "dlang-requests");
+        safeSetHeader(generatedHeaders, _userHeaders.Connection, "Connection", _keepAlive?"Keep-Alive":"Close");
 
         if ( !_userHeaders.Host )
         {
@@ -519,12 +523,15 @@ public struct HTTPRequest {
             }
         }
 
-        if ( _cookie.length ) {
+        if ( _cookie.length && !_userHeaders.Cookie ) {
             auto cs = _cookie.
                 filter!(c => _uri.path.pathMatches(c.path) && _uri.host.domainMatches(c.domain)).
                 map!(c => "%s=%s".format(c.attr, c.value)).
                 joiner(";");
-            generatedHeaders["Cookie"] = "%s".format(cs);
+            if ( ! cs.empty )
+            {
+                generatedHeaders["Cookie"] = to!string(cs);
+            }
         }
 
         _filteredHeaders.each!(h => generatedHeaders.remove(h));
@@ -1096,8 +1103,9 @@ public struct HTTPRequest {
         contentLength += "--".length + boundary.length + "--\r\n".length;
 
         auto h = requestHeaders();
-        h["Content-Type"] = "multipart/form-data; boundary=" ~ boundary;
-        h["Content-Length"] = to!string(contentLength);
+        safeSetHeader(h, _userHeaders.ContentType, "Content-Type", "multipart/form-data; boundary=" ~ boundary);
+        safeSetHeader(h, _userHeaders.ContentLength, "Content-Length", to!string(contentLength));
+        
         h.byKeyValue.
             map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
                 each!(h => req.put(h));
@@ -1238,11 +1246,11 @@ public struct HTTPRequest {
         req.put(requestString());
 
         auto h = requestHeaders;
-        if ( contentType && "Content-Type" !in h ) {
-            h["Content-Type"] = contentType;
+        if ( contentType ) {
+            safeSetHeader(h, _userHeaders.ContentType, "Content-Type", contentType);
         }
         static if ( rank!R == 1 ) {
-            h["Content-Length"] = to!string(content.length);
+            safeSetHeader(h, _userHeaders.ContentLength, "Content-Length", to!string(content.length));
         } else {
             if ( _userHeaders.ContentLength ) {
                 debug(requests) tracef("User provided content-length for chunked content");
@@ -1354,11 +1362,9 @@ public struct HTTPRequest {
         switch (_method) {
             case "POST","PUT":
                 encoded = params2query(params);
-                if ( "Content-Type" !in h ) {
-                    h["Content-Type"] = "application/x-www-form-urlencoded";
-                }
-                if ( "Content-Length" !in h && encoded.length > 0) {
-                    h["Content-Length"] = to!string(encoded.length);
+                safeSetHeader(h, _userHeaders.ContentType, "Content-Type", "application/x-www-form-urlencoded");
+                if ( encoded.length > 0) {
+                    safeSetHeader(h, _userHeaders.ContentLength, "Content-Length", to!string(encoded.length));
                 }
                 req.put(requestString());
                 break;

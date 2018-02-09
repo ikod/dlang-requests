@@ -577,7 +577,11 @@ Output:
 
 #### Adding/replacing request headers ###
 
-Use `string[string]` and `addHeaders()` method to add or replace some request headers:
+Use `string[string]` and `addHeaders()` method to add or replace some request headers.
+
+User-supplied headers override headers, created by library code,
+so you have to be careful adding common headers, like Content-Type, Content-Length, etc..
+
 
 ```d
 import requests;

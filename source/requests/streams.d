@@ -804,17 +804,17 @@ else {
             return this;
         }
         @trusted
-        override ptrdiff_t send(const(void)[] buf, SocketFlags flags) {
+        override ptrdiff_t send(const(void)[] buf, SocketFlags flags) scope {
             return openssl.SSL_write(ssl, buf.ptr, cast(uint) buf.length);
         }
-        override ptrdiff_t send(const(void)[] buf) {
+        override ptrdiff_t send(const(void)[] buf) scope {
             return send(buf, SocketFlags.NONE);
         }
         @trusted
-        override ptrdiff_t receive(void[] buf, SocketFlags flags) {
+        override ptrdiff_t receive(void[] buf, SocketFlags flags) scope {
             return openssl.SSL_read(ssl, buf.ptr, cast(int)buf.length);
         }
-        override ptrdiff_t receive(void[] buf) {
+        override ptrdiff_t receive(void[] buf) scope {
             return receive(buf, SocketFlags.NONE);
         }
         this(AddressFamily af, SocketType type = SocketType.STREAM, SSLOptions opts = SSLOptions()) {
@@ -825,7 +825,7 @@ else {
             super(sock, af);
             initSsl(opts);
         }
-        override void close() {
+        override void close() scope {
             //SSL_shutdown(ssl);
             super.close();
         }

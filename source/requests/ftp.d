@@ -641,11 +641,21 @@ package unittest {
     rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "another test, ignore please\n".representation);
     assert(unreliable_network || rs.code == 226);
     info("ftp get  ", "ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
-    rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
+    try {
+        rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
+    }
+    catch (ConnectError e)
+    {
+    }
     assert(unreliable_network || rs.code == 226);
     info("ftp get  ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT with authenticator");
     rq.authenticator = new FtpAuthentication("anonymous", "requests@");
-    rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
+    try {
+        rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
+    }
+    catch (ConnectError e)
+    {
+    }
     assert(unreliable_network || rs.code == 226);
     assert(rs.finalURI.path == "/pub/FreeBSD/README.TXT");
     assert(rq.format("%m|%h|%p|%P|%q|%U") == "GET|ftp.iij.ad.jp|21|/pub/FreeBSD/README.TXT||ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");

@@ -6,7 +6,7 @@ import std.format;
 import std.algorithm;
 import std.conv;
 import requests.utils;
-import idna;
+static import requests.idna;
 
 class UriException: Exception {
     this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
@@ -137,7 +137,7 @@ struct URI {
         //        traverseTree(parsed);
     }
     void idn_encode() @safe {
-        _host = idna.idn_encode(_original_host);
+        _host = requests.idna.idn_encode(_original_host);
     }
 }
 unittest {

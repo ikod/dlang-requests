@@ -53,8 +53,34 @@ static this() {
         openssl._libcrypto = cast(typeof(openssl._libcrypto))dlopen("libcrypto.dylib", RTLD_LAZY);
     } else
     version(linux) {
-        openssl._libssl = cast(typeof(openssl._libssl))dlopen("libssl.so", RTLD_LAZY);
-        openssl._libcrypto = cast(typeof(openssl._libcrypto))dlopen("libcrypto.so", RTLD_LAZY);
+        immutable string[] libsslname = [
+            "libssl.so",
+            "libssl.so.1.1",
+            "libssl.so.1.0.2",
+            "libssl.so.1.0.1",
+            "libssl.so.1.0.0"
+        ];
+        foreach(lib; libsslname) {
+            openssl._libssl = cast(typeof(openssl._libssl))dlopen(lib.ptr, RTLD_LAZY);
+            if ( openssl._libssl !is null ) {
+                tracef("will use %s".format(lib));
+                break;
+            }
+        }
+        immutable string[] libcryptoname = [
+            "libcrypto.so",
+            "libcrypto.so.1.1",
+            "libcrypto.so.1.0.2",
+            "libcrypto.so.1.0.1",
+            "libcrypto.so.1.0.0"
+        ];
+        foreach(lib; libcryptoname) {
+            openssl._libcrypto = cast(typeof(openssl._libcrypto))dlopen(lib.ptr, RTLD_LAZY);
+            if ( openssl._libcrypto !is null ) {
+                tracef("will use %s".format(lib));
+                break;
+            }
+        }
     } else
     version(Windows) {
         openssl._libssl = cast(typeof(openssl._libssl))LoadLibrary("libssl32.dll");

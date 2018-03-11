@@ -6,6 +6,9 @@ d:
 os:
     - linux
 
+env:
+    - UNRELIABLENETWORK=true
+
 before_install:
     - sudo apt-get install -y libevent-dev
 

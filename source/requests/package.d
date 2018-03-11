@@ -384,17 +384,20 @@ package unittest {
     import std.string;
     import std.stdio;
     import std.range;
+    import std.process;
 
     globalLogLevel(LogLevel.info);
+    // while we have no internal ftp server we can run tests in non-reloable networking environment
+    bool unreliable_network = environment.get("UNRELIABLENETWORK", "false") == "true";
 
     /// ftp upload from range
     info("Test getContent(ftp)");
     auto r = getContent("ftp://speedtest.tele2.net/1KB.zip");
-    assert(r.length == 1024);
+    assert(unreliable_network || r.length == 1024);
     
     info("Test postContent ftp");
     r = postContent("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
-    assert(r.length == 0);
+    assert(unreliable_network || r.length == 0);
 
     info("Test receiveAsRange with GET(ftp)");
     ubyte[] streamedContent;

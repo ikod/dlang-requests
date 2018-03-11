@@ -620,29 +620,33 @@ public struct FTPRequest {
 }
 
 package unittest {
+    import std.process;
+
     globalLogLevel(LogLevel.info);
+    bool unreliable_network = environment.get("UNRELIABLENETWORK", "false") == "true";
+
     info("testing ftp");
     auto rq = FTPRequest();
     info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
     auto rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
-    assert(rs.code == 226);
+    assert(unreliable_network || rs.code == 226);
     info("ftp get  ", "ftp://speedtest.tele2.net/nonexistent", ", in same session.");
     rs = rq.get("ftp://speedtest.tele2.net/nonexistent");
-    assert(rs.code != 226);
+    assert(unreliable_network || rs.code != 226);
     info("ftp get  ", "ftp://speedtest.tele2.net/1KB.zip", ", in same session.");
     rs = rq.get("ftp://speedtest.tele2.net/1KB.zip");
-    assert(rs.code == 226);
-    assert(rs.responseBody.length == 1024);
+    assert(unreliable_network || rs.code == 226);
+    assert(unreliable_network || rs.responseBody.length == 1024);
     info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
     rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "another test, ignore please\n".representation);
-    assert(rs.code == 226);
+    assert(unreliable_network || rs.code == 226);
     info("ftp get  ", "ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
     rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
-    assert(rs.code == 226);
+    assert(unreliable_network || rs.code == 226);
     info("ftp get  ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT with authenticator");
     rq.authenticator = new FtpAuthentication("anonymous", "requests@");
     rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
-    assert(rs.code == 226);
+    assert(unreliable_network || rs.code == 226);
     assert(rs.finalURI.path == "/pub/FreeBSD/README.TXT");
     assert(rq.format("%m|%h|%p|%P|%q|%U") == "GET|ftp.iij.ad.jp|21|/pub/FreeBSD/README.TXT||ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
     assert(rs.format("%h|%p|%P|%q|%U") == "ftp.iij.ad.jp|21|/pub/FreeBSD/README.TXT||ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");

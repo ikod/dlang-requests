@@ -263,14 +263,14 @@ package unittest {
     rq.useStreaming = true;
     rq.bufferSize = 16;
     string s = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
+    rs = rq.post(httpbinUrl ~ "post", s.representation, "application/octet-stream");
     stream = rs.receiveAsRange();
     while( !stream.empty() ) {
         streamedContent ~= stream.front;
         stream.popFront();
     }
     rq = Request();
-    rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
+    rs = rq.post(httpbinUrl ~ "post", s.representation, "application/octet-stream");
     assert(streamedContent == rs.responseBody.data);
 
 

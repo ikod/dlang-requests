@@ -251,7 +251,7 @@ public struct Request {
      + Set local address for any outgoing requests.
      + $(B v) can be string with hostname or ip address.
      +/
-    @property auto bind(string v) {
+    @property void bind(string v) {
         _http.bind(v);
         _ftp.bind(v);
     }

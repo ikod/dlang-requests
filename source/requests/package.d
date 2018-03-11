@@ -410,28 +410,28 @@ package unittest {
         streamedContent ~= stream.front;
         stream.popFront();
     }
-    assert(streamedContent.length == 1024);
+    assert(unreliable_network || streamedContent.length == 1024);
     //
     info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
     rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
-    assert(rs.code == 226);
+    assert(unreliable_network || rs.code == 226);
     info("ftp get  ", "ftp://speedtest.tele2.net/nonexistent", ", in same session.");
     rs = rq.get("ftp://speedtest.tele2.net/nonexistent");
-    assert(rs.code != 226);
+    assert(unreliable_network || rs.code != 226);
     rq.useStreaming = false;
     info("ftp get  ", "ftp://speedtest.tele2.net/1KB.zip", ", in same session.");
     rs = rq.get("ftp://speedtest.tele2.net/1KB.zip");
-    assert(rs.code == 226);
-    assert(rs.responseBody.length == 1024);
+    assert(unreliable_network || rs.code == 226);
+    assert(unreliable_network || rs.responseBody.length == 1024);
     info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
     rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "another test, ignore please\n".representation);
-    assert(rs.code == 226);
+    assert(unreliable_network || rs.code == 226);
     info("ftp get  ", "ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
     rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
-    assert(rs.code == 226);
+    assert(unreliable_network || rs.code == 226);
     rq.authenticator = new BasicAuthentication("anonymous", "request@");
     rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
-    assert(rs.code == 226);
+    assert(unreliable_network || rs.code == 226);
     info("testing ftp - done.");
 }
 

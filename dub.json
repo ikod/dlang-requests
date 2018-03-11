@@ -10,7 +10,6 @@
         {
             "name": "std",
             "dependencies": {
-                "idna": "~>0.0"
             }
         },
         {
@@ -18,7 +17,6 @@
             "versions": ["vibeD"],
             "dependencies": {
                 "vibe-d": "~>0.8",
-                "idna": "~>0.0"
             }
         }
     ],

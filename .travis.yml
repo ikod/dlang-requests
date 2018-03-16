@@ -9,9 +9,5 @@ os:
 env:
     - UNRELIABLENETWORK=true
 
-before_install:
-    - sudo apt-get install -y libevent-dev
-
 script:
     - dub test --config=std
-    - dub test --config=vibed

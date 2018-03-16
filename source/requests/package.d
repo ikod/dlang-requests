@@ -222,7 +222,6 @@ package unittest {
 
     info("Test receiveAsRange with GET");
     rq = Request();
-    rq.verbosity = 3;
     rq.useStreaming = true;
     rq.bufferSize = 16;
     rs = rq.get(httpbinUrl ~ "stream/20");
@@ -234,7 +233,6 @@ package unittest {
     }
     rq = Request();
     rs = rq.get(httpbinUrl ~ "stream/20");
-    writeln(cast(string)streamedContent);
     assert(streamedContent.length == rs.responseBody.data.length,
             "streamedContent.length(%d) == rs.responseBody.data.length(%d)".format(streamedContent.length, rs.responseBody.data.length));
     info("Test postContent");

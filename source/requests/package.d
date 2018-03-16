@@ -36,7 +36,7 @@ package unittest {
         }
     }
 
-    globalLogLevel(LogLevel.info);
+    globalLogLevel(LogLevel.trace);
 
     infof("testing Request");
     Request rq;

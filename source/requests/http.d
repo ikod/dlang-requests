@@ -918,6 +918,9 @@ public struct HTTPRequest {
 
         _bodyDecoder.putNoCopy(partialBody.data);
 
+        auto v = _bodyDecoder.get();
+        _response._responseBody.put(v);
+
         if ( _verbosity >= 2 ) writefln("< %d bytes of body received", partialBody.length);
 
         if ( _method == "HEAD" ) {
@@ -933,6 +936,7 @@ public struct HTTPRequest {
             if ( _unChunker && _unChunker.done ) {
                 break;
             }
+
             if ( _useStreaming && _response._responseBody.length && !redirectCodes.canFind(_response.code) ) {
                 debug(requests) trace("streaming requested");
                 _response.receiveAsRange.activated = true;
@@ -1032,7 +1036,7 @@ public struct HTTPRequest {
         _response._responseBody.putNoCopy(_bodyDecoder.get());
     }
     private bool serverClosedKeepAliveConnection() pure @safe nothrow {
-        return _response._responseHeaders.length == 0 && _keepAlive;
+        return _response._responseHeaders.length == 0 && _response._status_line.length == 0 &&  _keepAlive;
     }
     private bool isIdempotent(in string method) pure @safe nothrow {
         return ["GET", "HEAD"].canFind(method);

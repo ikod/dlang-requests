@@ -591,7 +591,7 @@ public struct HTTPRequest {
         auto transferEncoding = "transfer-encoding" in headers;
         if ( transferEncoding ) {
             debug(requests) tracef("transferEncoding: %s", *transferEncoding);
-            if ( *transferEncoding == "chunked") {
+            if ( (*transferEncoding).toLower == "chunked") {
                 _unChunker = new DecodeChunked();
                 _bodyDecoder.insert(_unChunker);
             }
@@ -919,7 +919,7 @@ public struct HTTPRequest {
         _bodyDecoder.putNoCopy(partialBody.data);
 
         auto v = _bodyDecoder.get();
-        _response._responseBody.put(v);
+        _response._responseBody.putNoCopy(v);
 
         if ( _verbosity >= 2 ) writefln("< %d bytes of body received", partialBody.length);
 
@@ -983,7 +983,7 @@ public struct HTTPRequest {
                             return res[0];
                         }
                         //
-                        // I'd like to "return _bodyDecoder.getNoCopy().join;" but if is slower
+                        // I'd like to "return _bodyDecoder.getNoCopy().join;" but it is slower
                         //
                         auto total = res.map!(b=>b.length).sum;
                         // create buffer for joined bytes

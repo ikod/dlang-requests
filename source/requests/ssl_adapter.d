@@ -63,7 +63,7 @@ static this() {
         foreach(lib; libsslname) {
             openssl._libssl = cast(typeof(openssl._libssl))dlopen(lib.ptr, RTLD_LAZY);
             if ( openssl._libssl !is null ) {
-                tracef("will use %s".format(lib));
+                debug(requests) tracef("will use %s".format(lib));
                 break;
             }
         }
@@ -77,7 +77,7 @@ static this() {
         foreach(lib; libcryptoname) {
             openssl._libcrypto = cast(typeof(openssl._libcrypto))dlopen(lib.ptr, RTLD_LAZY);
             if ( openssl._libcrypto !is null ) {
-                tracef("will use %s".format(lib));
+                debug(requests) tracef("will use %s".format(lib));
                 break;
             }
         }

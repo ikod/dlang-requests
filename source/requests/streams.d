@@ -647,7 +647,7 @@ public struct SSLOptions {
         /**
          * do we need to veryfy peer?
          */
-        bool     _verifyPeer = false;
+        bool     _verifyPeer = true;
         /**
          * path to CA cert
          */

@@ -640,6 +640,9 @@ rq.sslSetCaCert("/opt/local/etc/openssl/cert.pem");
 
 with path to CA cert file (location may differ for different OS or openssl packaging).
 
+By default ssl peer verification turned ON. This can lead to problems in case you use server-side self-signed certificates.
+To fix, you have either add server ca.crt to trusted store on local side(see https://unix.stackexchange.com/questions/90450/adding-a-self-signed-certificate-to-the-trusted-list for example), or use sslSetCaCert to add it for single requests call(`rq.sslSetCaCert("ca.crt");`), or just disable peer verification with
+`rq.sslSetVerifyPeer(false);`
 
 ### FTP requests ###
 

@@ -615,6 +615,11 @@ Output:
 
 HTTP requests can be configured for SSL options: you can enable or disable remote server certificate verification, set key and certificate to use for authorizing to remote server:
 
+* sslSetVerifyPeer(bool) - turn ssl peer verification **on** or **off** (**on** by default since v0.8.0)
+* sslSetKeyFile(string) - load client key from file
+* sslSetCertFile(string) - load client cert from file
+* sslSetCaCert(string) - load server CA cert for private or self-signed server certificates
+
 ```d
 import std.stdio;
 import requests;
@@ -623,7 +628,6 @@ import std.experimental.logger;
 void main() {
     globalLogLevel(LogLevel.trace);
     auto rq = Request();
-    rq.sslSetVerifyPeer(true); // enable peer verification
     rq.sslSetKeyFile("client01.key"); // set key file
     rq.sslSetCertFile("client01.crt"); // set cert file
     auto rs = rq.get("https://dlang.org/");

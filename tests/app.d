@@ -18,3 +18,7 @@ else {
         assert(rs.code == 200);
     }
 }
+
+version(unittest) {
+void main () {}
+}

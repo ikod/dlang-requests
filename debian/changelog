@@ -1,4 +1,4 @@
-dlang-requests (0.0.7-0) unstable; urgency=low
+dlang-requests (0.0.7) unstable; urgency=low
 
   * added proxy; fix for parsing url
 

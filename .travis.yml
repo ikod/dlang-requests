@@ -9,5 +9,19 @@ os:
 env:
     - UNRELIABLENETWORK=true
 
+before_install:
+  - pyenv global system 3.6
+  - pip3 install 'meson>=0.46'
+
+install:
+  - mkdir .ntmp && curl -L https://github.com/ninja-build/ninja/releases/download/v1.8.2/ninja-linux.zip -o .ntmp/ninja-linux.zip
+  - unzip .ntmp/ninja-linux.zip -d .ntmp
+
+before_script:
+- export PATH=$PATH:$PWD/.ntmp
+
 script:
     - dub test --config=std
+    - meson build && ninja -j6 -C build
+    # FIXME: Tests with Meson are currently broken (requests/streams.d(1026): Can't connect to 0.0.0.0:23035)
+    #- ninja -j8 -C build test

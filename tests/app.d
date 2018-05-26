@@ -19,6 +19,6 @@ else {
     }
 }
 
-version(unittest) {
+version(unittest_fakemain) {
 void main () {}
 }

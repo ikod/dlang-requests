@@ -34,7 +34,6 @@ src_dir = include_directories('source/')
 #
 # Targets
 #
-pg_module_versions = ['USE_PGSQL', 'Derelict_Static']
 
 dlang_requests_lib = library('dlang-requests',
         [requests_src],
@@ -58,7 +57,7 @@ test_exe = executable('drequests_test',
      'tests/app.d'],
     include_directories: [src_dir, include_directories('tests/')],
     d_unittest: true,
-    d_module_versions: ['std', 'httpbin']
+    d_module_versions: ['std', 'httpbin', 'unittest_fakemain']
 )
 test('drequests_test', test_exe)
 

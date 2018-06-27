@@ -127,8 +127,8 @@ static this() {
     mixin(SSL_Function_set_i!("SSL_CTX_free", void, SSL_CTX*));
     mixin(SSL_Function_set_i!("SSL_get_error", int, SSL*, int));
     mixin(SSL_Function_set_i!("SSL_ctrl", long, SSL*, int, long, void*));
-    mixin(SSL_Function_set_i!("ERR_reason_error_string", char*, ulong));
-    mixin(SSL_Function_set_i!("ERR_get_error", ulong));
+    mixin(CRYPTO_Function_set_i!("ERR_reason_error_string", char*, ulong));
+    mixin(CRYPTO_Function_set_i!("ERR_get_error", ulong));
 
     void delegate()[Version] init_matrix;
     init_matrix[Version(1,0)] = &openssl.init1_0;

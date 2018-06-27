@@ -42,6 +42,10 @@ details -document body, status code, headers, timings, etc.
 
 * At the lowest level you will find `HTTPRequest` and `FTPRequest`, which have some specific setting. You will almost never need this level.
 
+#### Windows ssl notes ####
+In case `requests` can't find opsn ssl library on Windows, here is several steps that can help:
+1. From the [slproweb](https://slproweb.com/products/Win32OpenSSL.html) download [openssl](https://slproweb.com/download/Win32OpenSSL_Light-1_0_2o.exe) binaries for Windows.
+1. Install it. **Important**: allow installer to install libraries in system folders.
 
 ### Make a simple request ###
 

@@ -826,12 +826,15 @@ else {
             initSsl(opts);
         }
         override void close() scope {
-            //SSL_shutdown(ssl);
             super.close();
-        }
-        ~this() {
-            openssl.SSL_free(ssl);
-            openssl.SSL_CTX_free(ctx);
+            if ( ssl !is null ) {
+                openssl.SSL_free(ssl);
+                ssl = null;
+            }
+            if ( ctx !is null ) {
+                openssl.SSL_CTX_free(ctx);
+                ctx = null;
+            }
         }
         void SSL_set_tlsext_host_name(string host) {
 

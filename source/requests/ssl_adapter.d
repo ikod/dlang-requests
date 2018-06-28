@@ -27,8 +27,11 @@ struct SSL {};
 struct SSL_CTX {};
 struct SSL_METHOD {};
 
+//
+// N  - function name, R - return type, A - args
+//
 string SSL_Function_decl(string N, R, A...)() {
-    string F = "extern (C) %s function %s adapter_%s;".format(R.stringof, A.stringof, N);
+    string F = "extern (C) @nogc nothrow %s function %s adapter_%s;".format(R.stringof, A.stringof, N);
     return F;
 }
 string SSL_Function_set_i(string N, R, A...)() {
@@ -253,22 +256,22 @@ struct OpenSSL {
         }
         return adapter_SSL_CTX_new(method);
     }
-    int SSL_CTX_set_default_verify_paths(SSL_CTX* ctx) const {
+    int SSL_CTX_set_default_verify_paths(SSL_CTX* ctx) const @nogc nothrow {
         return adapter_SSL_CTX_set_default_verify_paths(ctx);
     }
-    int SSL_CTX_load_verify_locations(SSL_CTX* ctx, char* CAFile, char* CAPath) const {
+    int SSL_CTX_load_verify_locations(SSL_CTX* ctx, char* CAFile, char* CAPath) const @nogc nothrow {
         return adapter_SSL_CTX_load_verify_locations(ctx, CAFile, CAPath);
     }
-    void SSL_CTX_set_verify(SSL_CTX* ctx, int mode, void* callback) const {
+    void SSL_CTX_set_verify(SSL_CTX* ctx, int mode, void* callback) const @nogc nothrow {
         adapter_SSL_CTX_set_verify(ctx, mode, callback);
     }
-    int SSL_CTX_use_PrivateKey_file(SSL_CTX* ctx, const char* file, int type) const {
+    int SSL_CTX_use_PrivateKey_file(SSL_CTX* ctx, const char* file, int type) const @nogc nothrow {
         return adapter_SSL_CTX_use_PrivateKey_file(ctx, file, type);
     }
-    int SSL_CTX_use_certificate_file(SSL_CTX* ctx, const char* file, int type) const {
+    int SSL_CTX_use_certificate_file(SSL_CTX* ctx, const char* file, int type) const @nogc nothrow {
         return adapter_SSL_CTX_use_certificate_file(ctx, file, type);
     }
-    int SSL_CTX_set_cipher_list(SSL_CTX* ssl_ctx, const char* c) const {
+    int SSL_CTX_set_cipher_list(SSL_CTX* ssl_ctx, const char* c) const @nogc nothrow {
         return adapter_SSL_CTX_set_cipher_list(ssl_ctx, c);
     }
     /*
@@ -278,47 +281,47 @@ struct OpenSSL {
     */
     enum int SSL_CTRL_SET_MIN_PROTO_VERSION = 123;
     enum int SSL_CTRL_SET_MAX_PROTO_VERSION = 124;
-    int SSL_CTX_set_min_proto_version(SSL_CTX* ctx, int v) const {
+    int SSL_CTX_set_min_proto_version(SSL_CTX* ctx, int v) const @nogc nothrow {
         int r = cast(int)adapter_SSL_CTX_ctrl(ctx, SSL_CTRL_SET_MIN_PROTO_VERSION, cast(long)v, null);
         return r;
     }
-    int SSL_CTX_set_max_proto_version(SSL_CTX* ctx, int v) const {
+    int SSL_CTX_set_max_proto_version(SSL_CTX* ctx, int v) const @nogc nothrow {
         int r = cast(int)adapter_SSL_CTX_ctrl(ctx, SSL_CTRL_SET_MAX_PROTO_VERSION, cast(long)v, null);
         return r;
     }
-    SSL* SSL_new(SSL_CTX* ctx) const {
+    SSL* SSL_new(SSL_CTX* ctx) const @nogc nothrow {
         return adapter_SSL_new(ctx);
     }
-    int SSL_set_fd(SSL* ssl, int fd) const {
+    int SSL_set_fd(SSL* ssl, int fd) const @nogc nothrow {
         return adapter_SSL_set_fd(ssl, fd);
     }
-    int SSL_connect(SSL* ssl) const {
+    int SSL_connect(SSL* ssl) const @nogc nothrow {
         return adapter_SSL_connect(ssl);
     }
-    int SSL_read(SSL* ssl, void *b, int n) const {
+    int SSL_read(SSL* ssl, void *b, int n) const @nogc nothrow {
         return adapter_SSL_read(ssl, b, n);
     }
-    int SSL_write(SSL* ssl, const void *b, int n) const {
+    int SSL_write(SSL* ssl, const void *b, int n) const @nogc nothrow {
         return adapter_SSL_write(ssl, b, n);
     }
-    void SSL_free(SSL* ssl) const {
+    void SSL_free(SSL* ssl) const @nogc nothrow @trusted {
         adapter_SSL_free(ssl);
     }
-    void SSL_CTX_free(SSL_CTX* ctx) const {
+    void SSL_CTX_free(SSL_CTX* ctx) const @nogc nothrow @trusted {
         adapter_SSL_CTX_free(ctx);
     }
-    int SSL_get_error(SSL* ssl, int err) const {
+    int SSL_get_error(SSL* ssl, int err) const @nogc nothrow {
         return adapter_SSL_get_error(ssl, err);
     }
-    long SSL_set_tlsext_host_name(SSL* ssl, const char* host) const {
+    long SSL_set_tlsext_host_name(SSL* ssl, const char* host) const @nogc nothrow {
         enum int SSL_CTRL_SET_TLSEXT_HOSTNAME = 55;
         enum long TLSEXT_NAMETYPE_host_name = 0;
         return adapter_SSL_ctrl(ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME,TLSEXT_NAMETYPE_host_name, cast(void*)host);
     }
-    char* ERR_reason_error_string(ulong code) const {
+    char* ERR_reason_error_string(ulong code) const @nogc nothrow {
         return adapter_ERR_reason_error_string(code);
     }
-    ulong ERR_get_error() const {
+    ulong ERR_get_error() const @nogc nothrow {
         return adapter_ERR_get_error();
     }
 }

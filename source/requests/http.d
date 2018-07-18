@@ -726,7 +726,7 @@ public struct HTTPRequest {
     }
 
     private bool followRedirectResponse() {
-        if ( !_maxRedirects) {
+        if ( !_maxRedirects ) {
             return false;
         }
         if ( _history.length >= _maxRedirects ) {

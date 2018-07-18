@@ -1712,6 +1712,10 @@ package unittest {
     rq.maxRedirects = 2;
     assertThrown!MaxRedirectsException(rq.get(httpbinUrl ~ "absolute-redirect/3"));
 
+    rq.maxRedirects = 0;
+    rs = rq.get(httpbinUrl ~ "absolute-redirect/1");
+    assert(rs.code==302);
+
     info("Check cookie");
     {
         rs = rq.get(httpbinUrl ~ "cookies/set?A=abcd&b=cdef");

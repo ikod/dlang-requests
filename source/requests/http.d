@@ -1718,6 +1718,7 @@ package unittest {
 
     info("Check cookie");
     {
+        rq.maxRedirects = 10;
         rs = rq.get(httpbinUrl ~ "cookies/set?A=abcd&b=cdef");
         assert(rs.code == 200);
         auto json = parseJSON(cast(string)rs.responseBody.data).object["cookies"].object;

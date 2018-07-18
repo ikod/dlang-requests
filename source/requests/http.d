@@ -726,6 +726,9 @@ public struct HTTPRequest {
     }
 
     private bool followRedirectResponse() {
+        if ( !_maxRedirects) {
+            return false;
+        }
         if ( _history.length >= _maxRedirects ) {
             throw new MaxRedirectsException("%d redirects reached maxRedirects %d.".format(_history.length, _maxRedirects));
         }

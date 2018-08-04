@@ -24,6 +24,7 @@ package unittest {
     import std.exception;
 
     string httpbinUrl = httpTestServer();
+    globalLogLevel(LogLevel.info);
 
     version(vibeD) {
     }
@@ -36,7 +37,6 @@ package unittest {
         }
     }
 
-    globalLogLevel(LogLevel.info);
 
     infof("testing Request");
     Request rq;
@@ -53,7 +53,7 @@ package unittest {
 
     
     rq = Request();
-    rq.keepAlive = true;
+    rq.keepAlive = false; // disable keepalive on idempotents requests
     {
         info("Check handling incomplete status line");
         rs = rq.get(httpbinUrl ~ "incomplete");
@@ -182,13 +182,17 @@ package unittest {
                 break;
         }
     }
+
+    info("Check redirects");
     rs = rq.get(httpbinUrl ~ "absolute-redirect/2");
     assert((cast(HTTPResponse)rs).history.length == 2);
     assert((cast(HTTPResponse)rs).code==200);
     //    rq = Request();
+    info("Check maxredirects");
     rq.maxRedirects = 2;
     rq.keepAlive = false;
     assertThrown!MaxRedirectsException(rq.get(httpbinUrl ~ "absolute-redirect/3"));
+
 
     info("Check chunked content");
     rq = Request();

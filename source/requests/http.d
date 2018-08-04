@@ -24,6 +24,8 @@ import requests.base;
 
 static immutable ushort[] redirectCodes = [301, 302, 303, 307, 308];
 static immutable uint     defaultBufferSize = 12*1024;
+enum   HTTP11 = 101;
+enum   HTTP10 = 100;
 
 static immutable string[string] proxies;
 static this() {
@@ -112,11 +114,13 @@ public auto queryParams(T...)(T params) pure nothrow @safe
 ///
 public class HTTPResponse : Response {
     private {
-        string         _status_line;
+        string              _status_line;
 
-        HTTPResponse[] _history; // redirects history
+        HTTPResponse[]      _history; // redirects history
 
         mixin(Setter!string("status_line"));
+
+        int                 _version;
     }
 
     ~this() {
@@ -141,6 +145,14 @@ public class HTTPResponse : Response {
         stat.sendTime = _requestSentAt - _connectedAt;
         stat.recvTime = _finishedAt - _requestSentAt;
         return stat;
+    }
+    private int parse_version(in string v) pure const nothrow @safe {
+        // try to parse HTTP/1.x to version
+        try if ( v.length > 5 ) {
+            return (v[5..$].split(".").map!"to!int(a)".array[0..2].reduce!((a,b) => a*100 + b));
+        } catch (Exception e) {
+        }
+        return 0;
     }
 }
 /**
@@ -628,6 +640,7 @@ public struct HTTPRequest {
                 auto parsed = line.split(" ");
                 if ( parsed.length >= 2 ) {
                     _response.code = parsed[1].to!ushort;
+                    _response._version = _response.parse_version(parsed[0]);
                 }
                 continue;
             }
@@ -652,7 +665,7 @@ public struct HTTPRequest {
             if ( header != "set-cookie" ) {
                 auto stored = _response.responseHeaders.get(header, null);
                 if ( stored ) {
-                    value = stored ~ ", " ~ value;
+                    value = stored ~ "," ~ value;
                 }
                 _response._responseHeaders[header] = value;
                 continue;
@@ -870,11 +883,12 @@ public struct HTTPRequest {
     private void receiveResponse() {
 
         _stream.readTimeout = timeout;
-        scope(exit) {
-            if ( _stream && _stream.isOpen ) {
-                _stream.readTimeout = 0.seconds;
-            }
-        }
+        // Commented this out as at exit we can have alreade closed socket
+        // scope(exit) {
+        //     if ( _stream && _stream.isOpen ) {
+        //         _stream.readTimeout = 0.seconds;
+        //     }
+        // }
 
         _bodyDecoder = new DataPipe!ubyte();
         scope(exit) {
@@ -1038,11 +1052,48 @@ public struct HTTPRequest {
         _bodyDecoder.flush();
         _response._responseBody.putNoCopy(_bodyDecoder.get());
     }
-    private bool serverClosedKeepAliveConnection() pure @safe nothrow {
-        return _response._responseHeaders.length == 0 && _response._status_line.length == 0 &&  _keepAlive;
+    ///
+    /// Check that we received anything.
+    /// Server can close previous connection (keepalive or not)
+    ///
+    private bool serverPrematurelyClosedConnection() pure @safe {
+        immutable server_closed_connection = _response._responseHeaders.length == 0 && _response._status_line.length == 0;
+        // debug(requests) tracef("server closed connection = %s (headers.length=%s, status_line.length=%s)",
+        //     server_closed_connection, _response._responseHeaders.length,  _response._status_line.length);
+        return server_closed_connection;
     }
     private bool isIdempotent(in string method) pure @safe nothrow {
         return ["GET", "HEAD"].canFind(method);
+    }
+    ///
+    /// If we do not want keepalive request,
+    /// or server signalled to close connection,
+    /// then close it
+    ///
+    void close_connection_if_not_keepalive() {
+        auto connection = "connection" in _response._responseHeaders;
+        if ( !_keepAlive ) {
+            _stream.close();
+        } else switch(_response._version) {
+            case HTTP11:
+                // HTTP/1.1 defines the "close" connection option for the sender to signal that the connection 
+                // will be closed after completion of the response. For example,
+                //        Connection: close
+                // in either the request or the response header fields indicates that the connection 
+                // SHOULD NOT be considered `persistent' (section 8.1) after the current request/response is complete.
+                // HTTP/1.1 applications that do not support persistent connections MUST include the "close" connection 
+                // option in every message.
+                if ( connection && (*connection).toLower.split(",").canFind("close") ) {
+                    _stream.close();
+                }
+                break;
+            default:
+                // for anything else close connection if there is no keep-alive in Connection
+                if ( connection && !(*connection).toLower.split(",").canFind("keep-alive") ) {
+                    _stream.close();
+                }
+                break;
+        }
     }
     ///
     /// Send multipart for request.
@@ -1153,11 +1204,9 @@ public struct HTTPRequest {
                 _response._receiveAsRange.data = _response.responseBody.data;
             }
         }
-        auto connection = "connection" in _response._responseHeaders;
-        if ( !connection || *connection == "close" ) {
-            debug(requests) tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
-            _stream.close();
-        }
+
+        close_connection_if_not_keepalive();
+
         if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
             if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
                 // 307 and 308 do not change method
@@ -1306,11 +1355,9 @@ public struct HTTPRequest {
                 _response._receiveAsRange.data = _response.responseBody.data;
             }
         }
-        auto connection = "connection" in _response._responseHeaders;
-        if ( !connection || *connection == "close" ) {
-            debug(requests) tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
-            _stream.close();
-        }
+
+        close_connection_if_not_keepalive();
+
         if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
             if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
                 // 307 and 308 do not change method
@@ -1412,7 +1459,7 @@ public struct HTTPRequest {
             }
         }
 
-        if ( serverClosedKeepAliveConnection()
+        if ( serverPrematurelyClosedConnection()
             && !restartedRequest
             && isIdempotent(_method)
             ) {
@@ -1437,17 +1484,15 @@ public struct HTTPRequest {
             }
         }
 
-        auto connection = "connection" in _response._responseHeaders;
-        if ( !connection || *connection == "close" ) {
-            debug(requests) tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
-            _stream.close();
-        }
+        close_connection_if_not_keepalive();
+
         if ( _verbosity >= 1 ) {
             writeln(">> Connect time: ", _response._connectedAt - _response._startedAt);
             writeln(">> Request send time: ", _response._requestSentAt - _response._connectedAt);
             writeln(">> Response recv time: ", _response._finishedAt - _response._requestSentAt);
         }
         if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
+            debug(requests) tracef("Handle redirect");
             if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
                 // 307 and 308 do not change method
                 return this.get();
@@ -1579,6 +1624,7 @@ package unittest {
         assert(json["c"].str == " d");
         assert(json["a"].str == "b");
     }
+    rq.keepAlive = false; // disable keepalive on non-idempotent requests
     info("Check POST files");
     {
         import std.file;
@@ -1676,9 +1722,6 @@ package unittest {
         assert(json["a"].str == "a b");
         assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
     }
-    info("Check HEAD");
-    rs = rq.exec!"HEAD"(httpbinUrl);
-    assert(rs.code==200);
     info("Check DELETE");
     rs = rq.exec!"DELETE"(httpbinUrl ~ "delete");
     assert(rs.code==200);
@@ -1689,6 +1732,11 @@ package unittest {
     info("Check PATCH");
     rs = rq.exec!"PATCH"(httpbinUrl ~ "patch", "привiт, свiт!", "application/octet-stream");
     assert(rs.code==200);
+    info("Check HEAD");
+    rs = rq.exec!"HEAD"(httpbinUrl);
+    assert(rs.code==200);
+
+    rq._keepAlive = true;
     info("Check compressed content");
     rs = rq.get(httpbinUrl ~ "gzip");
     assert(rs.code==200);
@@ -1749,9 +1797,11 @@ package unittest {
     rq = HTTPRequest();
     rq.maxContentLength = 1;
     assertThrown!RequestException(rq.get(httpbinUrl));
+
     rq = HTTPRequest();
     rq.maxHeadersLength = 1;
     assertThrown!RequestException(rq.get(httpbinUrl));
+
     rq = HTTPRequest();
     info("Check POST multiPartForm");
     {

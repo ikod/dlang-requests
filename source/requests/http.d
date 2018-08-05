@@ -555,16 +555,16 @@ public struct HTTPRequest {
     /// Handle proxy and query parameters.
     ///
     private @property string requestString(QueryParam[] params = null) {
-        string actual_proxy = select_proxy(_uri.scheme);
-        if ( actual_proxy && _uri.scheme != "https" ) {
-            return "%s %s HTTP/1.1\r\n".format(_method, _uri.uri);
-        }
         auto query = _uri.query.dup;
         if ( params ) {
             query ~= "&" ~ params2query(params);
             if ( query[0] != '?' ) {
                 query = "?" ~ query;
             }
+        }
+        string actual_proxy = select_proxy(_uri.scheme);
+        if ( actual_proxy && _uri.scheme != "https" ) {
+            return "%s %s%s HTTP/1.1\r\n".format(_method, _uri.uri(No.params), query);
         }
         return "%s %s%s HTTP/1.1\r\n".format(_method, _uri.path, query);
     }
@@ -1492,7 +1492,6 @@ public struct HTTPRequest {
             writeln(">> Response recv time: ", _response._finishedAt - _response._requestSentAt);
         }
         if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
-            debug(requests) tracef("Handle redirect");
             if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
                 // 307 and 308 do not change method
                 return this.get();
@@ -1618,7 +1617,7 @@ package unittest {
             .format(uri.host, uri.port, uri.path, httpbinUrl));
     info("Check GET with AA params");
     {
-        rs = HTTPRequest().get(httpbinUrl ~ "get", ["c":" d", "a":"b"]);
+        rs = rq.get(httpbinUrl ~ "get", ["c":" d", "a":"b"]);
         assert(rs.code == 200);
         auto json = parseJSON(cast(string)rs.responseBody.data).object["args"].object;
         assert(json["c"].str == " d");

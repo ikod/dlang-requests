@@ -58,7 +58,8 @@ package unittest {
         info("Check handling incomplete status line");
         rs = rq.get(httpbinUrl ~ "incomplete");
         if (httpbinUrl != "http://httpbin.org/") {
-            assert(rs.code==600);
+            // 600 when test server respond, or 502 if squid
+            assert(rs.code==600 || rs.code == 502);
         }
     }
     // handmade json
@@ -145,7 +146,7 @@ package unittest {
     info("Check PATCH");
     rs = rq.exec!"PATCH"(httpbinUrl ~ "patch", "привiт, свiт!", "application/octet-stream");
     assert(rs.code==200);
-    
+
     info("Check compressed content");
     rq = Request();
     rq.keepAlive = true;
@@ -171,7 +172,6 @@ package unittest {
     json = parseJSON(cast(string)rs.responseBody.data).object["cookies"].object;
     assert(json["A"].str == "abcd");
     assert(json["b"].str == "cdef");
-    auto cookie = rq.cookie();
     foreach(c; rq.cookie) {
         final switch(c.attr) {
             case "A":
@@ -221,7 +221,7 @@ package unittest {
     assert(r.splitter('\n').filter!("a.length>0").count == 20);
     r = getContent(httpbinUrl ~ "get", ["a":"b", "c":"d"]);
     string name = "user", sex = "male";
-    int    age = 42;
+    immutable age = 42;
     r = getContent(httpbinUrl ~ "get", "name", name, "age", age, "sex", sex);
 
     info("Test receiveAsRange with GET");
@@ -238,7 +238,8 @@ package unittest {
     rq = Request();
     rs = rq.get(httpbinUrl ~ "stream/20");
     assert(streamedContent.length == rs.responseBody.data.length,
-            "streamedContent.length(%d) == rs.responseBody.data.length(%d)".format(streamedContent.length, rs.responseBody.data.length));
+            "streamedContent.length(%d) == rs.responseBody.data.length(%d)".
+            format(streamedContent.length, rs.responseBody.data.length));
     info("Test postContent");
     r = postContent(httpbinUrl ~ "post", `{"a":"b", "c":1}`, "application/json");
     assert(parseJSON(cast(string)r).object["json"].object["c"].integer == 1);
@@ -321,7 +322,9 @@ package unittest {
         
     }
 }
-
+///
+/// Create array of query params from args
+///
 auto queryParams(A...)(A args) pure @safe nothrow {
     QueryParam[] res;
     static if ( args.length >= 2 ) {
@@ -393,7 +396,7 @@ package unittest {
 
     globalLogLevel(LogLevel.info);
     // while we have no internal ftp server we can run tests in non-reloable networking environment
-    bool unreliable_network = environment.get("UNRELIABLENETWORK", "false") == "true";
+    immutable unreliable_network = environment.get("UNRELIABLENETWORK", "false") == "true";
 
     /// ftp upload from range
     info("Test getContent(ftp)");

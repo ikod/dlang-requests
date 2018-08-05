@@ -5,6 +5,7 @@ import std.array;
 import std.format;
 import std.algorithm;
 import std.conv;
+import std.typecons;
 import requests.utils;
 static import requests.idna;
 
@@ -83,7 +84,7 @@ struct URI {
         return true;
     }
     
-    string recalc_uri() const pure @safe {
+    string recalc_uri(Flag!"params" params = Yes.params) const pure @safe {
         string userinfo;
         if ( _username ) {
             userinfo = "%s".format(_username);
@@ -97,7 +98,7 @@ struct URI {
             r ~= ":%d".format(_port);
         }
         r ~= _path;
-        if ( _query ) {
+        if ( params == Flag!"params".yes && _query ) {
             r ~= _query;
         }
         return r;
@@ -125,8 +126,8 @@ struct URI {
 //    mixin(setter("port"));
 //    mixin(setter("path"));
 //    mixin(setter("query"));
-    @property auto uri() pure @safe const {
-        return recalc_uri();
+    @property auto uri(Flag!"params" params = Yes.params) pure @safe const {
+        return recalc_uri(params);
     }
     @property void uri(string s) @trusted {
         _uri = s;
@@ -159,6 +160,8 @@ unittest {
     assert(a.port == 1234);
     assert(a.path == "/abc");
     assert(a.query == "?q=x");
+    assert(a.uri(No.params) == "http://igor:pass;word@example.com:1234/abc",
+        "Expected http://igor:pass;word@example.com:1234/abc, got %s".format(a.uri(No.params)));
     a.scheme = "https";
     a.query = "x=y";
     a.port = 345;

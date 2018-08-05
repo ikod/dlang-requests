@@ -446,6 +446,7 @@ unittest {
         scope(exit) {
             server.stop();
         }
+        Thread.sleep(1.seconds);
         string httpbinurl = "http://127.0.0.1:8081";
         Job[] jobs = [
             Job(httpbinurl ~ "/get").addHeaders([

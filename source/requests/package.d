@@ -58,7 +58,7 @@ package unittest {
         info("Check handling incomplete status line");
         rs = rq.get(httpbinUrl ~ "incomplete");
         if (httpbinUrl != "http://httpbin.org/") {
-            // 600 when test server respond, or 502 if squid
+            // 600 when test direct server respond, or 502 if test through squid
             assert(rs.code==600 || rs.code == 502);
         }
     }

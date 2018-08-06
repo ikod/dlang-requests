@@ -882,7 +882,12 @@ public struct HTTPRequest {
     ///
     private void receiveResponse() {
 
-        _stream.readTimeout = timeout;
+        try {
+            _stream.readTimeout = timeout;
+        } catch (Exception e) {
+            debug(requests) tracef("Failed to set read timeout for stream: %s", e.msg);
+            return;
+        }
         // Commented this out as at exit we can have alreade closed socket
         // scope(exit) {
         //     if ( _stream && _stream.isOpen ) {

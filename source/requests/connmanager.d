@@ -107,7 +107,7 @@ package class ConnManager {
 }
 
 unittest {
-    globalLogLevel = LogLevel.trace;
+    globalLogLevel = LogLevel.info;
     ConnManager cm = new ConnManager(2);
     auto s0 = new TCPStream();
     auto s1 = new TCPStream();

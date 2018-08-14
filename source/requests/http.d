@@ -374,10 +374,7 @@ public struct HTTPRequest {
     }
     @property final void proxy(string v) {
         if ( v != _proxy ) {
-            //if ( _stream && _stream.isOpen() ) {
-            //    debug(requests) tracef("Close connection because we reset proxy");
-            //    _stream.close();
-            //}
+            _cm.clear();
         }
         _proxy = v;
     }
@@ -390,10 +387,6 @@ public struct HTTPRequest {
         _cm = new ConnManager;
     }
     ~this() {
-        //if ( _stream && _stream.isConnected) {
-        //    _stream.close();
-        //}
-        //_stream = null;
         _headers = null;
         _authenticator = null;
         _history = null;
@@ -756,40 +749,6 @@ public struct HTTPRequest {
         }
         return true;
     }
-    //private bool followRedirectResponse() {
-    //    if ( !_maxRedirects ) {
-    //        return false;
-    //    }
-    //    if ( _history.length >= _maxRedirects ) {
-    //        throw new MaxRedirectsException("%d redirects reached maxRedirects %d.".format(_history.length, _maxRedirects));
-    //    }
-    //    auto location = "location" in _response.responseHeaders;
-    //    if ( !location ) {
-    //        return false;
-    //    }
-    //    _history ~= _response;
-    //    //auto connection = "connection" in _response._responseHeaders;
-    //    //if ( !connection || *connection == "close" ) {
-    //    //    debug(requests) tracef("Closing connection because of 'Connection: close' or no 'Connection' header");
-    //    //    _stream.close();
-    //    //}
-    //    URI oldURI = _uri;
-    //    URI newURI = oldURI;
-    //    try {
-    //        newURI = URI(*location);
-    //    } catch (UriException e) {
-    //        debug(requests) trace("Can't parse Location:, try relative uri");
-    //        newURI.path = *location;
-    //        newURI.uri = newURI.recalc_uri;
-    //    }
-    //    handleURLChange(oldURI, newURI);
-    //    oldURI = _response.uri;
-    //    _uri = newURI;
-    //    _response = new HTTPResponse;
-    //    _response.uri = oldURI;
-    //    _response.finalURI = newURI;
-    //    return true;
-    //}
     private URI uriFromLocation(const ref URI uri, in string location) {
         URI newURI = uri;
         try {
@@ -801,33 +760,6 @@ public struct HTTPRequest {
         }
         return newURI;
     }
-    ///
-    /// If uri changed so that we have to change host, port or proxy, then we have to close socket stream
-    ///
-    //private void handleURLChange(in URI from, in URI to) {
-    //    if ( _stream is null || !_stream.isConnected ) {
-    //        return;
-    //    }
-    //    string proxy_from = select_proxy(from.scheme);
-    //    string proxy_to = select_proxy(to.scheme);
-    //    if ( proxy_from != proxy_to ) {
-    //        // we are switching proxies
-    //        _stream.close();
-    //        return;
-    //    }
-    //    if ( proxy_to !is null ) {
-    //        // we do not have to close proxy connection if we will not change proxy
-    //        if ( (from.scheme=="https" || to.scheme=="https")
-    //             && (from.scheme != to.scheme) ) {
-    //            _stream.close();
-    //        }
-    //        return;
-    //    }
-    //    if ( from.scheme != to.scheme || from.host != to.host || from.port != to.port ) {
-    //        debug tracef("Have to reopen stream, because of URI change");
-    //        _stream.close();
-    //    }
-    //}
     ///
     /// if we have new uri, then we need to check if we have to reopen existent connection
     ///
@@ -845,69 +777,7 @@ public struct HTTPRequest {
     ///
     /// Setup connection. Handle proxy and https case
     ///
-    //private void setupConnection() {
-    //    //if ( _stream && _stream.isConnected ) {
-    //    //    debug(requests) tracef("Use old connection");
-    //    //    return;
-    //    //}
-    //    //
-    //    debug(requests) tracef("Set up new connection");
-    //    URI   uri; // this URI will be used temporarry if we need proxy
-    //    string actual_proxy = select_proxy(_uri.scheme);
-    //    final switch (_uri.scheme) {
-    //        case "http":
-    //            if ( actual_proxy ) {
-    //                uri.uri_parse(actual_proxy);
-    //                uri.idn_encode();
-    //            } else {
-    //                // use original uri
-    //                uri = _uri;
-    //            }
-    //            _stream = new TCPStream();
-    //            _stream.bind(_bind);
-    //            _stream.connect(uri.host, uri.port, _timeout);
-    //            break;
-    //        case "https":
-    //            if ( actual_proxy ) {
-    //                uri.uri_parse(actual_proxy);
-    //                uri.idn_encode();
-    //                _stream = new TCPStream();
-    //                _stream.bind(_bind);
-    //                _stream.connect(uri.host, uri.port, _timeout);
-    //                if ( verbosity>=1 ) {
-    //                    writeln("> CONNECT %s:%d HTTP/1.1".format(_uri.host, _uri.port));
-    //                }
-    //                _stream.send("CONNECT %s:%d HTTP/1.1\r\n\r\n".format(_uri.host, _uri.port));
-    //                while ( _stream.isConnected ) {
-    //                    ubyte[1024] b;
-    //                    auto read = _stream.receive(b);
-    //                    if ( verbosity>=1) {
-    //                        writefln("< %s", cast(string)b[0..read]);
-    //                    }
-    //                    debug(requests) tracef("read: %d", read);
-    //                    if ( b[0..read].canFind("\r\n\r\n") || b[0..read].canFind("\n\n") ) {
-    //                        debug(requests) tracef("proxy connection ready");
-    //                        // convert connection to ssl
-    //                        _stream = new SSLStream(_stream, _sslOptions, _uri.host);
-    //                        break;
-    //                    } else {
-    //                        debug(requests) tracef("still wait for proxy connection");
-    //                    }
-    //                }
-    //            } else {
-    //                uri = _uri;
-    //                _stream = new SSLStream(_sslOptions);
-    //                _stream.bind(_bind);
-    //                _stream.connect(uri.host, uri.port, _timeout);
-    //                debug(requests) tracef("ssl connection to origin server ready");
-    //            }
-    //            break;
-    //    }
-    //}
-    ///
-    /// Setup connection. Handle proxy and https case
-    ///
-    private NetworkStream setupConnection1()
+    private NetworkStream setupConnection()
     //in {assert(this._stream is null);}
     do {
 
@@ -1237,7 +1107,7 @@ public struct HTTPRequest {
 
         if ( _stream is null ) {
             debug(requests) trace("create new connection");
-            _stream = setupConnection1();
+            _stream = setupConnection();
         } else {
             debug(requests) trace("reuse old connection");
         }
@@ -1419,15 +1289,6 @@ public struct HTTPRequest {
             goto connect;
         }
 
-        //
-        //if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
-        //    if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
-        //        // 307 and 308 do not change method
-        //        return this.get();
-        //    }
-        //    goto connect;
-        //}
-        //
         _response._history = _history;
         if ( _stream ) {
             auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _stream);
@@ -1494,12 +1355,7 @@ public struct HTTPRequest {
             || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front))))
             || (rank!R == 2 && (is(Unqual!(typeof(content.front.front)) == ubyte)))
         )
-    //in{assert(_stream is null);}
-    //out{assert(_stream is null);}
     do {
-        //if ( _response && _response._receiveAsRange.activated && _stream && _stream.isConnected ) {
-        //    _stream.close();
-        //}
         //
         // application/json
         //
@@ -1528,7 +1384,7 @@ public struct HTTPRequest {
 
         if ( _stream is null ) {
             debug(requests) trace("create new connection");
-            _stream = setupConnection1();
+            _stream = setupConnection();
         } else {
             debug(requests) trace("reuse old connection");
         }
@@ -1727,9 +1583,6 @@ public struct HTTPRequest {
     do {
         debug(requests) tracef("started url=%s, this._uri=%s", url, _uri);
 
-        //if ( _response && _response._receiveAsRange.activated && _stream && _stream.isConnected ) {
-        //    _stream.close();
-        //}
         NetworkStream _stream;
         _method = method;
         _response = new HTTPResponse;
@@ -1754,7 +1607,7 @@ public struct HTTPRequest {
 
         if ( _stream is null ) {
             debug(requests) trace("create new connection");
-            _stream = setupConnection1();
+            _stream = setupConnection();
         } else {
             debug(requests) trace("reuse old connection");
         }
@@ -1926,15 +1779,6 @@ public struct HTTPRequest {
             goto connect;
         }
 
-        //
-        //if ( canFind(redirectCodes, _response.code) && followRedirectResponse() ) {
-        //    if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
-        //        // 307 and 308 do not change method
-        //        return this.get();
-        //    }
-        //    goto connect;
-        //}
-        //
         _response._history = _history;
         if ( _stream ) {
             auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _stream);

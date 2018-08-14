@@ -23,10 +23,10 @@ public class RequestException: Exception {
 public struct ReceiveAsRange {
     bool empty() {
         return data.length == 0;
-    };
+    }
     ubyte[] front() {
         return data;
-    };
+    }
     void popFront() {
         if ( read ) {
             // get new portion
@@ -35,7 +35,7 @@ public struct ReceiveAsRange {
             // we can't read any new data
             data.length = 0;
         }
-    };
+    }
     package {
         bool            activated;
         ubyte[]         data;

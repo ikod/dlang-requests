@@ -468,7 +468,7 @@ unittest {
         ];
 
         auto count = jobs.
-            pool(5).
+            pool(6).
             filter!(r => r.code==200).
             count();
 

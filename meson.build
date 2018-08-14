@@ -26,6 +26,7 @@ requests_src = [
     'source/requests/server/httpd.d',
     'source/requests/server/package.d',
     'source/requests/streams.d',
+    'source/requests/connmanager.d',
     'source/requests/base.d'
 ]
 

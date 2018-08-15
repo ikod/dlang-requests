@@ -32,7 +32,7 @@
             "dflags" : ["-c", "-Dddocs"]
         },
         "unittest": {
-            "buildOptions": ["unittests", "debugMode", "debugInfo"],
+            "buildOptions": ["unittests", "debugMode", "debugInfo", "coverage"],
             "versions": ["httpbin"],
             "debugVersions": ["requests"]
         },

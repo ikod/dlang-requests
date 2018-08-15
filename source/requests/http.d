@@ -155,6 +155,13 @@ public class HTTPResponse : Response {
         }
         return 0;
     }
+    unittest {
+        auto r = new HTTPResponse();
+        assert(r.parse_version("HTTP/1.1") == 101);
+        assert(r.parse_version("HTTP/1.0") == 100);
+        assert(r.parse_version("HTTP/0.9") == 9);
+        assert(r.parse_version("HTTP/xxx") == 0);
+    }
 }
 /**
  * Struct to send multiple files in POST request.
@@ -777,8 +784,9 @@ public struct HTTPRequest {
     ///
     /// Setup connection. Handle proxy and https case
     ///
+    /// Place new connection in ConnManager cache
+    ///
     private NetworkStream setupConnection()
-    //in {assert(this._stream is null);}
     do {
 
         debug(requests) tracef("Set up new connection");
@@ -834,6 +842,14 @@ public struct HTTPRequest {
                 debug(requests) tracef("ssl connection to origin server ready");
             }
             break;
+        }
+
+        if ( stream ) {
+            auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, stream);
+            if ( purged_connection ) {
+                debug(requests) tracef("closing purged connection %s", purged_connection);
+                purged_connection.close();
+            }
         }
 
         return stream;
@@ -1077,25 +1093,17 @@ public struct HTTPRequest {
         import std.uuid;
         import std.file;
 
-        //if ( _response && _response._receiveAsRange.activated && _stream && _stream.isConnected ) {
-        //    _stream.close();
-        //}
-        //
-        // application/json
-        //
-        NetworkStream _stream;
-        bool restartedRequest = false;
-
-        _method = method;
-
+        checkURL(url);
         if ( _cm is null ) {
             _cm = new ConnManager();
         }
 
+        NetworkStream _stream;
+        _method = method;
         _response = new HTTPResponse;
-        checkURL(url);
         _response.uri = _uri;
         _response.finalURI = _uri;
+        bool restartedRequest = false;
 
     connect:
         _contentReceived = 0;
@@ -1196,8 +1204,10 @@ public struct HTTPRequest {
         }
         catch (NetworkException e) {
             errorf("Error sending request: ", e.msg);
+            _stream.close();
             return _response;
         }
+
         if ( serverPrematurelyClosedConnection()
         && !restartedRequest
         && isIdempotent(_method)
@@ -1222,15 +1232,6 @@ public struct HTTPRequest {
         if ( _useStreaming ) {
             if ( _response._receiveAsRange.activated ) {
                 debug(requests) trace("streaming_in activated");
-                if ( _stream ) {
-                    auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _stream);
-                    if ( purged_connection ) {
-                        //debug(requests) tracef("closing purged connection %s", purged_connection);
-                        writeln(_uri);
-                        purged_connection.close();
-                    }
-                    _stream = null;
-                }
                 return _response;
             } else {
                 // this can happen if whole response body received together with headers
@@ -1262,18 +1263,7 @@ public struct HTTPRequest {
             _response = new HTTPResponse;
             _response.uri = current_uri;
             _response.finalURI = next_uri;
-
-            //// hande connection aspects of redirect
-            //handleURLChange(current_uri, next_uri);
-            if ( _stream ) {
-                auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _stream);
-                if ( purged_connection ) {
-                    //debug(requests) tracef("closing purged connection %s", purged_connection);
-                    writeln(_uri);
-                    purged_connection.close();
-                }
-                _stream = null;
-            }
+            _stream = null;
 
             // set new uri
             this._uri = next_uri;
@@ -1290,15 +1280,6 @@ public struct HTTPRequest {
         }
 
         _response._history = _history;
-        if ( _stream ) {
-            auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _stream);
-            if ( purged_connection ) {
-                debug(requests) tracef("closing purged connection %s", purged_connection);
-                writeln(_uri);
-                purged_connection.close();
-            }
-            _stream = null;
-        }
         return _response;
     }
 
@@ -1356,23 +1337,21 @@ public struct HTTPRequest {
             || (rank!R == 2 && (is(Unqual!(typeof(content.front.front)) == ubyte)))
         )
     do {
-        //
-        // application/json
-        //
-        bool restartedRequest = false;
-        bool send_flat;
+        debug(requests) tracef("started url=%s, this._uri=%s", url, _uri);
+
+        checkURL(url);
+        if ( _cm is null ) {
+            _cm = new ConnManager();
+        }
 
         NetworkStream _stream;
         _method = method;
         _response = new HTTPResponse;
         _history.length = 0;
-
-        if ( _cm is null ) {
-            _cm = new ConnManager();
-        }
-        checkURL(url);
         _response.uri = _uri;
         _response.finalURI = _uri;
+        bool restartedRequest = false;
+        bool send_flat;
 
     connect:
         _contentReceived = 0;
@@ -1483,15 +1462,6 @@ public struct HTTPRequest {
         if ( _useStreaming ) {
             if ( _response._receiveAsRange.activated ) {
                 debug(requests) trace("streaming_in activated");
-                if ( _stream ) {
-                    auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _stream);
-                    if ( purged_connection ) {
-                        //debug(requests) tracef("closing purged connection %s", purged_connection);
-                        writeln(_uri);
-                        purged_connection.close();
-                    }
-                    _stream = null;
-                }
                 return _response;
             } else {
                 // this can happen if whole response body received together with headers
@@ -1525,17 +1495,7 @@ public struct HTTPRequest {
             _response.uri = current_uri;
             _response.finalURI = next_uri;
 
-            //// hande connection aspects of redirect
-            //handleURLChange(current_uri, next_uri);
-            if ( _stream ) {
-                auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _stream);
-                if ( purged_connection ) {
-                    //debug(requests) tracef("closing purged connection %s", purged_connection);
-                    writeln(_uri);
-                    purged_connection.close();
-                }
-                _stream = null;
-            }
+            _stream = null;
 
             // set new uri
             this._uri = next_uri;
@@ -1551,21 +1511,11 @@ public struct HTTPRequest {
             goto connect;
         }
 
-        ///
         _response._history = _history;
-        if ( _stream ) {
-            auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _stream);
-            if ( purged_connection ) {
-                debug(requests) tracef("closing purged connection %s", purged_connection);
-                writeln(_uri);
-                purged_connection.close();
-            }
-            _stream = null;
-        }
         return _response;
     }
     ///
-    /// Send request with pameters.
+    /// Send request with parameters.
     /// If used for POST or PUT requests then application/x-www-form-urlencoded used.
     /// Request parameters will be encoded into request string or placed in request body for POST/PUT
     /// requests.
@@ -1583,19 +1533,18 @@ public struct HTTPRequest {
     do {
         debug(requests) tracef("started url=%s, this._uri=%s", url, _uri);
 
+        checkURL(url);
+        if ( _cm is null ) {
+            _cm = new ConnManager();
+        }
+
         NetworkStream _stream;
         _method = method;
         _response = new HTTPResponse;
         _history.length = 0;
-        if ( _cm is null ) {
-            _cm = new ConnManager();
-        }
-        bool restartedRequest = false; // True if this is restarted keepAlive request
-        string encoded;
-
-        checkURL(url);
         _response.uri = _uri;
         _response.finalURI = _uri;
+        bool restartedRequest = false; // True if this is restarted keepAlive request
 
     connect:
         _contentReceived = 0;
@@ -1637,6 +1586,8 @@ public struct HTTPRequest {
 
         Appender!string req;
 
+        string encoded;
+
         switch (_method) {
             case "POST","PUT":
                 encoded = params2query(params);
@@ -1659,8 +1610,9 @@ public struct HTTPRequest {
         }
 
         debug(requests) trace(req.data);
-
-        if ( _verbosity >= 1 ) req.data.splitLines.each!(a => writeln("> " ~ a));
+        if ( _verbosity >= 1 ) {
+            req.data.splitLines.each!(a => writeln("> " ~ a));
+        }
         //
         // Now send request and receive response
         //
@@ -1711,15 +1663,6 @@ public struct HTTPRequest {
         if ( _useStreaming ) {
             if ( _response._receiveAsRange.activated ) {
                 debug(requests) trace("streaming_in activated");
-                if ( _stream ) {
-                    auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _stream);
-                    if ( purged_connection ) {
-                        //debug(requests) tracef("closing purged connection %s", purged_connection);
-                        writeln(_uri);
-                        purged_connection.close();
-                    }
-                    _stream = null;
-                }
                 return _response;
             } else {
                 // this can happen if whole response body received together with headers
@@ -1752,18 +1695,7 @@ public struct HTTPRequest {
             _response = new HTTPResponse;
             _response.uri = current_uri;
             _response.finalURI = next_uri;
-
-            //// hande connection aspects of redirect
-            //handleURLChange(current_uri, next_uri);
-            if ( _stream ) {
-                auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _stream);
-                if ( purged_connection ) {
-                    //debug(requests) tracef("closing purged connection %s", purged_connection);
-                    writeln(_uri);
-                    purged_connection.close();
-                }
-                _stream = null;
-            }
+            _stream = null;
             
             // set new uri
             this._uri = next_uri;
@@ -1780,15 +1712,6 @@ public struct HTTPRequest {
         }
 
         _response._history = _history;
-        if ( _stream ) {
-            auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _stream);
-            if ( purged_connection ) {
-                debug(requests) tracef("closing purged connection %s", purged_connection);
-                writeln(_uri);
-                purged_connection.close();
-            }
-            _stream = null;
-        }
         return _response;
     }
 

@@ -359,7 +359,7 @@ Here is a short description of some `Request` options you can set:
 
 | name                | type             | meaning                                 | default    |
 |---------------------|------------------|-----------------------------------------|------------|
-| keepAlive           | `bool`           | request keepalive connection            | false      |
+| keepAlive           | `bool`           | request keepalive connection            | true       |
 | maxRedirects *)     | `uint`           | maximum redirect depth (0 to disable)   | 10         |
 | maxHeadersLength *) | `size_t`         | max. acceptable response headers length | 32KB       |
 | maxContentLength *) | `size_t`         | max. acceptable content length          | 5MB        |

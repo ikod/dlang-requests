@@ -326,16 +326,16 @@ public struct HTTPRequest {
         Auth           _authenticator;
         bool           _keepAlive = true;
         uint           _maxRedirects = 10;
-        size_t         _maxHeadersLength = 32 * 1024; // 32 KB
-        size_t         _maxContentLength; // 0 - Unlimited
+        size_t         _maxHeadersLength = 32 * 1024;   // 32 KB
+        size_t         _maxContentLength;               // 0 - Unlimited
         string         _proxy;
-        uint           _verbosity = 0;  // 0 - no output, 1 - headers, 2 - headers+body info
+        uint           _verbosity = 0;                  // 0 - no output, 1 - headers, 2 - headers+body info
         Duration       _timeout = 30.seconds;
         size_t         _bufferSize = defaultBufferSize; // 16k
-        bool           _useStreaming; // return iterator instead of completed request
+        bool           _useStreaming;                   // return iterator instead of completed request
 
-        //NetworkStream   _stream;
-        HTTPResponse[] _history; // redirects history
+        string[URI]     _permanent_redirects;            // cache 301 redirects for GET requests
+        HTTPResponse[] _history;                        // redirects history
         DataPipe!ubyte _bodyDecoder;
         DecodeChunked  _unChunker;
         long           _contentLength;
@@ -1547,6 +1547,11 @@ public struct HTTPRequest {
         bool restartedRequest = false; // True if this is restarted keepAlive request
 
     connect:
+        if ( _method == "GET" && _uri in _permanent_redirects ) {
+            debug(requests) trace("use parmanent redirects cache");
+            _uri = uriFromLocation(_uri, _permanent_redirects[_uri]);
+            _response._finalURI = _uri;
+        }
         _contentReceived = 0;
         _response._startedAt = Clock.currTime;
 
@@ -1688,6 +1693,10 @@ public struct HTTPRequest {
             immutable new_location = *("location" in _response.responseHeaders);
             immutable current_uri = _uri, next_uri = uriFromLocation(_uri, new_location);
 
+            if ( _method == "GET" && _response.code == 301 ) {
+                _permanent_redirects[_uri] = new_location;
+            }
+
             // save current response for history
             _history ~= _response;
 
@@ -1698,7 +1707,7 @@ public struct HTTPRequest {
             _stream = null;
             
             // set new uri
-            this._uri = next_uri;
+            _uri = next_uri;
             debug(requests) tracef("Redirected to %s", next_uri);
             if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
                 // 307 and 308 do not change method

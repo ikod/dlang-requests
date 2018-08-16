@@ -322,6 +322,7 @@ Response rs = rq.get("https://httpbin.org/");
 assert(rs.code==200);
 ```
 
+
 By default Keep-Alive requests are used, so you can reuse the connection:
 
 ```d
@@ -339,7 +340,11 @@ void main()
 }
 ```
 
-In the latter case `rq.get()` will reuse previous connection to server. `Request` will automatically reopen connection when host, protocol or port change (so it is safe to send different requests through single instance of `Request`). It also recovers when server prematurely closes keep-alive connection. You can turn `keepAlive` off when needed:
+In the latter case `rq.get()` will reuse previous connection to server.
+`Request` will automatically reopen connection when host, protocol or port change (so it is safe
+to send different requests through single instance of `Request`).
+It also recovers when server prematurely closes keep-alive connection.
+You can turn `keepAlive` off when needed:
 
 ```d
 rq.keepAlive = false;
@@ -383,6 +388,12 @@ Here is a short description of some `Request` options you can set:
 | cookie           | `Cookie[]`       | cookie the server sent to us                        |
 | contentLength    | `long`           | current document's content length or -1 if unknown  |
 | contentReceived  | `long`           | content received                                    |
+
+
+##### Redirect and connection optimisations #####
+
+`Request` keep results of Permanent redirections in small cache. It also keep map
+`(schema,host,port) -> connection` of opened connections, for subsequent usage.
 
 #### Streaming server response ####
 With `useStreaming`, you can receive response body as input range.

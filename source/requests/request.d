@@ -94,6 +94,9 @@ public struct Request {
         _http.proxy = v;
         _ftp.proxy = v;
     }
+    @property void socketFactory(NetworkStream function(string, string, ushort) f) {
+        _http.socketFactory = f;
+    }
     /++ Set Cookie for http requests.
         $(B v) - array of cookie.
 

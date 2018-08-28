@@ -305,6 +305,7 @@ public struct MultipartForm {
 /// $(B timeout) - Duration, Set timeout value for connect/receive/send.
 ///
 public struct HTTPRequest {
+    alias NetStrFactory = NetworkStream function(string, string, ushort);
     private {
         struct _UH {
             // flags for each important header, added by user using addHeaders
@@ -345,6 +346,7 @@ public struct HTTPRequest {
         string         _bind;
         _UH            _userHeaders;
         ConnManager    _cm;
+        NetStrFactory  _socketFactory;
     }
     package HTTPResponse   _response;
 
@@ -363,6 +365,7 @@ public struct HTTPRequest {
     mixin(Getter!long              ("contentReceived"));
     mixin(Getter_Setter!SSLOptions ("sslOptions"));
     mixin(Getter_Setter!string     ("bind"));
+    mixin(Setter!NetStrFactory     ("socketFactory"));
 
     @property void sslSetVerifyPeer(bool v) pure @safe nothrow @nogc {
         _sslOptions.setVerifyPeer(v);
@@ -790,8 +793,13 @@ public struct HTTPRequest {
     do {
 
         debug(requests) tracef("Set up new connection");
-        NetworkStream stream;
 
+        if ( _socketFactory ) {
+            debug(requests) tracef("use socketFactory");
+            return _socketFactory(_uri.scheme, _uri.host, _uri.port);
+        }
+
+        NetworkStream stream;
         URI   uri; // this URI will be used temporarry if we need proxy
         string actual_proxy = select_proxy(_uri.scheme);
         final switch (_uri.scheme) {

@@ -305,7 +305,7 @@ public struct MultipartForm {
 /// $(B timeout) - Duration, Set timeout value for connect/receive/send.
 ///
 public struct HTTPRequest {
-    alias NetStrFactory = NetworkStream function(string, string, ushort);
+    alias NetStrFactory = NetworkStream delegate(string, string, ushort);
     private {
         struct _UH {
             // flags for each important header, added by user using addHeaders
@@ -1071,12 +1071,12 @@ public struct HTTPRequest {
             _stream.close();
         } else switch(_response._version) {
             case HTTP11:
-                // HTTP/1.1 defines the "close" connection option for the sender to signal that the connection 
+                // HTTP/1.1 defines the "close" connection option for the sender to signal that the connection
                 // will be closed after completion of the response. For example,
                 //        Connection: close
-                // in either the request or the response header fields indicates that the connection 
+                // in either the request or the response header fields indicates that the connection
                 // SHOULD NOT be considered `persistent' (section 8.1) after the current request/response is complete.
-                // HTTP/1.1 applications that do not support persistent connections MUST include the "close" connection 
+                // HTTP/1.1 applications that do not support persistent connections MUST include the "close" connection
                 // option in every message.
                 if ( connection && (*connection).toLower.split(",").canFind("close") ) {
                     _stream.close();
@@ -1181,7 +1181,7 @@ public struct HTTPRequest {
         auto h = requestHeaders();
         safeSetHeader(h, _userHeaders.ContentType, "Content-Type", "multipart/form-data; boundary=" ~ boundary);
         safeSetHeader(h, _userHeaders.ContentLength, "Content-Length", to!string(contentLength));
-        
+
         h.byKeyValue.
             map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
                 each!(h => req.put(h));
@@ -1478,7 +1478,7 @@ public struct HTTPRequest {
         }
 
         close_connection_if_not_keepalive(_stream);
-        
+
         if ( _verbosity >= 1 ) {
             writeln(">> Connect time: ", _response._connectedAt - _response._startedAt);
             writeln(">> Request send time: ", _response._requestSentAt - _response._connectedAt);
@@ -1668,7 +1668,7 @@ public struct HTTPRequest {
             _cm.del(_uri.scheme, _uri.host, _uri.port);
             _stream.close();
             _stream = null;
-            
+
             restartedRequest = true;
             goto connect;
         }
@@ -1713,7 +1713,7 @@ public struct HTTPRequest {
             _response.uri = current_uri;
             _response.finalURI = next_uri;
             _stream = null;
-            
+
             // set new uri
             _uri = next_uri;
             debug(requests) tracef("Redirected to %s", next_uri);

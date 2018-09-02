@@ -94,7 +94,7 @@ public struct Request {
         _http.proxy = v;
         _ftp.proxy = v;
     }
-    @property void socketFactory(NetworkStream function(string, string, ushort) f) {
+    @property void socketFactory(NetworkStream delegate(string, string, ushort) f) {
         _http.socketFactory = f;
     }
     /++ Set Cookie for http requests.
@@ -163,7 +163,7 @@ public struct Request {
     ///
     /// get length og actually received content.
     /// this value increase over time, while we receive data
-    /// 
+    ///
     @property long contentReceived() pure @nogc nothrow {
         final switch ( _uri.scheme ) {
             case "http", "https":

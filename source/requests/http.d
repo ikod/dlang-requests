@@ -793,71 +793,66 @@ public struct HTTPRequest {
     do {
 
         debug(requests) tracef("Set up new connection");
-
-        if ( _socketFactory ) {
-            debug(requests) tracef("use socketFactory");
-            NetworkStream stream = _socketFactory(_uri.scheme, _uri.host, _uri.port);
-            if ( stream ) {
-                auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, stream);
-                if ( purged_connection ) {
-                    debug(requests) tracef("closing purged connection %s", purged_connection);
-                    purged_connection.close();
-                }
-            }
-            return stream;
-        }
-
         NetworkStream stream;
-        URI   uri; // this URI will be used temporarry if we need proxy
-        string actual_proxy = select_proxy(_uri.scheme);
-        final switch (_uri.scheme) {
-            case "http":
-            if ( actual_proxy ) {
-                uri.uri_parse(actual_proxy);
-                uri.idn_encode();
-            } else {
-                // use original uri
-                uri = _uri;
-            }
-            stream = new TCPStream();
-            stream.bind(_bind);
-            stream.connect(uri.host, uri.port, _timeout);
-            break;
-            case "https":
-            if ( actual_proxy ) {
-                uri.uri_parse(actual_proxy);
-                uri.idn_encode();
+
+        if ( _socketFactory )
+        {
+            debug(requests) tracef("use socketFactory");
+            stream = _socketFactory(_uri.scheme, _uri.host, _uri.port);
+        }
+        else
+        {
+            URI   uri; // this URI will be used temporarry if we need proxy
+            string actual_proxy = select_proxy(_uri.scheme);
+            final switch (_uri.scheme) {
+                case"http":
+                if ( actual_proxy ) {
+                    uri.uri_parse(actual_proxy);
+                    uri.idn_encode();
+                } else {
+                    // use original uri
+                    uri = _uri;
+                }
                 stream = new TCPStream();
                 stream.bind(_bind);
                 stream.connect(uri.host, uri.port, _timeout);
-                if ( verbosity>=1 ) {
-                    writeln("> CONNECT %s:%d HTTP/1.1".format(_uri.host, _uri.port));
-                }
-                stream.send("CONNECT %s:%d HTTP/1.1\r\n\r\n".format(_uri.host, _uri.port));
-                while ( stream.isConnected ) {
-                    ubyte[1024] b;
-                    auto read = stream.receive(b);
-                    if ( verbosity>=1) {
-                        writefln("< %s", cast(string)b[0..read]);
+                break ;
+                case"https":
+                if ( actual_proxy ) {
+                    uri.uri_parse(actual_proxy);
+                    uri.idn_encode();
+                    stream = new TCPStream();
+                    stream.bind(_bind);
+                    stream.connect(uri.host, uri.port, _timeout);
+                    if ( verbosity>=1 ) {
+                        writeln("> CONNECT %s:%d HTTP/1.1".format(_uri.host, _uri.port));
                     }
-                    debug(requests) tracef("read: %d", read);
-                    if ( b[0..read].canFind("\r\n\r\n") || b[0..read].canFind("\n\n") ) {
-                        debug(requests) tracef("proxy connection ready");
-                        // convert connection to ssl
-                        stream = new SSLStream(stream, _sslOptions, _uri.host);
-                        break;
-                    } else {
-                        debug(requests) tracef("still wait for proxy connection");
+                    stream.send("CONNECT %s:%d HTTP/1.1\r\n\r\n".format(_uri.host, _uri.port));
+                    while ( stream.isConnected ) {
+                        ubyte[1024] b;
+                        auto read = stream.receive(b);
+                        if ( verbosity>=1) {
+                            writefln("< %s", cast(string)b[0..read]);
+                        }
+                        debug(requests) tracef("read: %d", read);
+                        if ( b[0..read].canFind("\r\n\r\n") || b[0..read].canFind("\n\n") ) {
+                            debug(requests) tracef("proxy connection ready");
+                            // convert connection to ssl
+                            stream = new SSLStream(stream, _sslOptions, _uri.host);
+                            break ;
+                        } else {
+                            debug(requests) tracef("still wait for proxy connection");
+                        }
                     }
+                } else {
+                    uri = _uri;
+                    stream = new SSLStream(_sslOptions);
+                    stream.bind(_bind);
+                    stream.connect(uri.host, uri.port, _timeout);
+                    debug(requests) tracef("ssl connection to origin server ready");
                 }
-            } else {
-                uri = _uri;
-                stream = new SSLStream(_sslOptions);
-                stream.bind(_bind);
-                stream.connect(uri.host, uri.port, _timeout);
-                debug(requests) tracef("ssl connection to origin server ready");
+                break ;
             }
-            break;
         }
 
         if ( stream ) {

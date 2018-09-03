@@ -796,7 +796,15 @@ public struct HTTPRequest {
 
         if ( _socketFactory ) {
             debug(requests) tracef("use socketFactory");
-            return _socketFactory(_uri.scheme, _uri.host, _uri.port);
+            NetworkStream stream = _socketFactory(_uri.scheme, _uri.host, _uri.port);
+            if ( stream ) {
+                auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, stream);
+                if ( purged_connection ) {
+                    debug(requests) tracef("closing purged connection %s", purged_connection);
+                    purged_connection.close();
+                }
+            }
+            return stream;
         }
 
         NetworkStream stream;

@@ -381,7 +381,7 @@ Here is a short description of some `Request` options you can set:
 
 *) Throws exception when limit is reached.
 
-**) It provided - each time `Request` need new connection it will call factory to create instance of NetworkStream.
+**) If provided - each time `Request` need new connection it will call factory to create instance of NetworkStream.
 This way you can implement (outside of this library) lot of useful things: various proxies, unix-socket connections, etc.
 
 `Request` properties that are read-only:

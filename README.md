@@ -377,9 +377,12 @@ Here is a short description of some `Request` options you can set:
 | cookie              | `Cookie[]`       | cookies you will send to server         | null       |
 | authenticator       | `Auth`           | authenticatior                          | null       |
 | bind                | `string`         | use local address whan connect          | null       |
+| socketFactory**)    | (see below)      | user-provided connection factory        | null       |
 
 *) Throws exception when limit is reached.
 
+**) It provided - each time `Request` need new connection it will call factory to create instance of NetworkStream.
+This way you can implement (outside of this library) lot of useful things: various proxies, unix-socket connections, etc.
 
 `Request` properties that are read-only:
 

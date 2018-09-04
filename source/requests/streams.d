@@ -16,6 +16,7 @@ import std.zlib;
 import std.datetime;
 import std.socket;
 import core.stdc.errno;
+import core.stdc.string;
 
 import requests.ssl_adapter : openssl, SSL, SSL_CTX;
 
@@ -1042,26 +1043,27 @@ public abstract class SocketStream : NetworkStream {
         return rc;
     }
 
-    ptrdiff_t receive(void[] buff) @safe {
+    ptrdiff_t receive(void[] buff) {
         while (true) {
             auto r = s.receive(buff);
             if (r < 0) {
+                auto e = errno;
                 version(Windows) {
                     close();
-                    if ( errno == 0 ) {
+                    if ( e == 0 ) {
                         throw new TimeoutException("Timeout receiving data");
                     }
-                    throw new NetworkException("receiving data");
+                    throw new NetworkException("Unexpected error %s while receiving data".format(to!string(strerror(errno))));
                 }
                 version(Posix) {
-                    if ( errno == EINTR ) {
+                    if ( e == EINTR ) {
                         continue;
                     }
                     close();
-                    if ( errno == EAGAIN ) {
+                    if ( e == EAGAIN ) {
                         throw new TimeoutException("Timeout receiving data");
                     }
-                    throw new NetworkException("receiving data");
+                    throw new NetworkException("Unexpected error %s while receiving data".format(to!string(strerror(errno))));
                 }
             }
             else {

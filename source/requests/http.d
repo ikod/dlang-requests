@@ -795,17 +795,36 @@ public struct HTTPRequest {
         debug(requests) tracef("Set up new connection");
         NetworkStream stream;
 
+        // on exit
+        // place created connection to conn. manager
+        // close connection purged from manager (if any)
+        //
+        scope(exit) {
+            if ( stream )
+            {
+                if ( auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, stream) )
+                {
+                    debug(requests) tracef("closing purged connection %s", purged_connection);
+                    purged_connection.close();
+                }
+            }
+        }
+
         if ( _socketFactory )
         {
             debug(requests) tracef("use socketFactory");
             stream = _socketFactory(_uri.scheme, _uri.host, _uri.port);
         }
-        else
+
+        if ( stream ) // socket factory created connection
         {
-            URI   uri; // this URI will be used temporarry if we need proxy
-            string actual_proxy = select_proxy(_uri.scheme);
-            final switch (_uri.scheme) {
-                case"http":
+            return stream;
+        }
+
+        URI   uri; // this URI will be used temporarry if we need proxy
+        string actual_proxy = select_proxy(_uri.scheme);
+        final switch (_uri.scheme) {
+            case"http":
                 if ( actual_proxy ) {
                     uri.uri_parse(actual_proxy);
                     uri.idn_encode();
@@ -817,7 +836,7 @@ public struct HTTPRequest {
                 stream.bind(_bind);
                 stream.connect(uri.host, uri.port, _timeout);
                 break ;
-                case"https":
+            case"https":
                 if ( actual_proxy ) {
                     uri.uri_parse(actual_proxy);
                     uri.idn_encode();
@@ -852,15 +871,6 @@ public struct HTTPRequest {
                     debug(requests) tracef("ssl connection to origin server ready");
                 }
                 break ;
-            }
-        }
-
-        if ( stream ) {
-            auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, stream);
-            if ( purged_connection ) {
-                debug(requests) tracef("closing purged connection %s", purged_connection);
-                purged_connection.close();
-            }
         }
 
         return stream;

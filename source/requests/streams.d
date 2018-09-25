@@ -856,6 +856,7 @@ else {
             this.host = host;
             auto osock = ostream.so();
             underlyingSocket = osock;
+            osock.setOption(SocketOptionLevel.TCP, SocketOption.TCP_NODELAY, 1);
             auto ss = new OpenSslSocket(osock.handle, osock.addressFamily, _sslOptions);
             ssl = ss.ssl;
             if ( host !is null ) {
@@ -886,6 +887,7 @@ else {
                 openssl.SSL_set_tlsext_host_name(ssl, toStringz(host));
             }
             s = ss;
+            s.setOption(SocketOptionLevel.TCP, SocketOption.TCP_NODELAY, 1);
             __isOpen = true;
         }
         override SocketStream connect(string h, ushort p, Duration timeout = 10.seconds) {

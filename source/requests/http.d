@@ -1452,7 +1452,9 @@ public struct HTTPRequest {
                 }
             }
             _response._requestSentAt = Clock.currTime;
+            debug(requests) trace("starting receive response");
             receiveResponse(_stream);
+            debug(requests) trace("finished receive response");
             _response._finishedAt = Clock.currTime;
         } catch (NetworkException e) {
             _stream.close();

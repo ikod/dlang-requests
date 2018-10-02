@@ -335,7 +335,6 @@ public struct HTTPRequest {
         size_t         _bufferSize = defaultBufferSize; // 16k
         bool           _useStreaming;                   // return iterator instead of completed request
 
-        string[URI]     _permanent_redirects;            // cache 301 redirects for GET requests
         HTTPResponse[] _history;                        // redirects history
         DataPipe!ubyte _bodyDecoder;
         DecodeChunked  _unChunker;
@@ -346,6 +345,7 @@ public struct HTTPRequest {
         string         _bind;
         _UH            _userHeaders;
         ConnManager    _cm;
+        string[URI]   _permanent_redirects;            // cache 301 redirects for GET requests
         NetStrFactory  _socketFactory;
     }
     package HTTPResponse   _response;
@@ -1809,6 +1809,12 @@ public struct HTTPRequest {
     ///
     HTTPResponse post(A...)(string uri, A args) {
         return exec!"POST"(uri, args);
+    }
+    import requests.request;
+    HTTPResponse execute(Request r)
+    {
+        debug(requests) trace("serving %s".format(r));
+        return new HTTPResponse();
     }
 }
 

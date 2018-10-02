@@ -7,10 +7,12 @@ import requests.uri;
 
 import std.datetime;
 import std.conv;
+import std.range;
 import std.experimental.logger;
 import std.format;
-import requests.utils;
 
+import requests.utils;
+import requests.connmanager;
 
 /**
    This is simplest interface to both http and ftp protocols.
@@ -19,10 +21,15 @@ import requests.utils;
 */
 public struct Request {
     private {
-        URI         _uri;
-        HTTPRequest _http;  // route all http/https requests here
-        FTPRequest  _ftp;   // route all ftp requests here
-        string      _method;
+        URI           _uri;
+        string        _method;
+        QueryParam[]  _params;
+        
+        ConnManager   _cm;
+        string[URI]   _permanent_redirects;            // cache 301 redirects for GET requests
+
+        HTTPRequest   _http;  // route all http/https requests here
+        FTPRequest    _ftp;   // route all ftp requests here
     }
     /// Set timeout on connection and IO operation.
     /// $(B v) - timeout value
@@ -339,6 +346,72 @@ public struct Request {
         _http.uri = _uri;
         return _http.exec!(method)(null, args);
     }
+
+    /////////////////////////////////////////////////////////////////////
+    private Interceptor[] _interceptors;
+
+    void addInterceptor(Interceptor i)
+    {
+        _interceptors ~= i;
+    }
+    interface Interceptor {
+        Response opCall(Request r, RequestHandler next);
+    }
+    class RequestHandler {
+        private Interceptor[] _interceptors;
+        this(Interceptor[] i)
+        {
+            _interceptors = i;
+        }
+        Response handle(Request r)
+        {
+            auto i = _interceptors.front();
+            _interceptors.popFront();
+            return i(r, this);
+        }
+    }
+    class LastInterceptor : Interceptor
+    {
+        Response opCall(Request r, RequestHandler _)
+        {
+            HTTPRequest http;
+            return http.execute(r);
+        }
+    }
+    Response execute(string method, string url, string[string] query)
+    {
+        return execute(method, url, aa2params(query));
+    }
+
+    Response execute(string method, string url, QueryParam[] params = null)
+    {
+        _method = method;
+        _uri = URI(url);
+        _uri.idn_encode();
+        _params = params;
+        auto interceptors = _interceptors ~ new LastInterceptor();
+        auto handler = new RequestHandler(interceptors);
+        return handler.handle(this);
+    }
+    unittest {
+        info("testing Request");
+        class LogInterceptor : Interceptor {
+            Response opCall(Request r, RequestHandler next)
+            {
+                info("interceptor enter");
+                auto rs = next.handle(r);
+                info("interceptor leaved, rs = %s".format(rs));
+                return rs;
+            }
+        }
+        globalLogLevel = LogLevel.trace;
+        Request rq;
+        Response rs;
+        rq.addInterceptor(new LogInterceptor());
+        rs = rq.execute("GET", "http://google.com");
+        globalLogLevel = LogLevel.trace;
+    }
+    ///////////////////////////////////////////////////////////////////////
 
     string toString() const {
         return "Request(%s, %s)".format(_method, _uri.uri());

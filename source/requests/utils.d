@@ -5,6 +5,8 @@ import std.string;
 import std.datetime;
 import std.algorithm.sorting;
 import std.experimental.logger;
+import std.typecons;
+import std.algorithm;
 //import requests.streams;
 
 __gshared immutable short[string] standard_ports;
@@ -202,8 +204,11 @@ package unittest {
     assert(urlDecode("a+bc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D") == `a bc !#$&'()*+,/:;=?@[]`);
 }
 
-import std.typecons;
 
 public alias Cookie     = Tuple!(string, "path", string, "domain", string, "attr", string, "value");
 public alias QueryParam = Tuple!(string, "key", string, "value");
 
+QueryParam[] aa2params(string[string] aa)
+{
+    return aa.byKeyValue.map!(p => QueryParam(p.key, p.value)).array;
+}

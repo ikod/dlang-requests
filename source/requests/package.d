@@ -129,6 +129,7 @@ package unittest {
         }
     }
     // associative array
+    info("Check POST from AA");
     rs = rq.post(httpbinUrl ~ "post", ["a":"b ", "c":"d"]);
     assert(rs.code==200);
     auto form = parseJSON(cast(string)rs.responseBody.data).object["form"].object;
@@ -248,13 +249,15 @@ package unittest {
     ///
     /// posting query parameters using "application/x-www-form-urlencoded"
     info("Test postContent using query params");
-    postContent(httpbinUrl ~ "post", queryParams("first", "a", "second", 2));
+    r = postContent(httpbinUrl ~ "post", queryParams("first", "a", "second", 2));
+    assert(parseJSON(cast(string)r).object["form"].object["first"].str == "a");
     
     /// posting using multipart/form-data (large data and files). See docs fot HTTPRequest
     info("Test postContent form");
     MultipartForm mpform;
     mpform.add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
-    postContent(httpbinUrl ~ "post", mpform);
+    r = postContent(httpbinUrl ~ "post", mpform);
+    assert(parseJSON(cast(string)r).object["form"].object["greeting"].str == "hello");
     
     /// you can do this using Request struct to access response details
     info("Test postContent form via Request()");
@@ -262,7 +265,8 @@ package unittest {
     mpform = MultipartForm().add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
     rs = rq.post(httpbinUrl ~ "post", mpform);
     assert(rs.code == 200);
-    
+    assert(parseJSON(cast(string)(rs.responseBody().data)).object["form"].object["greeting"].str == "hello");
+
     info("Test receiveAsRange with POST");
     streamedContent.length = 0;
     rq = Request();
@@ -278,6 +282,23 @@ package unittest {
     rq = Request();
     rs = rq.post(httpbinUrl ~ "post", s.representation, "application/octet-stream");
     assert(streamedContent == rs.responseBody.data);
+
+    streamedContent.length = 0;
+    rq = Request();
+    rq.useStreaming = true;
+    rq.bufferSize = 16;
+    mpform = MultipartForm().add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
+    rs = rq.post(httpbinUrl ~ "post", mpform);
+    stream = rs.receiveAsRange();
+    while( !stream.empty() ) {
+        streamedContent ~= stream.front;
+        stream.popFront();
+    }
+    rq = Request();
+    mpform = MultipartForm().add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
+    rs = rq.post(httpbinUrl ~ "post", mpform);
+    assert(parseJSON(cast(string)(rs.responseBody().data)).object["form"].object["greeting"].str ==
+           parseJSON(cast(string)streamedContent).object["form"].object["greeting"].str);
 
 
     info("Test POST'ing from Rank(2) range with user-provided Content-Length");

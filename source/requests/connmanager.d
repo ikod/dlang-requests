@@ -16,21 +16,25 @@ import requests.streams;
 ///
 /// Evict least used
 ///
-package class ConnManager {
+package struct ConnManager {
     package alias  CMKey = Tuple!(string, string, ushort);
     package struct CMValue {
         NetworkStream   stream;
         SysTime         timestamp;
     }
     private {
-        ubyte            _limit;
+        int              _limit = 10;
         CMValue[CMKey]   _cache;
     }
-    this(ubyte limit = 10) {
+    this(int limit) {
         _limit = limit;
     }
     ~this() {
-        enforce!Exception(_cache.length == 0, "You must clear connManager before it GC-ed");
+        //assert(0);
+        clear();
+    }
+    @property auto length() {
+        return _cache.length;
     }
     ///
     /// evict oldest connection
@@ -108,7 +112,7 @@ package class ConnManager {
 
 unittest {
     globalLogLevel = LogLevel.info;
-    ConnManager cm = new ConnManager(2);
+    ConnManager cm = ConnManager(2);
     auto s0 = new TCPStream();
     auto s1 = new TCPStream();
     auto s2 = new TCPStream();

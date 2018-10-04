@@ -434,7 +434,7 @@ Pool!R pool(R)(R r, uint w) {
     return Pool!R(r, w);
 }
 
-unittest {
+version(None) unittest {
 
     version(vibeD) {
         string httpbinurl = "http://httpbin.org";
@@ -447,6 +447,7 @@ unittest {
             server.stop();
         }
         Thread.sleep(1.seconds);
+        globalLogLevel = LogLevel.trace;
         string httpbinurl = "http://127.0.0.1:8081";
         Job[] jobs = [
             Job(httpbinurl ~ "/get").addHeaders([

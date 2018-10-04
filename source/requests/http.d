@@ -24,7 +24,6 @@ import requests.base;
 import requests.connmanager;
 
 static immutable ushort[] redirectCodes = [301, 302, 303, 307, 308];
-static immutable uint     defaultBufferSize = 12*1024;
 enum   HTTP11 = 101;
 enum   HTTP10 = 100;
 
@@ -163,130 +162,6 @@ public class HTTPResponse : Response {
         assert(r.parse_version("HTTP/xxx") == 0);
     }
 }
-/**
- * Struct to send multiple files in POST request.
- */
-public struct PostFile {
-    /// Path to the file to send.
-    string fileName;
-    /// Name of the field (if empty - send file base name)
-    string fieldName;
-    /// contentType of the file if not empty
-    string contentType;
-}
-///
-/// This is File-like interface for sending data to multipart fotms
-///
-public interface FiniteReadable {
-    /// size of the content
-    abstract ulong  getSize();
-    /// file-like read()
-    abstract ubyte[] read();
-}
-///
-/// Helper to create form elements from File.
-/// Params:
-/// name = name of the field in form
-/// f = opened std.stio.File to send to server
-/// parameters = optional parameters (most important are "filename" and "Content-Type")
-///
-public auto formData(string name, File f, string[string] parameters = null) {
-    return MultipartForm.FormData(name, new FormDataFile(f), parameters);
-}
-///
-/// Helper to create form elements from ubyte[].
-/// Params:
-/// name = name of the field in form
-/// b = data to send to server
-/// parameters = optional parameters (can be "filename" and "Content-Type")
-///
-public auto formData(string name, ubyte[] b, string[string] parameters = null) {
-    return MultipartForm.FormData(name, new FormDataBytes(b), parameters);
-}
-public auto formData(string name, string b, string[string] parameters = null) {
-    return MultipartForm.FormData(name, new FormDataBytes(b.dup.representation), parameters);
-}
-public class FormDataBytes : FiniteReadable {
-    private {
-        ulong   _size;
-        ubyte[] _data;
-        size_t  _offset;
-        bool    _exhausted;
-    }
-    this(ubyte[] data) {
-        _data = data;
-        _size = data.length;
-    }
-    final override ulong getSize() {
-        return _size;
-    }
-    final override ubyte[] read() {
-        enforce( !_exhausted, "You can't read froum exhausted source" );
-        size_t toRead = min(defaultBufferSize, _size - _offset);
-        auto result = _data[_offset.._offset+toRead];
-        _offset += toRead;
-        if ( toRead == 0 ) {
-            _exhausted = true;
-        }
-        return result;
-    }
-}
-public class FormDataFile : FiniteReadable {
-    import  std.file;
-    private {
-        File    _fileHandle;
-        ulong   _fileSize;
-        size_t  _processed;
-        bool    _exhausted;
-    }
-    this(File file) {
-        import std.file;
-        _fileHandle = file;
-        _fileSize = std.file.getSize(file.name);
-    }
-    final override ulong getSize() pure nothrow @safe {
-        return _fileSize;
-    }
-    final override ubyte[] read() {
-        enforce( !_exhausted, "You can't read froum exhausted source" );
-        auto b = new ubyte[defaultBufferSize];
-        auto r = _fileHandle.rawRead(b);
-        auto toRead = min(r.length, _fileSize - _processed);
-        if ( toRead == 0 ) {
-            _exhausted = true;
-        }
-        _processed += toRead;
-        return r[0..toRead];
-    }
-}
-///
-/// This struct used to bulld POST's to forms.
-/// Each part have name and data. data is something that can be read-ed and have size.
-/// For example this can be string-like object (wrapped for reading) or opened File.
-///
-public struct MultipartForm {
-    package struct FormData {
-        FiniteReadable  input;
-        string          name;
-        string[string]  parameters;
-        this(string name, FiniteReadable i, string[string] parameters = null) {
-            this.input = i;
-            this.name = name;
-            this.parameters = parameters;
-        }
-    }
-
-    private FormData[] _sources;
-    auto add(FormData d) {
-        _sources ~= d;
-        return this;
-    }
-    auto add(string name, FiniteReadable i, string[string]parameters = null) {
-        _sources ~= FormData(name, i, parameters);
-        return this;
-    }
-}
-///
 
 ///
 /// Request.
@@ -332,7 +207,7 @@ public struct HTTPRequest {
         string         _proxy;
         uint           _verbosity = 0;                  // 0 - no output, 1 - headers, 2 - headers+body info
         Duration       _timeout = 30.seconds;
-        size_t         _bufferSize = defaultBufferSize; // 16k
+        size_t         _bufferSize = 16*1024; // 16k
         bool           _useStreaming;                   // return iterator instead of completed request
 
         HTTPResponse[] _history;                        // redirects history
@@ -344,9 +219,14 @@ public struct HTTPRequest {
         SSLOptions     _sslOptions;
         string         _bind;
         _UH            _userHeaders;
-        ConnManager    _cm;
-        string[URI]   _permanent_redirects;            // cache 301 redirects for GET requests
+
+        RefCounted!ConnManager      _cm;
+        string[URI]                 _permanent_redirects;            // cache 301 redirects for GET requests
+        MultipartForm               _multipartForm;
+
         NetStrFactory  _socketFactory;
+        
+        QueryParam[]    _params;
     }
     package HTTPResponse   _response;
 
@@ -394,7 +274,7 @@ public struct HTTPRequest {
 
     this(string uri) {
         _uri = URI(uri);
-        _cm = new ConnManager;
+        _cm = ConnManager(10);
     }
     ~this() {
         _headers = null;
@@ -402,9 +282,9 @@ public struct HTTPRequest {
         _history = null;
         _bodyDecoder = null;
         _unChunker = null;
-        if ( _cm ) {
-            _cm.clear();
-        }
+        //if ( _cm ) {
+        //    _cm.clear();
+        //}
     }
     string toString() const {
         return "HTTPRequest(%s, %s)".format(_method, _uri.uri());
@@ -961,26 +841,33 @@ public struct HTTPRequest {
             if ( _useStreaming && _response._responseBody.length && !redirectCodes.canFind(_response.code) ) {
                 debug(requests) trace("streaming requested");
                 // save _stream in closure
-                auto stream = _stream;
+                auto __stream = _stream;
+                auto __bodyDecoder = _bodyDecoder;
+                auto __unChunker = _unChunker;
+                auto __contentReceived = _contentReceived;
+                auto __contentLength = _contentLength;
+                auto __bufferSize = _bufferSize;
+
                 // set up response
                 _response.receiveAsRange.activated = true;
                 _response.receiveAsRange.data = _response._responseBody.data;
+                debug(requests) tracef("data length at the sreaming beginnig %d", _response._receiveAsRange.data.length);
                 _response.receiveAsRange.read = delegate ubyte[] () {
 
                     while(true) {
                         // check if we received everything we need
-                        if ( ( _unChunker && _unChunker.done )
-                            || !stream.isConnected()
-                            || (_contentLength > 0 && _contentReceived >= _contentLength) )
+                        if ( ( __unChunker && __unChunker.done )
+                            || !__stream.isConnected()
+                            || (__contentLength > 0 && __contentReceived >= __contentLength) )
                         {
                             debug(requests) trace("streaming_in receive completed");
-                            _bodyDecoder.flush();
-                            return _bodyDecoder.get();
+                            __bodyDecoder.flush();
+                            return __bodyDecoder.get();
                         }
                         // have to continue
-                        auto b = new ubyte[_bufferSize];
+                        auto b = new ubyte[__bufferSize];
                         try {
-                            read = stream.receive(b);
+                            read = __stream.receive(b);
                         }
                         catch (Exception e) {
                             throw new RequestException("streaming_in error reading from socket", __FILE__, __LINE__, e);
@@ -989,17 +876,17 @@ public struct HTTPRequest {
 
                         if ( read == 0 ) {
                             debug(requests) tracef("streaming_in: server closed connection");
-                            _bodyDecoder.flush();
-                            return _bodyDecoder.get();
+                            __bodyDecoder.flush();
+                            return __bodyDecoder.get();
                         }
 
                         if ( verbosity>=3 ) {
                             writeln(b[0..read].dump.join("\n"));
                         }
 
-                        _contentReceived += read;
-                        _bodyDecoder.putNoCopy(b[0..read]);
-                        auto res = _bodyDecoder.getNoCopy();
+                        __contentReceived += read;
+                        __bodyDecoder.putNoCopy(b[0..read]);
+                        auto res = __bodyDecoder.getNoCopy();
                         if ( res.length == 0 ) {
                             // there were nothing to produce (beginning of the chunk or no decompressed data)
                             continue;
@@ -1115,9 +1002,9 @@ public struct HTTPRequest {
         import std.file;
 
         checkURL(url);
-        if ( _cm is null ) {
-            _cm = new ConnManager();
-        }
+        //if ( _cm is null ) {
+        //    _cm = new ConnManager();
+        //}
 
         NetworkStream _stream;
         _method = method;
@@ -1361,9 +1248,9 @@ public struct HTTPRequest {
         debug(requests) tracef("started url=%s, this._uri=%s", url, _uri);
 
         checkURL(url);
-        if ( _cm is null ) {
-            _cm = new ConnManager();
-        }
+        //if ( _cm is null ) {
+        //    _cm = new ConnManager();
+        //}
 
         NetworkStream _stream;
         _method = method;
@@ -1557,9 +1444,9 @@ public struct HTTPRequest {
         debug(requests) tracef("started url=%s, this._uri=%s", url, _uri);
 
         checkURL(url);
-        if ( _cm is null ) {
-            _cm = new ConnManager();
-        }
+        //if ( _cm is null ) {
+        //    _cm = new ConnManager();
+        //}
 
         NetworkStream _stream;
         _method = method;
@@ -1810,12 +1697,422 @@ public struct HTTPRequest {
     HTTPResponse post(A...)(string uri, A args) {
         return exec!"POST"(uri, args);
     }
+    // XXX interceptors
     import requests.request;
+    HTTPResponse exec_from_multipart_form(Request r) {
+        import std.uuid;
+        import std.file;
+
+        _method = r.method;
+        _uri = r.uri;
+        _params = r.params;
+        _useStreaming = r.useStreaming;
+        _cm = r.cm;
+        _permanent_redirects = r.permanent_redirects;
+        _maxRedirects = r.maxRedirects;
+        _authenticator = r.authenticator;
+        _maxHeadersLength = r.maxHeadersLength;
+        _maxContentLength = r.maxContentLength;
+        _verbosity = r.verbosity;
+        _multipartForm = r.multipartForm;
+
+        infof("exec from multipart form request: %s", r);
+
+        NetworkStream _stream;
+        _response = new HTTPResponse;
+        _response.uri = _uri;
+        _response.finalURI = _uri;
+        bool restartedRequest = false;
+
+    connect:
+        _contentReceived = 0;
+        _response._startedAt = Clock.currTime;
+
+        assert(_stream is null);
+
+        _stream = _cm.get(_uri.scheme, _uri.host, _uri.port);
+
+        if ( _stream is null ) {
+            debug(requests) trace("create new connection");
+            _stream = setupConnection();
+        } else {
+            debug(requests) trace("reuse old connection");
+        }
+
+        assert(_stream !is null);
+
+        if ( !_stream.isConnected ) {
+            debug(requests) trace("disconnected stream on enter");
+            if ( !restartedRequest ) {
+                debug(requests) trace("disconnected stream on enter: retry");
+                assert(_cm.get(_uri.scheme, _uri.host, _uri.port) == _stream);
+
+                _cm.del(_uri.scheme, _uri.host, _uri.port);
+                _stream.close();
+                _stream = null;
+
+                restartedRequest = true;
+                goto connect;
+            }
+            debug(requests) trace("disconnected stream on enter: return response");
+            //_stream = null;
+            return _response;
+        }
+        _response._connectedAt = Clock.currTime;
+
+        Appender!string req;
+        req.put(requestString());
+
+        string   boundary = randomUUID().toString;
+        string[] partHeaders;
+        size_t   contentLength;
+
+        foreach(ref part; _multipartForm._sources) {
+            string h = "--" ~ boundary ~ "\r\n";
+            string disposition = `form-data; name="%s"`.format(part.name);
+            string optionals = part.
+            parameters.byKeyValue().
+            filter!(p => p.key!="Content-Type").
+            map!   (p => "%s=%s".format(p.key, p.value)).
+            join("; ");
+
+            h ~= `Content-Disposition: ` ~ [disposition, optionals].join("; ") ~ "\r\n";
+
+            auto contentType = "Content-Type" in part.parameters;
+            if ( contentType ) {
+                h ~= "Content-Type: " ~ *contentType ~ "\r\n";
+            }
+
+            h ~= "\r\n";
+            partHeaders ~= h;
+            contentLength += h.length + part.input.getSize() + "\r\n".length;
+        }
+        contentLength += "--".length + boundary.length + "--\r\n".length;
+
+        auto h = requestHeaders();
+        safeSetHeader(h, _userHeaders.ContentType, "Content-Type", "multipart/form-data; boundary=" ~ boundary);
+        safeSetHeader(h, _userHeaders.ContentLength, "Content-Length", to!string(contentLength));
+
+        h.byKeyValue.
+        map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
+        each!(h => req.put(h));
+        req.put("\r\n");
+
+        debug(requests) trace(req.data);
+        if ( _verbosity >= 1 ) req.data.splitLines.each!(a => writeln("> " ~ a));
+
+        try {
+            _stream.send(req.data());
+            foreach(ref source; _multipartForm._sources) {
+                debug(requests) tracef("sending part headers <%s>", partHeaders.front);
+                _stream.send(partHeaders.front);
+                partHeaders.popFront;
+                while (true) {
+                    auto chunk = source.input.read();
+                    if ( chunk.length <= 0 ) {
+                        break;
+                    }
+                    _stream.send(chunk);
+                }
+                _stream.send("\r\n");
+            }
+            _stream.send("--" ~ boundary ~ "--\r\n");
+            _response._requestSentAt = Clock.currTime;
+            receiveResponse(_stream);
+            _response._finishedAt = Clock.currTime;
+        }
+        catch (NetworkException e) {
+            errorf("Error sending request: ", e.msg);
+            _stream.close();
+            return _response;
+        }
+
+        if ( serverPrematurelyClosedConnection()
+        && !restartedRequest
+        && isIdempotent(_method)
+        ) {
+            ///
+            /// We didn't receive any data (keepalive connectioin closed?)
+            /// and we can restart this request.
+            /// Go ahead.
+            ///
+            debug(requests) tracef("Server closed keepalive connection");
+
+            assert(_cm.get(_uri.scheme, _uri.host, _uri.port) == _stream);
+
+            _cm.del(_uri.scheme, _uri.host, _uri.port);
+            _stream.close();
+            _stream = null;
+
+            restartedRequest = true;
+            goto connect;
+        }
+
+        if ( _useStreaming ) {
+            if ( _response._receiveAsRange.activated ) {
+                debug(requests) trace("streaming_in activated");
+                return _response;
+            } else {
+                // this can happen if whole response body received together with headers
+                _response._receiveAsRange.data = _response.responseBody.data;
+            }
+        }
+
+        close_connection_if_not_keepalive(_stream);
+
+        if ( _verbosity >= 1 ) {
+            writeln(">> Connect time: ", _response._connectedAt - _response._startedAt);
+            writeln(">> Request send time: ", _response._requestSentAt - _response._connectedAt);
+            writeln(">> Response recv time: ", _response._finishedAt - _response._requestSentAt);
+        }
+
+        if ( willFollowRedirect ) {
+            if ( _history.length >= _maxRedirects ) {
+                _stream = null;
+                throw new MaxRedirectsException("%d redirects reached maxRedirects %d.".format(_history.length, _maxRedirects));
+            }
+            // "location" in response already checked in canFollowRedirect
+            immutable new_location = *("location" in _response.responseHeaders);
+            immutable current_uri = _uri;
+            immutable next_uri = uriFromLocation(_uri, new_location);
+
+            // save current response for history
+            _history ~= _response;
+
+            // prepare new response (for redirected request)
+            _response = new HTTPResponse;
+            _response.uri = current_uri;
+            _response.finalURI = next_uri;
+            _stream = null;
+
+            // set new uri
+            this._uri = next_uri;
+            debug(requests) tracef("Redirected to %s", next_uri);
+            if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
+                // 307 and 308 do not change method
+                return this.get(new_location);
+            }
+            if ( restartedRequest ) {
+                debug(requests) trace("Rare event: clearing 'restartedRequest' on redirect");
+                restartedRequest = false;
+            }
+            goto connect;
+        }
+
+        _response._history = _history;
+        return _response;
+    }
+
+    HTTPResponse exec_from_parameters(Request r) {
+        _method = r.method;
+        _uri = r.uri;
+        _params = r.params;
+        _useStreaming = r.useStreaming;
+        _cm = r.cm;
+        _permanent_redirects = r.permanent_redirects;
+        _maxRedirects = r.maxRedirects;
+        _authenticator = r.authenticator;
+        _maxHeadersLength = r.maxHeadersLength;
+        _maxContentLength = r.maxContentLength;
+        _verbosity = r.verbosity;
+
+        infof("exec from parameters request: %s", r);
+        assert(_uri != URI.init);
+        NetworkStream _stream;
+        _response = new HTTPResponse;
+        _history.length = 0;
+        _response.uri = _uri;
+        _response.finalURI = _uri;
+        bool restartedRequest = false; // True if this is restarted keepAlive request
+
+    connect:
+        if ( _method == "GET" && _uri in _permanent_redirects ) {
+            debug(requests) trace("use parmanent redirects cache");
+            _uri = uriFromLocation(_uri, _permanent_redirects[_uri]);
+            _response._finalURI = _uri;
+        }
+        _contentReceived = 0;
+        _response._startedAt = Clock.currTime;
+
+        assert(_stream is null);
+
+        _stream = _cm.get(_uri.scheme, _uri.host, _uri.port);
+
+        if ( _stream is null ) {
+            debug(requests) trace("create new connection");
+            _stream = setupConnection();
+        } else {
+            debug(requests) trace("reuse old connection");
+        }
+
+        assert(_stream !is null);
+
+        if ( !_stream.isConnected ) {
+            debug(requests) trace("disconnected stream on enter");
+            if ( !restartedRequest ) {
+                debug(requests) trace("disconnected stream on enter: retry");
+                assert(_cm.get(_uri.scheme, _uri.host, _uri.port) == _stream);
+
+                _cm.del(_uri.scheme, _uri.host, _uri.port);
+                _stream.close();
+                _stream = null;
+
+                restartedRequest = true;
+                goto connect;
+            }
+            debug(requests) trace("disconnected stream on enter: return response");
+            //_stream = null;
+            return _response;
+        }
+        _response._connectedAt = Clock.currTime;
+
+        auto h = requestHeaders();
+
+        Appender!string req;
+
+        string encoded;
+
+        switch (_method) {
+            case "POST","PUT":
+                encoded = params2query(_params);
+                safeSetHeader(h, _userHeaders.ContentType, "Content-Type", "application/x-www-form-urlencoded");
+                if ( encoded.length > 0) {
+                    safeSetHeader(h, _userHeaders.ContentLength, "Content-Length", to!string(encoded.length));
+                }
+                req.put(requestString());
+                break;
+            default:
+                req.put(requestString(_params));
+        }
+
+        h.byKeyValue.
+        map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
+        each!(h => req.put(h));
+        req.put("\r\n");
+        if ( encoded ) {
+            req.put(encoded);
+        }
+
+        debug(requests) trace(req.data);
+        if ( _verbosity >= 1 ) {
+            req.data.splitLines.each!(a => writeln("> " ~ a));
+        }
+        //
+        // Now send request and receive response
+        //
+        try {
+            _stream.send(req.data());
+            _response._requestSentAt = Clock.currTime;
+            debug(requests) trace("starting receive response");
+            receiveResponse(_stream);
+            debug(requests) tracef("done receive response");
+            _response._finishedAt = Clock.currTime;
+        }
+        catch (NetworkException e) {
+            // On SEND this can means:
+            // we started to send request to the server, but it closed connection because of keepalive timeout.
+            // We have to restart request if possible.
+
+            // On RECEIVE - if we received something - then this exception is real and unexpected error.
+            // If we didn't receive anything - we can restart request again as it can be
+            debug(requests) tracef("Exception on receive response: %s", e.msg);
+            if ( _response._responseHeaders.length != 0 )
+            {
+                _stream.close();
+                throw new RequestException("Unexpected network error");
+            }
+        }
+
+        if ( serverPrematurelyClosedConnection()
+            && !restartedRequest
+            && isIdempotent(_method)
+            ) {
+            ///
+            /// We didn't receive any data (keepalive connectioin closed?)
+            /// and we can restart this request.
+            /// Go ahead.
+            ///
+            debug(requests) tracef("Server closed keepalive connection");
+
+            assert(_cm.get(_uri.scheme, _uri.host, _uri.port) == _stream);
+
+            _cm.del(_uri.scheme, _uri.host, _uri.port);
+            _stream.close();
+            _stream = null;
+
+            restartedRequest = true;
+            goto connect;
+        }
+
+        if ( _useStreaming ) {
+            if ( _response._receiveAsRange.activated ) {
+                debug(requests) trace("streaming_in activated");
+                return _response;
+            } else {
+                // this can happen if whole response body received together with headers
+                _response._receiveAsRange.data = _response.responseBody.data;
+            }
+        }
+
+        close_connection_if_not_keepalive(_stream);
+
+        if ( _verbosity >= 1 ) {
+            writeln(">> Connect time: ", _response._connectedAt - _response._startedAt);
+            writeln(">> Request send time: ", _response._requestSentAt - _response._connectedAt);
+            writeln(">> Response recv time: ", _response._finishedAt - _response._requestSentAt);
+        }
+
+        if ( willFollowRedirect ) {
+            debug(requests) trace("going to follow redirect");
+            if ( _history.length >= _maxRedirects ) {
+                _stream = null;
+                throw new MaxRedirectsException("%d redirects reached maxRedirects %d.".format(_history.length, _maxRedirects));
+            }
+            // "location" in response already checked in canFollowRedirect
+            immutable new_location = *("location" in _response.responseHeaders);
+            immutable current_uri = _uri;
+            immutable next_uri =    uriFromLocation(_uri, new_location);
+
+            if ( _method == "GET" && _response.code == 301 ) {
+                _permanent_redirects[_uri] = new_location;
+            }
+
+            // save current response for history
+            _history ~= _response;
+
+            // prepare new response (for redirected request)
+            _response = new HTTPResponse;
+            _response.uri = current_uri;
+            _response.finalURI = next_uri;
+            _stream = null;
+
+            // set new uri
+            _uri = next_uri;
+            debug(requests) tracef("Redirected to %s", next_uri);
+            if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
+                // 307 and 308 do not change method
+                return this.get(new_location);
+            }
+            if ( restartedRequest ) {
+                debug(requests) trace("Rare event: clearing 'restartedRequest' on redirect");
+                restartedRequest = false;
+            }
+            goto connect;
+        }
+
+        _response._history = _history;
+        return _response;
+    }
     HTTPResponse execute(Request r)
     {
         debug(requests) trace("serving %s".format(r));
-        return new HTTPResponse();
+        if ( r.hasMultipartForm )
+        {
+            return exec_from_multipart_form(r);
+        }
+        return exec_from_parameters(r);
     }
+    // XXX interceptors
 }
 
 version(vibeD) {

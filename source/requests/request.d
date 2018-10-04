@@ -10,6 +10,9 @@ import std.conv;
 import std.range;
 import std.experimental.logger;
 import std.format;
+import std.typecons;
+import std.stdio;
+import std.algorithm;
 
 import requests.utils;
 import requests.connmanager;
@@ -19,14 +22,36 @@ import requests.connmanager;
    Request has methods get, post and exec which routed to proper concrete handler (http or ftp, etc).
    To enable some protocol-specific featutes you have to use protocol interface directly (see docs for HTTPRequest or FTPRequest)
 */
+
+
+
+interface Interceptor {
+    Response opCall(Request r, RequestHandler next);
+}
+class RequestHandler {
+    private Interceptor[] _interceptors;
+    this(Interceptor[] i)
+    {
+        _interceptors = i;
+    }
+    Response handle(Request r)
+    {
+        auto i = _interceptors.front();
+        _interceptors.popFront();
+        return i(r, this);
+    }
+}
+
 public struct Request {
     private {
         URI           _uri;
         string        _method;
-        QueryParam[]  _params;
-        
-        ConnManager   _cm;
-        string[URI]   _permanent_redirects;            // cache 301 redirects for GET requests
+        bool          _useStreaming;
+        uint          _maxRedirects = 10;
+        Auth          _authenticator;
+        size_t         _maxHeadersLength = 32 * 1024;   // 32 KB
+        size_t         _maxContentLength;               // 0 - Unlimited
+        uint           _verbosity = 0;
 
         HTTPRequest   _http;  // route all http/https requests here
         FTPRequest    _ftp;   // route all ftp requests here
@@ -51,18 +76,30 @@ public struct Request {
     /// $(B v) - limit on redirect depth
     /// Throws $(B MaxRedirectsException) when limit is reached.
     @property void maxRedirects(uint v) pure @nogc nothrow {
-        _http.maxRedirects = v;
+        _maxRedirects = v;
+    }
+    @property auto maxRedirects() pure @nogc nothrow {
+        return _maxRedirects;
     }
     /// Set maximum content lenth both for http and ftp requests
     /// $(B v) - maximum content length in bytes. When limit reached - throws $(B RequestException)
     @property void maxContentLength(size_t v) pure @nogc nothrow {
-        _http.maxContentLength = v;
-        _ftp.maxContentLength = v;
+        _maxContentLength = v;
+        //_http.maxContentLength = v;
+        //_ftp.maxContentLength = v;
+    }
+    @property auto maxContentLength() pure @nogc nothrow {
+        return _maxContentLength;
+        //_http.maxContentLength = v;
+        //_ftp.maxContentLength = v;
     }
     /// Set maximum length for HTTP headers
     /// $(B v) - maximum length of the HTTP response. When limit reached - throws $(B RequestException)
     @property void maxHeadersLength(size_t v) pure @nogc nothrow {
-        _http.maxHeadersLength = v;
+        _maxHeadersLength = v;
+    }
+    @property auto maxHeadersLength() pure @nogc nothrow {
+        return _maxHeadersLength;
     }
     /// Set IO buffer size for http and ftp requests
     /// $(B v) - buffer size in bytes.
@@ -73,8 +110,12 @@ public struct Request {
     /// Set verbosity for HTTP or FTP requests.
     /// $(B v) - verbosity level (0 - no output, 1 - headers to stdout, 2 - headers and data hexdump to stdout). default = 0.
     @property void verbosity(uint v) {
+        _verbosity = v;
         _http.verbosity = v;
         _ftp.verbosity = v;
+    }
+    @property auto verbosity() {
+        return _verbosity;
     }
     /++ Set authenticator for http requests.
      +   $(B v) - Auth instance.
@@ -89,8 +130,12 @@ public struct Request {
      +   ---
      +/
     @property void authenticator(Auth v) {
+        _authenticator = v;
         _http.authenticator = v;
         _ftp.authenticator = v;
+    }
+    @property auto authenticator() {
+        return _authenticator;
     }
     /// set proxy property.
     /// $(B v) - full url to proxy.
@@ -164,8 +209,14 @@ public struct Request {
     +/
 
     @property void useStreaming(bool v) pure @nogc nothrow {
+        _useStreaming = true;
         _http.useStreaming = v;
         _ftp.useStreaming = v;
+    }
+    @property bool useStreaming() pure @nogc nothrow {
+        //_http.useStreaming = v;
+        //_ftp.useStreaming = v;
+        return _useStreaming;
     }
     ///
     /// get length og actually received content.
@@ -288,28 +339,28 @@ public struct Request {
     /// When arguments do not conform scheme (for example you try to call get("ftp://somehost.net/pub/README", {"a":"b"}) which doesn't make sense)
     /// you will receive Exception("Operation not supported for ftp")
     ///
-    Response get(A...)(string uri, A args) {
-        if ( uri ) {
-            _uri = URI(uri);
-            _uri.idn_encode();
-        }
-        _method = "GET";
-        final switch ( _uri.scheme ) {
-            case "http", "https":
-                _http.uri = _uri;
-                static if (__traits(compiles, _http.get(null, args))) {
-                    return _http.get(null, args);
-                } else {
-                    throw new Exception("Operation not supported for http");
-                }
-            case "ftp":
-                static if (args.length == 0) {
-                    return _ftp.get(uri);
-                } else {
-                    throw new Exception("Operation not supported for ftp");
-                }
-        }
-    }
+    //Response get(A...)(string uri, A args) {
+    //    if ( uri ) {
+    //        _uri = URI(uri);
+    //        _uri.idn_encode();
+    //    }
+    //    _method = "GET";
+    //    final switch ( _uri.scheme ) {
+    //        case "http", "https":
+    //            _http.uri = _uri;
+    //            static if (__traits(compiles, _http.get(null, args))) {
+    //                return _http.get(null, args);
+    //            } else {
+    //                throw new Exception("Operation not supported for http");
+    //            }
+    //        case "ftp":
+    //            static if (args.length == 0) {
+    //                return _ftp.get(uri);
+    //            } else {
+    //                throw new Exception("Operation not supported for ftp");
+    //            }
+    //    }
+    //}
     /// Execute POST for http and STOR file for FTP.
     /// You have to provide  $(B uri) and data. Data should conform to HTTPRequest.post or FTPRequest.post depending on the URI scheme.
     /// When arguments do not conform scheme you will receive Exception("Operation not supported for ftp")
@@ -346,29 +397,55 @@ public struct Request {
         _http.uri = _uri;
         return _http.exec!(method)(null, args);
     }
+    string toString() const {
+        return "Request(%s, %s)".format(_method, _uri.uri());
+    }
+    string format(string fmt) const {
+        final switch(_uri.scheme) {
+            case "http", "https":
+            return _http.format(fmt);
+            case "ftp":
+            return _ftp.format(fmt);
+        }
+    }
 
     /////////////////////////////////////////////////////////////////////
-    private Interceptor[] _interceptors;
+    private QueryParam[]           _params;
+    private MultipartForm          _multipartForm;
+    private RefCounted!ConnManager _cm;                              // connection manager
+    private string[URI]            _permanent_redirects;             // cache 301 redirects for GET requests
+    private Interceptor[]          _interceptors;
 
+    @property auto cm() {
+        return _cm;
+    }
+    @property string method() {
+        return _method;
+    }
+    @property URI uri() {
+        return _uri;
+    }
+    @property QueryParam[] params() {
+        return _params;
+    }
+    @property auto permanent_redirects() {
+        return _permanent_redirects;
+    }
+    @property auto multipartForm()
+    {
+        return _multipartForm;
+    }
+    @property auto multipartForm(MultipartForm f)
+    {
+        return _multipartForm;
+    }
+    @property bool hasMultipartForm()
+    {
+        return !_multipartForm.empty;
+    }
     void addInterceptor(Interceptor i)
     {
         _interceptors ~= i;
-    }
-    interface Interceptor {
-        Response opCall(Request r, RequestHandler next);
-    }
-    class RequestHandler {
-        private Interceptor[] _interceptors;
-        this(Interceptor[] i)
-        {
-            _interceptors = i;
-        }
-        Response handle(Request r)
-        {
-            auto i = _interceptors.front();
-            _interceptors.popFront();
-            return i(r, this);
-        }
     }
     class LastInterceptor : Interceptor
     {
@@ -378,50 +455,114 @@ public struct Request {
             return http.execute(r);
         }
     }
-    Response execute(string method, string url, string[string] query)
+    //Response execute(string method, string url, string[string] query)
+    //{
+    //    return execute(method, url, aa2params(query));
+    //}
+    //
+    Response post(string uri, string[string] query)
     {
-        return execute(method, url, aa2params(query));
+        return execute("POST", uri, aa2params(query));
+    }
+    Response post(string uri, QueryParam[] query)
+    {
+        return execute("POST", uri, query);
+    }
+    Response post(string uri, MultipartForm form)
+    {
+        return execute("POST", uri, form);
     }
 
+    Response get(string uri, string[string] query)
+    {
+        return execute("GET", uri, aa2params(query));
+    }
+    Response get(string uri, QueryParam[] params = null)
+    {
+        if ( uri ) {
+            _uri = URI(uri);
+            _uri.idn_encode();
+        }
+        final switch ( _uri.scheme ) {
+            case "http", "https":
+                return execute("GET", uri, params);
+            case "ftp":
+                return _ftp.get(uri);
+        }
+    }
+    Response exec(string method="GET")(string url, QueryParam[] params=null)
+    {
+        return execute(method, url, params);
+    }
+    Response execute(string method, string url, MultipartForm form)
+    {
+        _method = method;
+        _uri = URI(url);
+        _uri.idn_encode();
+        _params = null;
+        _multipartForm = form;
+
+        // https://issues.dlang.org/show_bug.cgi?id=10535
+        _permanent_redirects[URI.init] = ""; _permanent_redirects.remove(URI.init);
+        //
+        if ( _cm.refCountedStore().refCount() == 0)
+        {
+            _cm = RefCounted!ConnManager(10);
+        }
+        auto interceptors = _interceptors ~ new LastInterceptor();
+        auto handler = new RequestHandler(interceptors);
+        return handler.handle(this);
+    }
     Response execute(string method, string url, QueryParam[] params = null)
     {
         _method = method;
         _uri = URI(url);
         _uri.idn_encode();
+        _multipartForm = MultipartForm.init;
         _params = params;
+
+        // https://issues.dlang.org/show_bug.cgi?id=10535
+        _permanent_redirects[URI.init] = ""; _permanent_redirects.remove(URI.init);
+        //
+        if ( _cm.refCountedStore().refCount() == 0)
+        {
+            _cm = RefCounted!ConnManager(10);
+        }
         auto interceptors = _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);
         return handler.handle(this);
     }
-    unittest {
-        info("testing Request");
-        class LogInterceptor : Interceptor {
-            Response opCall(Request r, RequestHandler next)
-            {
-                info("interceptor enter");
-                auto rs = next.handle(r);
-                info("interceptor leaved, rs = %s".format(rs));
-                return rs;
-            }
-        }
-        globalLogLevel = LogLevel.trace;
-        Request rq;
-        Response rs;
-        rq.addInterceptor(new LogInterceptor());
-        rs = rq.execute("GET", "http://google.com");
-        globalLogLevel = LogLevel.trace;
-    }
     ///////////////////////////////////////////////////////////////////////
+}
 
-    string toString() const {
-        return "Request(%s, %s)".format(_method, _uri.uri());
-    }
-    string format(string fmt) const {
-        final switch(_uri.scheme) {
-            case "http", "https":
-                return _http.format(fmt);
-            case "ftp":
-                return _ftp.format(fmt);
+unittest {
+    info("testing Request");
+    class LogInterceptor : Interceptor {
+        Response opCall(Request r, RequestHandler next)
+        {
+            info("interceptor enter");
+            auto rs = next.handle(r);
+            info("interceptor leaved, rs = %s".format(rs));
+            return rs;
         }
     }
+    globalLogLevel = LogLevel.trace;
+    Request rq;
+    Response rs;
+    rq._cm = RefCounted!ConnManager(10);
+    rq.addInterceptor(new LogInterceptor());
+
+    infof("cm: %d", rq._cm.refCountedStore().refCount());
+    rs = rq.execute("GET", "http://google.com");
+    info("try streaming");
+    rq.useStreaming = true;
+    rq.bufferSize = 128;
+    rs = rq.execute("GET", "http://google.com");
+    auto s = rs.receiveAsRange;
+    while (!s.empty)
+    {
+        s.front;
+        s.popFront();
+    }
+    globalLogLevel = LogLevel.info;
 }

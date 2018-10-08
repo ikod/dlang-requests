@@ -13,11 +13,15 @@ import std.experimental.logger;
 import std.stdio;
 import std.path;
 import std.traits;
+import std.typecons;
 
 import requests.uri;
 import requests.utils;
 import requests.streams;
 import requests.base;
+import requests.request;
+import requests.connmanager;
+import requests.rangeadapter;
 
 public class FTPServerResponseError: Exception {
     this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
@@ -71,6 +75,8 @@ public struct FTPRequest {
         string        _method;
         string        _proxy;
         string        _bind;
+        RefCounted!ConnManager      _cm;
+        InputRangeAdapter           _postData;
     }
     mixin(Getter_Setter!Duration("timeout"));
     mixin(Getter_Setter!uint("verbosity"));
@@ -95,9 +101,9 @@ public struct FTPRequest {
     }
 
     ~this() {
-        if ( _controlChannel ) {
-            _controlChannel.close();
-        }
+        //if ( _controlChannel ) {
+        //    _controlChannel.close();
+        //}
     }
     string toString() const {
         return "FTPRequest(%s, %s)".format(_method, _uri.uri());
@@ -138,13 +144,13 @@ public struct FTPRequest {
         }
         return a.data();
     }
-    ushort sendCmdGetResponse(string cmd) {
+    ushort sendCmdGetResponse(string cmd, NetworkStream __controlChannel) {
         debug(requests) tracef("cmd to server: %s", cmd.strip);
         if ( _verbosity >=1 ) {
             writefln("> %s", cmd.strip);
         }
-        _controlChannel.send(cmd);
-        string response = serverResponse();
+        __controlChannel.send(cmd);
+        string response = serverResponse(__controlChannel);
         _responseHistory ~= response;
         return responseToCode(response);
     }
@@ -164,19 +170,19 @@ public struct FTPRequest {
         _uri = newURI;
     }
 
-    string serverResponse() {
+    string serverResponse(NetworkStream __controlChannel) {
         string res, buffer;
         immutable bufferLimit = 16*1024;
-        _controlChannel.readTimeout = _timeout;
+        __controlChannel.readTimeout = _timeout;
         scope(exit) {
-            _controlChannel.readTimeout = 0.seconds;
+            __controlChannel.readTimeout = 0.seconds;
         }
         auto b = new ubyte[_bufferSize];
-        while ( buffer.length < bufferLimit ) {
+        while ( __controlChannel && __controlChannel.isConnected && buffer.length < bufferLimit ) {
             debug(requests) trace("Wait on control channel");
             ptrdiff_t rc;
             try {
-                rc = _controlChannel.receive(b);
+                rc = __controlChannel.receive(b);
             }
             catch (Exception e) {
                 error("Failed to read response from server");
@@ -215,26 +221,36 @@ public struct FTPRequest {
         debug(requests) info("Trying to create path %s".format(path));
         enforce(path.length>=2, "You called tryCdOrCreate, but there is nothing to create: %s".format(path));
         auto next_dir = path[1];
-        auto code = sendCmdGetResponse("CWD " ~ next_dir ~ "\r\n");
+        auto code = sendCmdGetResponse("CWD " ~ next_dir ~ "\r\n", _controlChannel);
         if ( code >= 300) {
             // try to create, then again CWD
-            code = sendCmdGetResponse("MKD " ~ next_dir ~ "\r\n");
+            code = sendCmdGetResponse("MKD " ~ next_dir ~ "\r\n", _controlChannel);
             if ( code > 300 ) {
                 return code;
             }
-            code = sendCmdGetResponse("CWD " ~ next_dir ~ "\r\n");
+            code = sendCmdGetResponse("CWD " ~ next_dir ~ "\r\n", _controlChannel);
         }
         if ( path.length == 2 ) {
             return code;
         }
         return tryCdOrCreatePath(path[1..$]);
     }
-    auto post(R, A...)(string uri, R content, A args) 
+
+    FTPResponse post(R, A...)(string uri, R content, A args) 
         if ( __traits(compiles, cast(ubyte[])content) 
         || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front)))) 
         || (rank!R == 2 && (is(Unqual!(typeof(content.front.front)) == ubyte)))
-        ) {
-        enforce( uri || _uri.host, "FTP URL undefined");
+        )
+    {
+        if ( uri ) {
+            handleChangeURI(uri);
+        }
+        _postData = makeAdapter(content);
+        return post();
+    }
+
+    FTPResponse post()
+    {
         string response;
         ushort code;
 
@@ -246,17 +262,15 @@ public struct FTPRequest {
             _response._finishedAt = Clock.currTime;
         }
 
-        if ( uri ) {
-            handleChangeURI(uri);
-        }
-
         _response.uri = _uri;
         _response.finalURI = _uri;
 
+        _controlChannel = _cm.get(_uri.scheme, _uri.host, _uri.port);
+        
         if ( !_controlChannel ) {
             _controlChannel = new TCPStream();
             _controlChannel.connect(_uri.host, _uri.port, _timeout);
-            response = serverResponse();
+            response = serverResponse(_controlChannel);
             _responseHistory ~= response;
             
             code = responseToCode(response);
@@ -277,13 +291,13 @@ public struct FTPRequest {
             }
             debug(requests) tracef("Use %s:%s%s as username:password", user, pass[0], replicate("-", pass.length-1));
             
-            code = sendCmdGetResponse("USER " ~ user ~ "\r\n");
+            code = sendCmdGetResponse("USER " ~ user ~ "\r\n", _controlChannel);
             if ( code/100 > 3 ) {
                 _response.code = code;
                 return _response;
             } else if ( code/100 == 3) {
                 
-                code = sendCmdGetResponse("PASS " ~ pass ~ "\r\n");
+                code = sendCmdGetResponse("PASS " ~ pass ~ "\r\n", _controlChannel);
                 if ( code/100 > 2 ) {
                     _response.code = code;
                     return _response;
@@ -291,7 +305,7 @@ public struct FTPRequest {
             }
             
         }
-        code = sendCmdGetResponse("PWD\r\n");
+        code = sendCmdGetResponse("PWD\r\n", _controlChannel);
         string pwd;
         if ( code/100 == 2 ) {
             // like '257 "/home/testuser"'
@@ -302,7 +316,7 @@ public struct FTPRequest {
         }
         scope (exit) {
             if ( pwd && _controlChannel ) {
-                sendCmdGetResponse("CWD " ~ pwd ~ "\r\n");
+                sendCmdGetResponse("CWD " ~ pwd ~ "\r\n", _controlChannel);
             }
         }
 
@@ -310,7 +324,7 @@ public struct FTPRequest {
         if ( path != "/") {
             path = path.chompPrefix("/");
         }
-        code = sendCmdGetResponse("CWD " ~ path ~ "\r\n");
+        code = sendCmdGetResponse("CWD " ~ path ~ "\r\n", _controlChannel);
         if ( code == 550 ) {
             // try to create directory end enter it
             code = tryCdOrCreatePath(dirName(_uri.path).split('/'));
@@ -320,7 +334,7 @@ public struct FTPRequest {
             return _response;
         }
 
-        code = sendCmdGetResponse("PASV\r\n");
+        code = sendCmdGetResponse("PASV\r\n", _controlChannel);
         if ( code/100 > 2 ) {
             _response.code = code;
             return _response;
@@ -351,54 +365,62 @@ public struct FTPRequest {
 
         dataStream.connect(host, port, _timeout);
 
-        code = sendCmdGetResponse("TYPE I\r\n");
+        code = sendCmdGetResponse("TYPE I\r\n", _controlChannel);
         if ( code/100 > 2 ) {
             _response.code = code;
             return _response;
         }
 
-        code = sendCmdGetResponse("STOR " ~ baseName(_uri.path) ~ "\r\n");
+        code = sendCmdGetResponse("STOR " ~ baseName(_uri.path) ~ "\r\n", _controlChannel);
         if ( code/100 > 1 ) {
             _response.code = code;
             return _response;
         }
-        static if ( __traits(compiles, cast(ubyte[])content) ) {
-            auto data = cast(ubyte[])content;
-            auto b = new ubyte[_bufferSize];
-            for(size_t pos = 0; pos < data.length;) {
-                auto chunk = data.take(_bufferSize).array;
-                auto rc = dataStream.send(chunk);
-                if ( rc <= 0 ) {
-                    debug(requests) trace("done");
-                    break;
-                }
-                debug(requests) tracef("sent %d bytes to data channel", rc);
-                pos += rc;
-            }
-        } else {
-            while (!content.empty) {
-                auto chunk = content.front;
-                debug(requests) trace("ftp posting %d of data chunk".format(chunk.length));
-                auto rc = dataStream.send(chunk);
-                if ( rc <= 0 ) {
-                    debug(requests) trace("done");
-                    break;
-                }
-                content.popFront;
-            }
+        size_t uploaded;
+        while ( !_postData.empty ) {
+            auto chunk = _postData.front;
+            uploaded += chunk.length;
+            dataStream.send(chunk);
+            _postData.popFront;
         }
+        debug(requests) tracef("sent");
+        //static if ( __traits(compiles, cast(ubyte[])content) ) {
+        //    auto data = cast(ubyte[])content;
+        //    auto b = new ubyte[_bufferSize];
+        //    for(size_t pos = 0; pos < data.length;) {
+        //        auto chunk = data.take(_bufferSize).array;
+        //        auto rc = dataStream.send(chunk);
+        //        if ( rc <= 0 ) {
+        //            debug(requests) trace("done");
+        //            break;
+        //        }
+        //        debug(requests) tracef("sent %d bytes to data channel", rc);
+        //        pos += rc;
+        //    }
+        //} else {
+        //    while (!content.empty) {
+        //        auto chunk = content.front;
+        //        debug(requests) trace("ftp posting %d of data chunk".format(chunk.length));
+        //        auto rc = dataStream.send(chunk);
+        //        if ( rc <= 0 ) {
+        //            debug(requests) trace("done");
+        //            break;
+        //        }
+        //        content.popFront;
+        //    }
+        //}
         dataStream.close();
         dataStream = null;
-        response = serverResponse();
+        response = serverResponse(_controlChannel);
         code = responseToCode(response);
         if ( code/100 == 2 ) {
-            debug(requests) tracef("Successfully uploaded %d bytes", _response._responseBody.length);
+            debug(requests) tracef("Successfully uploaded %d bytes", uploaded);
         }
         _response.code = code;
         return _response;
     }
 
-    auto get(string uri = null) {
+    FTPResponse get(string uri = null) {
         enforce( uri || _uri.host, "FTP URL undefined");
         string response;
         ushort code;
@@ -419,12 +441,19 @@ public struct FTPRequest {
         _response.uri = _uri;
         _response.finalURI = _uri;
 
+        _controlChannel = _cm.get(_uri.scheme, _uri.host, _uri.port);
+        
         if ( !_controlChannel ) {
             _controlChannel = new TCPStream();
             _controlChannel.bind(_bind);
             _controlChannel.connect(_uri.host, _uri.port, _timeout);
+            if ( auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _controlChannel) )
+            {
+                debug(requests) tracef("closing purged connection %s", purged_connection);
+                purged_connection.close();
+            }
             _response._connectedAt = Clock.currTime;
-            response = serverResponse();
+            response = serverResponse(_controlChannel);
             _responseHistory ~= response;
             
             code = responseToCode(response);
@@ -445,13 +474,13 @@ public struct FTPRequest {
             }
             debug(requests) tracef("Use %s:%s%s as username:password", user, pass[0], replicate("-", pass.length-1));
             
-            code = sendCmdGetResponse("USER " ~ user ~ "\r\n");
+            code = sendCmdGetResponse("USER " ~ user ~ "\r\n", _controlChannel);
             if ( code/100 > 3 ) {
                 _response.code = code;
                 return _response;
             } else if ( code/100 == 3) {
                 
-                code = sendCmdGetResponse("PASS " ~ pass ~ "\r\n");
+                code = sendCmdGetResponse("PASS " ~ pass ~ "\r\n", _controlChannel);
                 if ( code/100 > 2 ) {
                     _response.code = code;
                     return _response;
@@ -462,7 +491,7 @@ public struct FTPRequest {
             _response._connectedAt = Clock.currTime;
         }
 
-        code = sendCmdGetResponse("PWD\r\n");
+        code = sendCmdGetResponse("PWD\r\n", _controlChannel);
         string pwd;
         if ( code/100 == 2 ) {
             // like '257 "/home/testuser"'
@@ -473,7 +502,7 @@ public struct FTPRequest {
         }
         scope (exit) {
             if ( pwd && _controlChannel && !_useStreaming ) {
-                sendCmdGetResponse("CWD " ~ pwd ~ "\r\n");
+                sendCmdGetResponse("CWD " ~ pwd ~ "\r\n", _controlChannel);
             }
         }
         
@@ -481,19 +510,19 @@ public struct FTPRequest {
         if ( path != "/") {
             path = path.chompPrefix("/");
         }
-        code = sendCmdGetResponse("CWD " ~ path ~ "\r\n");
+        code = sendCmdGetResponse("CWD " ~ path ~ "\r\n", _controlChannel);
         if ( code/100 > 2 ) {
             _response.code = code;
             return _response;
         }
 
-        code = sendCmdGetResponse("TYPE I\r\n");
+        code = sendCmdGetResponse("TYPE I\r\n", _controlChannel);
         if ( code/100 > 2 ) {
             _response.code = code;
             return _response;
         }
         
-        code = sendCmdGetResponse("SIZE " ~ baseName(_uri.path) ~ "\r\n");
+        code = sendCmdGetResponse("SIZE " ~ baseName(_uri.path) ~ "\r\n", _controlChannel);
         if ( code/100 == 2 ) {
             // something like 
             // 213 229355520
@@ -507,11 +536,11 @@ public struct FTPRequest {
             }
         }
 
-        if ( _maxContentLength && _contentLength > _maxContentLength ) {
+        if ( _maxContentLength > 0 && _contentLength > _maxContentLength ) {
             throw new RequestException("maxContentLength exceeded for ftp data");
         }
 
-        code = sendCmdGetResponse("PASV\r\n");
+        code = sendCmdGetResponse("PASV\r\n", _controlChannel);
         if ( code/100 > 2 ) {
             _response.code = code;
             return _response;
@@ -542,7 +571,7 @@ public struct FTPRequest {
         dataStream.bind(_bind);
         dataStream.connect(host, port, _timeout);
         
-        code = sendCmdGetResponse("RETR " ~ baseName(_uri.path) ~ "\r\n");
+        code = sendCmdGetResponse("RETR " ~ baseName(_uri.path) ~ "\r\n", _controlChannel);
         if ( code/100 > 1 ) {
             _response.code = code;
             return _response;
@@ -564,6 +593,14 @@ public struct FTPRequest {
             }
             if ( _useStreaming ) {
                 debug(requests) trace("ftp uses streaming");
+
+                auto __maxContentLength = _maxContentLength;
+                auto __contentLength = _contentLength;
+                auto __contentReceived = _contentReceived;
+                auto __bufferSize = _bufferSize;
+                auto __dataStream = dataStream;
+                auto __controlChannel = _controlChannel;
+
                 _response.receiveAsRange.activated = true;
                 _response.receiveAsRange.data.length = 0;
                 _response.receiveAsRange.data = _response._responseBody.data;
@@ -571,51 +608,74 @@ public struct FTPRequest {
                     Buffer!ubyte result;
                     while(true) {
                         // check if we received everything we need
-                        if ( _contentReceived >= _maxContentLength ) 
+                        if ( __maxContentLength > 0 && __contentReceived >= __maxContentLength ) 
                         {
                             throw new RequestException("ContentLength > maxContentLength (%d>%d)".
-                                format(_contentLength, _maxContentLength));
+                                format(__contentLength, __maxContentLength));
                         }
                         // have to continue
-                        auto b = new ubyte[_bufferSize];
+                        auto b = new ubyte[__bufferSize];
                         ptrdiff_t read;
                         try {
-                            read = dataStream.receive(b);
+                            read = __dataStream.receive(b);
                         }
                         catch (Exception e) {
                             throw new RequestException("streaming_in error reading from socket", __FILE__, __LINE__, e);
                         }
 
                         if ( read > 0 ) {
-                            _contentReceived += read;
+                            __contentReceived += read;
                             result.putNoCopy(b[0..read]);
                             return result.data;
                         }
                         if ( read == 0 ) {
                             debug(requests) tracef("streaming_in: server closed connection");
-                            dataStream.close();
-                            code = responseToCode(serverResponse());
+                            __dataStream.close();
+                            code = responseToCode(serverResponse(__controlChannel));
                             if ( code/100 == 2 ) {
                                 debug(requests) tracef("Successfully received %d bytes", _response._responseBody.length);
                             }
                             _response.code = code;
-                            sendCmdGetResponse("CWD " ~ pwd ~ "\r\n");
+                            sendCmdGetResponse("CWD " ~ pwd ~ "\r\n", __controlChannel);
                             break;
                         }
                     }
                     return result.data;
                 };
+                debug(requests) tracef("leave streaming get");
                 return _response;
             }
         }
         dataStream.close();
-        response = serverResponse();
+        response = serverResponse(_controlChannel);
         code = responseToCode(response);
         if ( code/100 == 2 ) {
             debug(requests) tracef("Successfully received %d bytes", _response._responseBody.length);
         }
         _response.code = code;
         return _response;
+    }
+
+    FTPResponse execute(Request r)
+    {
+        string method = r.method;
+        _uri = r.uri();
+        _authenticator = r.authenticator;
+        _maxContentLength = r.maxContentLength;
+        _useStreaming = r.useStreaming;
+        _verbosity = r.verbosity;
+        _cm = r.cm;
+        _postData = r.postData;
+
+        if ( method == "GET" )
+        {
+            return get();
+        }
+        if ( method == "POST" )
+        {
+            return post();
+        }
+        assert(0, "Can't handle method %s for ftp request".format(method));
     }
 }
 

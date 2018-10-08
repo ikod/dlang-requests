@@ -16,6 +16,7 @@ import std.algorithm;
 
 import requests.utils;
 import requests.connmanager;
+import requests.rangeadapter;
 
 /**
    This is simplest interface to both http and ftp protocols.
@@ -52,7 +53,7 @@ public struct Request {
         size_t         _maxHeadersLength = 32 * 1024;   // 32 KB
         size_t         _maxContentLength;               // 0 - Unlimited
         uint           _verbosity = 0;
-
+        bool          _keepAlive;
         HTTPRequest   _http;  // route all http/https requests here
         FTPRequest    _ftp;   // route all ftp requests here
     }
@@ -70,7 +71,10 @@ public struct Request {
     /// single instance of Request).
     /// It also recovers if server prematurely close keep-alive connection.
     @property void keepAlive(bool v) pure @nogc nothrow {
-        _http.keepAlive = v;
+        _keepAlive = v;
+    }
+    @property bool keepAlive() pure @nogc nothrow {
+        return _keepAlive;
     }
     /// Set limit on HTTP redirects
     /// $(B v) - limit on redirect depth
@@ -209,13 +213,9 @@ public struct Request {
     +/
 
     @property void useStreaming(bool v) pure @nogc nothrow {
-        _useStreaming = true;
-        _http.useStreaming = v;
-        _ftp.useStreaming = v;
+        _useStreaming = v;
     }
     @property bool useStreaming() pure @nogc nothrow {
-        //_http.useStreaming = v;
-        //_ftp.useStreaming = v;
         return _useStreaming;
     }
     ///
@@ -365,37 +365,41 @@ public struct Request {
     /// You have to provide  $(B uri) and data. Data should conform to HTTPRequest.post or FTPRequest.post depending on the URI scheme.
     /// When arguments do not conform scheme you will receive Exception("Operation not supported for ftp")
     ///
-    Response post(A...)(string uri, A args) {
-        if ( uri ) {
-            _uri = URI(uri);
-            _uri.idn_encode();
-        }
-        _method = "POST";
-        final switch ( _uri.scheme ) {
-            case "http", "https":
-                _http.uri = _uri;
-                static if (__traits(compiles, _http.post(null, args))) {
-                    return _http.post(null, args);
-                } else {
-                    throw new Exception("Operation not supported for http");
-                }
-            case "ftp":
-                static if (__traits(compiles, _ftp.post(uri, args))) {
-                    return _ftp.post(uri, args);
-                } else {
-                    throw new Exception("Operation not supported for ftp");
-                }
-        }
-    }
+    //Response post(A...)(string uri, A args) {
+    //    if ( uri ) {
+    //        _uri = URI(uri);
+    //        _uri.idn_encode();
+    //    }
+    //    _method = "POST";
+    //    final switch ( _uri.scheme ) {
+    //        case "http", "https":
+    //            _http.uri = _uri;
+    //            static if (__traits(compiles, _http.post(null, args))) {
+    //                return _http.post(null, args);
+    //            } else {
+    //                throw new Exception("Operation not supported for http");
+    //            }
+    //        case "ftp":
+    //            static if (__traits(compiles, _ftp.post(uri, args))) {
+    //                return _ftp.post(uri, args);
+    //            } else {
+    //                throw new Exception("Operation not supported for ftp");
+    //            }
+    //    }
+    //}
     /++
      + Execute request with method
      +/
-    Response exec(string method="GET", A...)(string uri, A args) {
-        _method = method;
-        _uri = URI(uri);
-        _uri.idn_encode();
-        _http.uri = _uri;
-        return _http.exec!(method)(null, args);
+    //Response exec(string method="GET", A...)(string uri, A args) {
+    //    _method = method;
+    //    _uri = URI(uri);
+    //    _uri.idn_encode();
+    //    _http.uri = _uri;
+    //    return _http.exec!(method)(null, args);
+    //}
+    Response exec(string method="GET", A...)(string url, A args)
+    {
+        return execute(method, url, args);
     }
     string toString() const {
         return "Request(%s, %s)".format(_method, _uri.uri());
@@ -415,6 +419,8 @@ public struct Request {
     private RefCounted!ConnManager _cm;                              // connection manager
     private string[URI]            _permanent_redirects;             // cache 301 redirects for GET requests
     private Interceptor[]          _interceptors;
+    private string                 _contentType;                     // content type for POST/PUT payloads
+    private InputRangeAdapter      _postData;
 
     @property auto cm() {
         return _cm;
@@ -427,6 +433,18 @@ public struct Request {
     }
     @property QueryParam[] params() {
         return _params;
+    }
+    @property string contentType()
+    {
+        return _contentType;
+    }
+    @property void contentType(string v)
+    {
+        _contentType = v;
+    }
+    @property InputRangeAdapter postData()
+    {
+        return _postData;
     }
     @property auto permanent_redirects() {
         return _permanent_redirects;
@@ -451,15 +469,18 @@ public struct Request {
     {
         Response opCall(Request r, RequestHandler _)
         {
-            HTTPRequest http;
-            return http.execute(r);
+            if ( r._uri.scheme == "ftp" )
+            {
+                FTPRequest ftp;
+                return ftp.execute(r);
+            }
+            else
+            {
+                HTTPRequest http;
+                return http.execute(r);
+            }
         }
     }
-    //Response execute(string method, string url, string[string] query)
-    //{
-    //    return execute(method, url, aa2params(query));
-    //}
-    //
     Response post(string uri, string[string] query)
     {
         return execute("POST", uri, aa2params(query));
@@ -471,6 +492,10 @@ public struct Request {
     Response post(string uri, MultipartForm form)
     {
         return execute("POST", uri, form);
+    }
+    Response post(R)(string uri, R content, string contentType="application/octet-stream")
+    {
+        return execute("POST", uri, content, contentType);
     }
 
     Response get(string uri, string[string] query)
@@ -487,12 +512,29 @@ public struct Request {
             case "http", "https":
                 return execute("GET", uri, params);
             case "ftp":
-                return _ftp.get(uri);
+                return execute("GET", uri);
         }
     }
-    Response exec(string method="GET")(string url, QueryParam[] params=null)
+    Response execute(R)(string method, string url, R content, string ct = "application/octet-stream")
     {
-        return execute(method, url, params);
+        _method = method;
+        _uri = URI(url);
+        _uri.idn_encode();
+        _params = null;
+        _multipartForm = MultipartForm.init;
+        _contentType = ct;
+        _postData = makeAdapter(content);
+        // https://issues.dlang.org/show_bug.cgi?id=10535
+        _permanent_redirects[URI.init] = ""; _permanent_redirects.remove(URI.init);
+        //
+        if ( _cm.refCountedStore().refCount() == 0)
+        {
+            _cm = RefCounted!ConnManager(10);
+        }
+        auto interceptors = _interceptors ~ new LastInterceptor();
+        auto handler = new RequestHandler(interceptors);
+        return handler.handle(this);
+        
     }
     Response execute(string method, string url, MultipartForm form)
     {

@@ -1034,13 +1034,13 @@ public abstract class SocketStream : NetworkStream {
         return this;
     }
 
-    ptrdiff_t send(const(void)[] buff) @safe
+    ptrdiff_t send(const(void)[] buff)
     in {assert(isConnected);}
     body {
         auto rc = s.send(buff);
         if (rc < 0) {
             close();
-            throw new NetworkException("sending data");
+            throw new NetworkException("sending data: %s".format(to!string(strerror(errno))));
         }
         return rc;
     }
@@ -1077,7 +1077,10 @@ public abstract class SocketStream : NetworkStream {
     }
 
     @property void readTimeout(Duration timeout) @safe {
-        s.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
+        if ( __isConnected )
+        {
+            s.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, timeout);
+        }
     }
     override SocketStream accept() {
         assert(false, "Implement before use");

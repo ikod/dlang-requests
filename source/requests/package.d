@@ -423,10 +423,6 @@ package unittest {
     info("Test getContent(ftp)");
     auto r = getContent("ftp://speedtest.tele2.net/1KB.zip");
     assert(unreliable_network || r.length == 1024);
-    
-    info("Test postContent ftp");
-    r = postContent("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
-    assert(unreliable_network || r.length == 0);
 
     info("Test receiveAsRange with GET(ftp)");
     ubyte[] streamedContent;
@@ -440,6 +436,10 @@ package unittest {
         stream.popFront();
     }
     assert(unreliable_network || streamedContent.length == 1024);
+    info("Test postContent ftp");
+    r = postContent("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
+    assert(unreliable_network || r.length == 0);
+
     //
     info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
     rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);

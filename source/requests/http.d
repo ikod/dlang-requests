@@ -22,6 +22,7 @@ import requests.uri;
 import requests.utils;
 import requests.base;
 import requests.connmanager;
+import requests.rangeadapter;
 
 static immutable ushort[] redirectCodes = [301, 302, 303, 307, 308];
 enum   HTTP11 = 101;
@@ -226,7 +227,9 @@ public struct HTTPRequest {
 
         NetStrFactory  _socketFactory;
         
-        QueryParam[]    _params;
+        QueryParam[]        _params;
+        string              _contentType;
+        InputRangeAdapter   _postData;
     }
     package HTTPResponse   _response;
 
@@ -1699,6 +1702,231 @@ public struct HTTPRequest {
     }
     // XXX interceptors
     import requests.request;
+
+    // we use this if we send from ubyte[][] and user provided Content-Length
+    private void sendFlattenContent(NetworkStream _stream) {
+        while ( !_postData.empty ) {
+            auto chunk = _postData.front;
+            _stream.send(chunk);
+            _postData.popFront;
+        }
+        debug(requests) tracef("sent");
+    }
+    // we use this if we send from ubyte[][] as chunked content
+    private void sendChunkedContent(NetworkStream _stream) {
+        while ( !_postData.empty ) {
+            auto chunk = _postData.front;
+            auto chunkHeader = "%x\r\n".format(chunk.length);
+            debug(requests) tracef("sending %s%s", chunkHeader, cast(string)chunk);
+            _stream.send(chunkHeader);
+            _stream.send(chunk);
+            _stream.send("\r\n");
+            debug(requests) tracef("chunk sent");
+            _postData.popFront;
+        }
+        debug(requests) tracef("sent");
+        _stream.send("0\r\n\r\n");
+    }
+
+    HTTPResponse exec_from_range(Request r)
+    do {
+
+        _method = r.method;
+        _uri = r.uri;
+        _params = r.params;
+        _useStreaming = r.useStreaming;
+        _cm = r.cm;
+        _permanent_redirects = r.permanent_redirects;
+        _maxRedirects = r.maxRedirects;
+        _authenticator = r.authenticator;
+        _maxHeadersLength = r.maxHeadersLength;
+        _maxContentLength = r.maxContentLength;
+        _verbosity = r.verbosity;
+        _keepAlive = r.keepAlive;
+        _contentType = r.contentType;
+        _postData = r.postData;
+
+        debug(requests) tracef("exec from range request: %s", r);
+
+        NetworkStream _stream;
+        _response = new HTTPResponse;
+        _history.length = 0;
+        _response.uri = _uri;
+        _response.finalURI = _uri;
+        bool restartedRequest = false;
+        bool send_flat;
+
+        connect:
+        _contentReceived = 0;
+        _response._startedAt = Clock.currTime;
+
+        assert(_stream is null);
+
+        _stream = _cm.get(_uri.scheme, _uri.host, _uri.port);
+
+        if ( _stream is null ) {
+            debug(requests) trace("create new connection");
+            _stream = setupConnection();
+        } else {
+            debug(requests) trace("reuse old connection");
+        }
+
+        assert(_stream !is null);
+
+        if ( !_stream.isConnected ) {
+            debug(requests) trace("disconnected stream on enter");
+            if ( !restartedRequest ) {
+                debug(requests) trace("disconnected stream on enter: retry");
+                assert(_cm.get(_uri.scheme, _uri.host, _uri.port) == _stream);
+
+                _cm.del(_uri.scheme, _uri.host, _uri.port);
+                _stream.close();
+                _stream = null;
+
+                restartedRequest = true;
+                goto connect;
+            }
+            debug(requests) trace("disconnected stream on enter: return response");
+            //_stream = null;
+            return _response;
+        }
+        _response._connectedAt = Clock.currTime;
+
+        Appender!string req;
+        req.put(requestString());
+
+        auto h = requestHeaders;
+        if ( _contentType ) {
+            safeSetHeader(h, _userHeaders.ContentType, "Content-Type", _contentType);
+        }
+
+        if ( _postData.length >= 0 )
+        {
+            // we know t
+            safeSetHeader(h, _userHeaders.ContentLength, "Content-Length", to!string(_postData.length));
+        }
+
+        if ( _userHeaders.ContentLength || "Content-Length" in h )
+        {
+            debug(requests) tracef("User provided content-length for chunked content");
+            send_flat = true;
+        }
+        else
+        {
+            h["Transfer-Encoding"] = "chunked";
+            send_flat = false;
+        }
+        h.byKeyValue.
+            map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
+            each!(h => req.put(h));
+        req.put("\r\n");
+
+        debug(requests) tracef("send <%s>", req.data);
+        if ( _verbosity >= 1 ) {
+            req.data.splitLines.each!(a => writeln("> " ~ a));
+        }
+
+        try {
+            // send headers
+            _stream.send(req.data());
+            // send body
+            //static if ( rank!R == 1) {
+            //    _stream.send(content);
+            //} else {
+            if ( send_flat ) {
+                sendFlattenContent(_stream);
+            } else {
+                sendChunkedContent(_stream);
+            }
+            //}
+            _response._requestSentAt = Clock.currTime;
+            debug(requests) trace("starting receive response");
+            receiveResponse(_stream);
+            debug(requests) trace("finished receive response");
+            _response._finishedAt = Clock.currTime;
+        }
+        catch (NetworkException e)
+        {
+            _stream.close();
+            throw new RequestException("Network error during data exchange");
+        }
+        if ( serverPrematurelyClosedConnection()
+        && !restartedRequest
+        && isIdempotent(_method)
+        ) {
+            ///
+            /// We didn't receive any data (keepalive connectioin closed?)
+            /// and we can restart this request.
+            /// Go ahead.
+            ///
+            debug(requests) tracef("Server closed keepalive connection");
+
+            assert(_cm.get(_uri.scheme, _uri.host, _uri.port) == _stream);
+
+            _cm.del(_uri.scheme, _uri.host, _uri.port);
+            _stream.close();
+            _stream = null;
+
+            restartedRequest = true;
+            goto connect;
+        }
+
+        if ( _useStreaming ) {
+            if ( _response._receiveAsRange.activated ) {
+                debug(requests) trace("streaming_in activated");
+                return _response;
+            } else {
+                // this can happen if whole response body received together with headers
+                _response._receiveAsRange.data = _response.responseBody.data;
+            }
+        }
+
+        close_connection_if_not_keepalive(_stream);
+
+        if ( _verbosity >= 1 ) {
+            writeln(">> Connect time: ", _response._connectedAt - _response._startedAt);
+            writeln(">> Request send time: ", _response._requestSentAt - _response._connectedAt);
+            writeln(">> Response recv time: ", _response._finishedAt - _response._requestSentAt);
+        }
+
+
+        if ( willFollowRedirect ) {
+            if ( _history.length >= _maxRedirects ) {
+                _stream = null;
+                throw new MaxRedirectsException("%d redirects reached maxRedirects %d.".format(_history.length, _maxRedirects));
+            }
+            // "location" in response already checked in canFollowRedirect
+            immutable new_location = *("location" in _response.responseHeaders);
+            immutable current_uri = _uri, next_uri = uriFromLocation(_uri, new_location);
+
+            // save current response for history
+            _history ~= _response;
+
+            // prepare new response (for redirected request)
+            _response = new HTTPResponse;
+            _response.uri = current_uri;
+            _response.finalURI = next_uri;
+
+            _stream = null;
+
+            // set new uri
+            this._uri = next_uri;
+            debug(requests) tracef("Redirected to %s", next_uri);
+            if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
+                // 307 and 308 do not change method
+                return this.get(new_location);
+            }
+            if ( restartedRequest ) {
+                debug(requests) trace("Rare event: clearing 'restartedRequest' on redirect");
+                restartedRequest = false;
+            }
+            goto connect;
+        }
+
+        _response._history = _history;
+        return _response;
+    }
+
     HTTPResponse exec_from_multipart_form(Request r) {
         import std.uuid;
         import std.file;
@@ -1714,9 +1942,10 @@ public struct HTTPRequest {
         _maxHeadersLength = r.maxHeadersLength;
         _maxContentLength = r.maxContentLength;
         _verbosity = r.verbosity;
+        _keepAlive = r.keepAlive;
         _multipartForm = r.multipartForm;
 
-        infof("exec from multipart form request: %s", r);
+        debug(requests) tracef("exec from multipart form request: %s", r);
 
         NetworkStream _stream;
         _response = new HTTPResponse;
@@ -1915,8 +2144,10 @@ public struct HTTPRequest {
         _maxHeadersLength = r.maxHeadersLength;
         _maxContentLength = r.maxContentLength;
         _verbosity = r.verbosity;
+        _keepAlive = r.keepAlive;
 
-        infof("exec from parameters request: %s", r);
+        debug(requests) tracef("exec from parameters request: %s", r);
+
         assert(_uri != URI.init);
         NetworkStream _stream;
         _response = new HTTPResponse;
@@ -2106,6 +2337,10 @@ public struct HTTPRequest {
     HTTPResponse execute(Request r)
     {
         debug(requests) trace("serving %s".format(r));
+        if ( !r.postData.empty)
+        {
+            return exec_from_range(r);
+        }
         if ( r.hasMultipartForm )
         {
             return exec_from_multipart_form(r);

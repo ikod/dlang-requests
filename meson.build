@@ -27,6 +27,7 @@ requests_src = [
     'source/requests/server/package.d',
     'source/requests/streams.d',
     'source/requests/connmanager.d',
+    'source/requests/rangeadapter.d',
     'source/requests/base.d'
 ]
 

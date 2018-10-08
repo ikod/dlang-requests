@@ -10,7 +10,7 @@ env:
     - UNRELIABLENETWORK=true
 
 before_install:
-  - pyenv global system 3.6
+  #- pyenv global system 3.6
   - pip3 install 'meson>=0.46'
 
 install:

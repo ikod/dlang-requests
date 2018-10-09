@@ -666,6 +666,8 @@ public struct FTPRequest {
         _verbosity = r.verbosity;
         _cm = r.cm;
         _postData = r.postData;
+        _bufferSize = r.bufferSize;
+        _proxy = r.proxy;
 
         if ( method == "GET" )
         {

@@ -19,7 +19,7 @@ shared static this() {
 
 string Getter_Setter(T)(string name) {
     return `
-        @property final ` ~ T.stringof ~ ` ` ~ name ~ `() pure const @safe @nogc nothrow {
+        @property final auto ` ~ name ~ `() pure inout @safe @nogc nothrow {
             return _` ~ name ~ `;
         }
         @property final void ` ~ name ~ `(` ~ T.stringof ~ ` s) pure @nogc nothrow { 

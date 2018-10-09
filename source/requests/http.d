@@ -181,7 +181,6 @@ public class HTTPResponse : Response {
 /// $(B timeout) - Duration, Set timeout value for connect/receive/send.
 ///
 public struct HTTPRequest {
-    alias NetStrFactory = NetworkStream delegate(string, string, ushort);
     private {
         struct _UH {
             // flags for each important header, added by user using addHeaders
@@ -225,7 +224,7 @@ public struct HTTPRequest {
         string[URI]                 _permanent_redirects;            // cache 301 redirects for GET requests
         MultipartForm               _multipartForm;
 
-        NetStrFactory  _socketFactory;
+        NetStreamFactory  _socketFactory;
         
         QueryParam[]        _params;
         string              _contentType;
@@ -248,7 +247,7 @@ public struct HTTPRequest {
     mixin(Getter!long              ("contentReceived"));
     mixin(Getter_Setter!SSLOptions ("sslOptions"));
     mixin(Getter_Setter!string     ("bind"));
-    mixin(Setter!NetStrFactory     ("socketFactory"));
+    mixin(Setter!NetStreamFactory  ("socketFactory"));
 
     @property void sslSetVerifyPeer(bool v) pure @safe nothrow @nogc {
         _sslOptions.setVerifyPeer(v);
@@ -1728,22 +1727,9 @@ public struct HTTPRequest {
         _stream.send("0\r\n\r\n");
     }
 
-    HTTPResponse exec_from_range(Request r)
+    HTTPResponse exec_from_range(ref Request r)
     do {
 
-        _method = r.method;
-        _uri = r.uri;
-        _params = r.params;
-        _useStreaming = r.useStreaming;
-        _cm = r.cm;
-        _permanent_redirects = r.permanent_redirects;
-        _maxRedirects = r.maxRedirects;
-        _authenticator = r.authenticator;
-        _maxHeadersLength = r.maxHeadersLength;
-        _maxContentLength = r.maxContentLength;
-        _verbosity = r.verbosity;
-        _keepAlive = r.keepAlive;
-        _contentType = r.contentType;
         _postData = r.postData;
 
         debug(requests) tracef("exec from range request: %s", r);
@@ -1927,22 +1913,12 @@ public struct HTTPRequest {
         return _response;
     }
 
-    HTTPResponse exec_from_multipart_form(Request r) {
+    HTTPResponse exec_from_multipart_form(ref Request r) {
         import std.uuid;
         import std.file;
 
         _method = r.method;
         _uri = r.uri;
-        _params = r.params;
-        _useStreaming = r.useStreaming;
-        _cm = r.cm;
-        _permanent_redirects = r.permanent_redirects;
-        _maxRedirects = r.maxRedirects;
-        _authenticator = r.authenticator;
-        _maxHeadersLength = r.maxHeadersLength;
-        _maxContentLength = r.maxContentLength;
-        _verbosity = r.verbosity;
-        _keepAlive = r.keepAlive;
         _multipartForm = r.multipartForm;
 
         debug(requests) tracef("exec from multipart form request: %s", r);
@@ -2132,19 +2108,8 @@ public struct HTTPRequest {
         return _response;
     }
 
-    HTTPResponse exec_from_parameters(Request r) {
-        _method = r.method;
-        _uri = r.uri;
+    HTTPResponse exec_from_parameters(ref Request r) {
         _params = r.params;
-        _useStreaming = r.useStreaming;
-        _cm = r.cm;
-        _permanent_redirects = r.permanent_redirects;
-        _maxRedirects = r.maxRedirects;
-        _authenticator = r.authenticator;
-        _maxHeadersLength = r.maxHeadersLength;
-        _maxContentLength = r.maxContentLength;
-        _verbosity = r.verbosity;
-        _keepAlive = r.keepAlive;
 
         debug(requests) tracef("exec from parameters request: %s", r);
 
@@ -2336,6 +2301,23 @@ public struct HTTPRequest {
     }
     HTTPResponse execute(Request r)
     {
+        _method = r.method;
+        _uri = r.uri;
+        _useStreaming = r.useStreaming;
+        _cm = r.cm;
+        _permanent_redirects = r.permanent_redirects;
+        _maxRedirects = r.maxRedirects;
+        _authenticator = r.authenticator;
+        _maxHeadersLength = r.maxHeadersLength;
+        _maxContentLength = r.maxContentLength;
+        _verbosity = r.verbosity;
+        _keepAlive = r.keepAlive;
+        _bufferSize = r.bufferSize;
+        _proxy = r.proxy;
+        _timeout = r.timeout;
+        _contentType = r.contentType;
+        _socketFactory = r.socketFactory;
+
         debug(requests) trace("serving %s".format(r));
         if ( !r.postData.empty)
         {

@@ -24,7 +24,7 @@ import requests.rangeadapter;
    To enable some protocol-specific featutes you have to use protocol interface directly (see docs for HTTPRequest or FTPRequest)
 */
 
-
+alias NetStreamFactory = NetworkStream delegate(string, string, ushort);
 
 interface Interceptor {
     Response opCall(Request r, RequestHandler next);
@@ -54,73 +54,48 @@ public struct Request {
         size_t         _maxContentLength;               // 0 - Unlimited
         uint           _verbosity = 0;
         bool          _keepAlive;
+        size_t        _bufferSize = 16*1024;
+        string        _proxy;
+        NetStreamFactory       _socketFactory;
+        QueryParam[]           _params;
+        MultipartForm          _multipartForm;
+        RefCounted!ConnManager _cm;                              // connection manager
+        string[URI]            _permanent_redirects;             // cache 301 redirects for GET requests
+        Interceptor[]          _interceptors;
+        string                 _contentType;                     // content type for POST/PUT payloads
+        InputRangeAdapter      _postData;
+        Duration               _timeout = 30.seconds;
+
         HTTPRequest   _http;  // route all http/https requests here
         FTPRequest    _ftp;   // route all ftp requests here
     }
     /// Set timeout on connection and IO operation.
     /// $(B v) - timeout value
     /// If timeout expired Request operation will throw $(B TimeoutException).
-    @property void timeout(Duration v) pure @nogc nothrow {
-        _http.timeout = v;
-        _ftp.timeout = v;
-    }
+    mixin(Getter_Setter!Duration("timeout"));
     /// Set http keepAlive value
     /// $(B v) - use keepalive requests - $(B true), or not - $(B false)
     /// Request will automatically reopen connection when host, protocol
     /// or port change (so it is safe to send different requests through
     /// single instance of Request).
     /// It also recovers if server prematurely close keep-alive connection.
-    @property void keepAlive(bool v) pure @nogc nothrow {
-        _keepAlive = v;
-    }
-    @property bool keepAlive() pure @nogc nothrow {
-        return _keepAlive;
-    }
+    mixin(Getter_Setter!bool("keepAlive"));
     /// Set limit on HTTP redirects
     /// $(B v) - limit on redirect depth
     /// Throws $(B MaxRedirectsException) when limit is reached.
-    @property void maxRedirects(uint v) pure @nogc nothrow {
-        _maxRedirects = v;
-    }
-    @property auto maxRedirects() pure @nogc nothrow {
-        return _maxRedirects;
-    }
+    mixin(Getter_Setter!uint("maxRedirects"));
     /// Set maximum content lenth both for http and ftp requests
     /// $(B v) - maximum content length in bytes. When limit reached - throws $(B RequestException)
-    @property void maxContentLength(size_t v) pure @nogc nothrow {
-        _maxContentLength = v;
-        //_http.maxContentLength = v;
-        //_ftp.maxContentLength = v;
-    }
-    @property auto maxContentLength() pure @nogc nothrow {
-        return _maxContentLength;
-        //_http.maxContentLength = v;
-        //_ftp.maxContentLength = v;
-    }
+    mixin(Getter_Setter!uint("maxContentLength"));
     /// Set maximum length for HTTP headers
     /// $(B v) - maximum length of the HTTP response. When limit reached - throws $(B RequestException)
-    @property void maxHeadersLength(size_t v) pure @nogc nothrow {
-        _maxHeadersLength = v;
-    }
-    @property auto maxHeadersLength() pure @nogc nothrow {
-        return _maxHeadersLength;
-    }
+    mixin(Getter_Setter!size_t("maxHeadersLength"));
     /// Set IO buffer size for http and ftp requests
     /// $(B v) - buffer size in bytes.
-    @property void bufferSize(size_t v) {
-        _http.bufferSize = v;
-        _ftp.bufferSize = v;
-    }
+    mixin(Getter_Setter!size_t("bufferSize"));
     /// Set verbosity for HTTP or FTP requests.
     /// $(B v) - verbosity level (0 - no output, 1 - headers to stdout, 2 - headers and data hexdump to stdout). default = 0.
-    @property void verbosity(uint v) {
-        _verbosity = v;
-        _http.verbosity = v;
-        _ftp.verbosity = v;
-    }
-    @property auto verbosity() {
-        return _verbosity;
-    }
+    mixin(Getter_Setter!uint("verbosity"));
     /++ Set authenticator for http requests.
      +   $(B v) - Auth instance.
      +   Example:
@@ -133,26 +108,25 @@ public struct Request {
      +   }
      +   ---
      +/
-    @property void authenticator(Auth v) {
-        _authenticator = v;
-        _http.authenticator = v;
-        _ftp.authenticator = v;
-    }
-    @property auto authenticator() {
-        return _authenticator;
-    }
+    mixin(Getter_Setter!Auth("authenticator"));
     /// set proxy property.
     /// $(B v) - full url to proxy.
     ///
     /// Note that we recognize proxy settings from process environment (see $(LINK https://github.com/ikod/dlang-requests/issues/46)):
     /// you can use http_proxy, https_proxy, all_proxy (as well as uppercase names).
-    @property void proxy(string v) {
-        _http.proxy = v;
-        _ftp.proxy = v;
-    }
-    @property void socketFactory(NetworkStream delegate(string, string, ushort) f) {
-        _http.socketFactory = f;
-    }
+    mixin(Getter_Setter!string("proxy"));
+    mixin(Getter_Setter!string("method"));
+    mixin(Getter_Setter!URI("uri"));
+    mixin(Getter_Setter!(QueryParam[])("params"));
+    mixin(Getter_Setter!string("contentType"));
+    mixin(Getter_Setter!InputRangeAdapter("postData"));
+    mixin(Getter_Setter!(string[URI])("permanent_redirects"));
+    mixin(Getter_Setter!MultipartForm("multipartForm"));
+    mixin(Getter_Setter!NetStreamFactory("socketFactory"));
+    mixin(Getter_Setter!bool("useStreaming"));
+    //@property void socketFactory(NetworkStream delegate(string, string, ushort) f) {
+    //    _http.socketFactory = f;
+    //}
     /++ Set Cookie for http requests.
         $(B v) - array of cookie.
 
@@ -212,12 +186,13 @@ public struct Request {
      ---
     +/
 
-    @property void useStreaming(bool v) pure @nogc nothrow {
-        _useStreaming = v;
-    }
-    @property bool useStreaming() pure @nogc nothrow {
-        return _useStreaming;
-    }
+    //@property void useStreaming(bool v) pure @nogc nothrow {
+    //    _useStreaming = v;
+    //}
+    //@property bool useStreaming() pure @nogc nothrow {
+    //    return _useStreaming;
+    //}
+
     ///
     /// get length og actually received content.
     /// this value increase over time, while we receive data
@@ -339,64 +314,12 @@ public struct Request {
     /// When arguments do not conform scheme (for example you try to call get("ftp://somehost.net/pub/README", {"a":"b"}) which doesn't make sense)
     /// you will receive Exception("Operation not supported for ftp")
     ///
-    //Response get(A...)(string uri, A args) {
-    //    if ( uri ) {
-    //        _uri = URI(uri);
-    //        _uri.idn_encode();
-    //    }
-    //    _method = "GET";
-    //    final switch ( _uri.scheme ) {
-    //        case "http", "https":
-    //            _http.uri = _uri;
-    //            static if (__traits(compiles, _http.get(null, args))) {
-    //                return _http.get(null, args);
-    //            } else {
-    //                throw new Exception("Operation not supported for http");
-    //            }
-    //        case "ftp":
-    //            static if (args.length == 0) {
-    //                return _ftp.get(uri);
-    //            } else {
-    //                throw new Exception("Operation not supported for ftp");
-    //            }
-    //    }
-    //}
+
     /// Execute POST for http and STOR file for FTP.
     /// You have to provide  $(B uri) and data. Data should conform to HTTPRequest.post or FTPRequest.post depending on the URI scheme.
     /// When arguments do not conform scheme you will receive Exception("Operation not supported for ftp")
     ///
-    //Response post(A...)(string uri, A args) {
-    //    if ( uri ) {
-    //        _uri = URI(uri);
-    //        _uri.idn_encode();
-    //    }
-    //    _method = "POST";
-    //    final switch ( _uri.scheme ) {
-    //        case "http", "https":
-    //            _http.uri = _uri;
-    //            static if (__traits(compiles, _http.post(null, args))) {
-    //                return _http.post(null, args);
-    //            } else {
-    //                throw new Exception("Operation not supported for http");
-    //            }
-    //        case "ftp":
-    //            static if (__traits(compiles, _ftp.post(uri, args))) {
-    //                return _ftp.post(uri, args);
-    //            } else {
-    //                throw new Exception("Operation not supported for ftp");
-    //            }
-    //    }
-    //}
-    /++
-     + Execute request with method
-     +/
-    //Response exec(string method="GET", A...)(string uri, A args) {
-    //    _method = method;
-    //    _uri = URI(uri);
-    //    _uri.idn_encode();
-    //    _http.uri = _uri;
-    //    return _http.exec!(method)(null, args);
-    //}
+
     Response exec(string method="GET", A...)(string url, A args)
     {
         return execute(method, url, args);
@@ -414,48 +337,9 @@ public struct Request {
     }
 
     /////////////////////////////////////////////////////////////////////
-    private QueryParam[]           _params;
-    private MultipartForm          _multipartForm;
-    private RefCounted!ConnManager _cm;                              // connection manager
-    private string[URI]            _permanent_redirects;             // cache 301 redirects for GET requests
-    private Interceptor[]          _interceptors;
-    private string                 _contentType;                     // content type for POST/PUT payloads
-    private InputRangeAdapter      _postData;
 
     @property auto cm() {
         return _cm;
-    }
-    @property string method() {
-        return _method;
-    }
-    @property URI uri() {
-        return _uri;
-    }
-    @property QueryParam[] params() {
-        return _params;
-    }
-    @property string contentType()
-    {
-        return _contentType;
-    }
-    @property void contentType(string v)
-    {
-        _contentType = v;
-    }
-    @property InputRangeAdapter postData()
-    {
-        return _postData;
-    }
-    @property auto permanent_redirects() {
-        return _permanent_redirects;
-    }
-    @property auto multipartForm()
-    {
-        return _multipartForm;
-    }
-    @property auto multipartForm(MultipartForm f)
-    {
-        return _multipartForm;
     }
     @property bool hasMultipartForm()
     {
@@ -579,24 +463,22 @@ public struct Request {
 
 unittest {
     info("testing Request");
-    class LogInterceptor : Interceptor {
+    int interceptorCalls;
+
+    class DummyInterceptor : Interceptor {
         Response opCall(Request r, RequestHandler next)
         {
-            info("interceptor enter");
+            interceptorCalls++;
             auto rs = next.handle(r);
-            info("interceptor leaved, rs = %s".format(rs));
             return rs;
         }
     }
-    globalLogLevel = LogLevel.trace;
+    globalLogLevel = LogLevel.info;
     Request rq;
     Response rs;
-    rq._cm = RefCounted!ConnManager(10);
-    rq.addInterceptor(new LogInterceptor());
+    rq.addInterceptor(new DummyInterceptor());
 
-    infof("cm: %d", rq._cm.refCountedStore().refCount());
     rs = rq.execute("GET", "http://google.com");
-    info("try streaming");
     rq.useStreaming = true;
     rq.bufferSize = 128;
     rs = rq.execute("GET", "http://google.com");
@@ -606,5 +488,6 @@ unittest {
         s.front;
         s.popFront();
     }
+    assert(interceptorCalls == 2, "Expected interceptorCalls==2, got %d".format(interceptorCalls));
     globalLogLevel = LogLevel.info;
 }

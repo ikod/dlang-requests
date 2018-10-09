@@ -119,21 +119,17 @@ unittest {
 
     auto s0 = "abc";
     InputRangeAdapter ira = makeAdapter(s0);
-    writefln("ira0.length = %d", ira.length);
     assert(ira.equal(["abc"]));
 
     auto s1 = "abc".representation();
     ira = makeAdapter(s1);
-    writefln("ira1.length = %d", ira.length);
     assert(ira.equal(["abc".representation()]));
 
     auto s2 = ["abc".representation, "кококо".representation];
     ira = makeAdapter(s2);
-    writefln("ira2.length = %d", ira.length);
     assert(ira.equal(s2));
 
     auto f = File("README.md", "r");
     auto r = f.byLine();
     ira = makeAdapter(r);
-    //writeln(ira);
 }

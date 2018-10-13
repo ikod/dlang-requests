@@ -7,6 +7,7 @@ public import requests.base;
 public import requests.uri;
 public import requests.request;
 public import requests.pool;
+public import requests.utils;
 
 import std.datetime;
 import std.conv;
@@ -173,7 +174,7 @@ package unittest {
     json = parseJSON(cast(string)rs.responseBody.data).object["cookies"].object;
     assert(json["A"].str == "abcd");
     assert(json["b"].str == "cdef");
-    foreach(c; rq.cookie) {
+    foreach(c; rq.cookie._array) {
         final switch(c.attr) {
             case "A":
                 assert(c.value == "abcd");

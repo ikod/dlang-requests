@@ -142,7 +142,7 @@ public struct MultipartForm {
         _sources ~= FormData(name, i, parameters);
         return this;
     }
-    bool empty()
+    bool empty() const
     {
         return _sources.length == 0;
     }

@@ -97,7 +97,7 @@ struct InputRangeAdapter {
     immutable(ubyte)[] front() {
         return _front();
     }
-    bool empty() {
+    bool empty() const {
         if ( _empty is null )
         {
             return true;

@@ -215,12 +215,12 @@ public struct HTTPRequest {
         DecodeChunked  _unChunker;
         long           _contentLength;
         long           _contentReceived;
-        Cookie[]       _cookie;
         SSLOptions     _sslOptions;
         string         _bind;
         _UH            _userHeaders;
 
         RefCounted!ConnManager      _cm;
+        RefCounted!Cookies          _cookie;
         string[URI]                 _permanent_redirects;            // cache 301 redirects for GET requests
         MultipartForm               _multipartForm;
 
@@ -261,18 +261,18 @@ public struct HTTPRequest {
     @property void sslSetCaCert(string path) pure @safe nothrow @nogc {
         _sslOptions.setCaCert(path);
     }
-    @property final void cookie(Cookie[] s) pure @safe @nogc nothrow {
-        _cookie = s;
-    }
+    //@property final void cookie(Cookie[] s) pure @safe @nogc nothrow {
+    //    _cookie = s;
+    //}
     @property final void proxy(string v) {
         if ( v != _proxy ) {
             _cm.clear();
         }
         _proxy = v;
     }
-    @property final Cookie[] cookie() pure @safe @nogc nothrow {
-        return _cookie;
-    }
+    //@property final Cookie[] cookie() pure @safe @nogc nothrow {
+    //    return _cookie;
+    //}
 
     this(string uri) {
         _uri = URI(uri);
@@ -426,8 +426,8 @@ public struct HTTPRequest {
             }
         }
 
-        if ( _cookie.length && !_userHeaders.Cookie ) {
-            auto cs = _cookie.
+        if ( _cookie._array.length && !_userHeaders.Cookie ) {
+            auto cs = _cookie._array.
                 filter!(c => _uri.path.pathMatches(c.path) && _uri.host.domainMatches(c.domain)).
                 map!(c => "%s=%s".format(c.attr, c.value)).
                 joiner(";");
@@ -561,7 +561,7 @@ public struct HTTPRequest {
                 _response._responseHeaders[header] = value;
                 continue;
             }
-            _cookie ~= processCookie(value);
+            _cookie._array ~= processCookie(value);
         }
     }
 
@@ -853,7 +853,6 @@ public struct HTTPRequest {
                 // set up response
                 _response.receiveAsRange.activated = true;
                 _response.receiveAsRange.data = _response._responseBody.data;
-                debug(requests) tracef("data length at the sreaming beginnig %d", _response._receiveAsRange.data.length);
                 _response.receiveAsRange.read = delegate ubyte[] () {
 
                     while(true) {
@@ -1727,7 +1726,7 @@ public struct HTTPRequest {
         _stream.send("0\r\n\r\n");
     }
 
-    HTTPResponse exec_from_range(ref Request r)
+    HTTPResponse exec_from_range(const Request r)
     do {
 
         _postData = r.postData;
@@ -1919,7 +1918,7 @@ public struct HTTPRequest {
 
         _method = r.method;
         _uri = r.uri;
-        _multipartForm = r.multipartForm;
+        _multipartForm = r.multipartForm; // can't use const Request r bacause this can be changed
 
         debug(requests) tracef("exec from multipart form request: %s", r);
 
@@ -2108,8 +2107,8 @@ public struct HTTPRequest {
         return _response;
     }
 
-    HTTPResponse exec_from_parameters(ref Request r) {
-        _params = r.params;
+    HTTPResponse exec_from_parameters(const Request r) {
+        _params = r.params.dup;
 
         debug(requests) tracef("exec from parameters request: %s", r);
 
@@ -2304,7 +2303,6 @@ public struct HTTPRequest {
         _method = r.method;
         _uri = r.uri;
         _useStreaming = r.useStreaming;
-        _cm = r.cm;
         _permanent_redirects = r.permanent_redirects;
         _maxRedirects = r.maxRedirects;
         _authenticator = r.authenticator;
@@ -2317,6 +2315,12 @@ public struct HTTPRequest {
         _timeout = r.timeout;
         _contentType = r.contentType;
         _socketFactory = r.socketFactory;
+        _sslOptions = r.sslOptions;
+
+        // this assignments increments refCounts, so we can't use const Request
+        // but Request is anyway struct and called by-value
+        _cm = r.cm;
+        _cookie = r.cookie;
 
         debug(requests) trace("serving %s".format(r));
         if ( !r.postData.empty)
@@ -2327,7 +2331,8 @@ public struct HTTPRequest {
         {
             return exec_from_multipart_form(r);
         }
-        return exec_from_parameters(r);
+        auto rs = exec_from_parameters(r);
+        return rs;
     }
     // XXX interceptors
 }
@@ -2535,7 +2540,7 @@ package unittest {
         auto json = parseJSON(cast(string)rs.responseBody.data).object["cookies"].object;
         assert(json["A"].str == "abcd");
         assert(json["b"].str == "cdef");
-        foreach(c; rq.cookie) {
+        foreach(c; rq._cookie._array) {
             final switch(c.attr) {
                 case "A":
                     assert(c.value == "abcd");

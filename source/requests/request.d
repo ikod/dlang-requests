@@ -45,26 +45,40 @@ class RequestHandler {
 
 public struct Request {
     private {
-        URI           _uri;
-        string        _method;
-        bool          _useStreaming;
-        uint          _maxRedirects = 10;
-        Auth          _authenticator;
-        size_t         _maxHeadersLength = 32 * 1024;   // 32 KB
-        size_t         _maxContentLength;               // 0 - Unlimited
-        uint           _verbosity = 0;
-        bool          _keepAlive;
-        size_t        _bufferSize = 16*1024;
-        string        _proxy;
-        NetStreamFactory       _socketFactory;
-        QueryParam[]           _params;
-        MultipartForm          _multipartForm;
-        RefCounted!ConnManager _cm;                              // connection manager
-        string[URI]            _permanent_redirects;             // cache 301 redirects for GET requests
-        Interceptor[]          _interceptors;
-        string                 _contentType;                     // content type for POST/PUT payloads
-        InputRangeAdapter      _postData;
-        Duration               _timeout = 30.seconds;
+        // request configuration
+        bool                    _useStreaming;
+        uint                    _maxRedirects = 10;
+        Auth                    _authenticator;
+        size_t                  _maxHeadersLength = 32 * 1024;   // 32 KB
+        size_t                  _maxContentLength;               // 0 - Unlimited
+        uint                    _verbosity = 0;
+        bool                    _keepAlive = true;
+        size_t                  _bufferSize = 16*1024;
+        string                  _proxy;
+        string                  _contentType;                     // content type for POST/PUT payloads
+        Duration                _timeout = 30.seconds;
+        bool                    _sslSetVerifyPeer = true;
+        SSLOptions              _sslOptions;
+        //
+
+        // instrumentation
+        NetStreamFactory        _socketFactory;
+        Interceptor[]           _interceptors;
+        //
+
+        // parameters for each request
+        URI                     _uri;
+        string                  _method;
+        QueryParam[]            _params;
+        MultipartForm           _multipartForm;
+        InputRangeAdapter       _postData;
+        //
+
+        // can be changed during execution
+        RefCounted!ConnManager  _cm;                              // connection manager
+        RefCounted!Cookies      _cookie;                          // cookies received
+        string[URI]             _permanent_redirects;             // cache 301 redirects for GET requests
+        //
 
         HTTPRequest   _http;  // route all http/https requests here
         FTPRequest    _ftp;   // route all ftp requests here
@@ -124,6 +138,22 @@ public struct Request {
     mixin(Getter_Setter!MultipartForm("multipartForm"));
     mixin(Getter_Setter!NetStreamFactory("socketFactory"));
     mixin(Getter_Setter!bool("useStreaming"));
+    mixin(Getter_Setter!(RefCounted!Cookies)("cookie"));
+    mixin(Getter!SSLOptions("sslOptions"));
+
+    @property void sslSetVerifyPeer(bool v) pure @safe nothrow @nogc {
+        _sslOptions.setVerifyPeer(v);
+    }
+    @property void sslSetKeyFile(string p, SSLOptions.filetype t = SSLOptions.filetype.pem) pure @safe nothrow @nogc {
+        _sslOptions.setKeyFile(p, t);
+    }
+    @property void sslSetCertFile(string p, SSLOptions.filetype t = SSLOptions.filetype.pem) pure @safe nothrow @nogc {
+        _sslOptions.setCertFile(p, t);
+    }
+    @property void sslSetCaCert(string path) pure @safe nothrow @nogc {
+        _sslOptions.setCaCert(path);
+    }
+
     //@property void socketFactory(NetworkStream delegate(string, string, ushort) f) {
     //    _http.socketFactory = f;
     //}
@@ -152,13 +182,13 @@ public struct Request {
         }
         ---
     +/
-    @property void cookie(Cookie[] v) pure @nogc nothrow {
-        _http.cookie = v;
-    }
-    /// Get Cookie for http requests.
-    @property Cookie[] cookie()  pure @nogc nothrow {
-        return _http.cookie;
-    }
+    //@property void cookie(Cookie[] v) pure @nogc nothrow {
+    //    _http.cookie = v;
+    //}
+    ///// Get Cookie for http requests.
+    //@property Cookie[] cookie()  pure @nogc nothrow {
+    //    return _http.cookie;
+    //}
     /++
      set "streaming" property
      $(B v) = value to set (true - use streaming).
@@ -226,9 +256,9 @@ public struct Request {
      +     auto rs = rq.get("https://localhost:4443/");
      + ---
      +/
-    @property void sslSetVerifyPeer(bool v) {
-        _http.sslSetVerifyPeer(v);
-    }
+    //@property void sslSetVerifyPeer(bool v) {
+    //    _http.sslSetVerifyPeer(v);
+    //}
 
     /++
      + Set path to ssl key file.
@@ -244,10 +274,6 @@ public struct Request {
      +     auto rs = rq.get("https://localhost:4443/");
      + ---
      +/
-    @property void sslSetKeyFile(string path, SSLOptions.filetype type = SSLOptions.filetype.pem) pure @safe nothrow @nogc {
-        _http.sslSetKeyFile(path, type);
-    }
-
     /++
      + Set path to ssl cert file.
      +
@@ -262,10 +288,6 @@ public struct Request {
      +     auto rs = rq.get("https://localhost:4443/");
      + ---
      +/
-    @property void sslSetCertFile(string path, SSLOptions.filetype type = SSLOptions.filetype.pem) pure @safe nothrow @nogc {
-        _http.sslSetCertFile(path, type);
-    }
-
     /++
      + Set path to ssl ca cert file.
      + Example:
@@ -275,14 +297,6 @@ public struct Request {
      +     auto rs = rq.get("https://localhost:4443/");
      + ---
      +/
-    @property void sslSetCaCert(string path) pure @safe nothrow @nogc {
-        _http.sslSetCaCert(path);
-    }
-
-    @property auto sslOptions() {
-        return _http.sslOptions();
-    }
-
     /++
      + Set local address for any outgoing requests.
      + $(B v) can be string with hostname or ip address.
@@ -341,7 +355,7 @@ public struct Request {
     @property auto cm() {
         return _cm;
     }
-    @property bool hasMultipartForm()
+    @property bool hasMultipartForm() const
     {
         return !_multipartForm.empty;
     }
@@ -388,16 +402,7 @@ public struct Request {
     }
     Response get(string uri, QueryParam[] params = null)
     {
-        if ( uri ) {
-            _uri = URI(uri);
-            _uri.idn_encode();
-        }
-        final switch ( _uri.scheme ) {
-            case "http", "https":
-                return execute("GET", uri, params);
-            case "ftp":
-                return execute("GET", uri);
-        }
+        return execute("GET", uri, params);
     }
     Response execute(R)(string method, string url, R content, string ct = "application/octet-stream")
     {
@@ -415,6 +420,10 @@ public struct Request {
         {
             _cm = RefCounted!ConnManager(10);
         }
+        if ( _cookie.refCountedStore().refCount() == 0)
+        {
+            _cookie = RefCounted!Cookies();
+        }
         auto interceptors = _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);
         return handler.handle(this);
@@ -431,9 +440,14 @@ public struct Request {
         // https://issues.dlang.org/show_bug.cgi?id=10535
         _permanent_redirects[URI.init] = ""; _permanent_redirects.remove(URI.init);
         //
+
         if ( _cm.refCountedStore().refCount() == 0)
         {
             _cm = RefCounted!ConnManager(10);
+        }
+        if ( _cookie.refCountedStore().refCount() == 0)
+        {
+            _cookie = RefCounted!Cookies();
         }
         auto interceptors = _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);
@@ -454,9 +468,14 @@ public struct Request {
         {
             _cm = RefCounted!ConnManager(10);
         }
+        if ( _cookie.refCountedStore().refCount() == 0)
+        {
+            _cookie = RefCounted!Cookies(Cookies());
+        }
         auto interceptors = _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);
-        return handler.handle(this);
+        auto r = handler.handle(this);
+        return r;
     }
     ///////////////////////////////////////////////////////////////////////
 }

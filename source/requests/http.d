@@ -13,7 +13,6 @@ import std.range;
 import std.string;
 import std.traits;
 import std.typecons;
-import std.bitmanip;
 import std.experimental.logger;
 import core.thread;
 
@@ -182,19 +181,6 @@ public class HTTPResponse : Response {
 ///
 public struct HTTPRequest {
     private {
-        struct _UH {
-            // flags for each important header, added by user using addHeaders
-            mixin(bitfields!(
-                bool, "Host", 1,
-                bool, "UserAgent", 1,
-                bool, "ContentLength", 1,
-                bool, "Connection", 1,
-                bool, "AcceptEncoding", 1,
-                bool, "ContentType", 1,
-                bool, "Cookie", 1,
-                uint, "", 1
-            ));
-        }
         string         _method = "GET";
         URI            _uri;
         string[string] _headers;
@@ -2316,7 +2302,9 @@ public struct HTTPRequest {
         _contentType = r.contentType;
         _socketFactory = r.socketFactory;
         _sslOptions = r.sslOptions;
-
+        _bind = r.bind;
+        _headers = r.headers;
+        _userHeaders = r.userHeaders;
         // this assignments increments refCounts, so we can't use const Request
         // but Request is anyway struct and called by-value
         _cm = r.cm;

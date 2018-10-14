@@ -11,6 +11,7 @@ import std.stdio;
 import std.algorithm;
 import std.string;
 import std.exception;
+import std.bitmanip;
 
 public interface Auth {
     string[string] authHeaders(string domain);
@@ -254,4 +255,18 @@ public class Response {
         }
         return a.data();
     }
+}
+
+struct _UH {
+    // flags for each important header, added by user using addHeaders
+    mixin(bitfields!(
+    bool, "Host", 1,
+    bool, "UserAgent", 1,
+    bool, "ContentLength", 1,
+    bool, "Connection", 1,
+    bool, "AcceptEncoding", 1,
+    bool, "ContentType", 1,
+    bool, "Cookie", 1,
+    uint, "", 1
+    ));
 }

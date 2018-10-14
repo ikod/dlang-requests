@@ -668,6 +668,7 @@ public struct FTPRequest {
         _postData = r.postData;
         _bufferSize = r.bufferSize;
         _proxy = r.proxy;
+        _bind = r.bind;
 
         if ( method == "GET" )
         {

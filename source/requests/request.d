@@ -13,6 +13,7 @@ import std.format;
 import std.typecons;
 import std.stdio;
 import std.algorithm;
+import std.uni;
 
 import requests.utils;
 import requests.connmanager;
@@ -59,6 +60,9 @@ public struct Request {
         Duration                _timeout = 30.seconds;
         bool                    _sslSetVerifyPeer = true;
         SSLOptions              _sslOptions;
+        string                  _bind;
+        _UH                     _userHeaders;
+        string[string]          _headers;
         //
 
         // instrumentation
@@ -140,7 +144,13 @@ public struct Request {
     mixin(Getter_Setter!bool("useStreaming"));
     mixin(Getter_Setter!(RefCounted!Cookies)("cookie"));
     mixin(Getter!SSLOptions("sslOptions"));
+    mixin(Getter_Setter!string("bind"));
+    mixin(Getter_Setter!(string[string])("headers"));
 
+    package @property auto userHeaders() pure @safe nothrow @nogc
+    {
+        return _userHeaders;
+    }
     @property void sslSetVerifyPeer(bool v) pure @safe nothrow @nogc {
         _sslOptions.setVerifyPeer(v);
     }
@@ -301,10 +311,10 @@ public struct Request {
      + Set local address for any outgoing requests.
      + $(B v) can be string with hostname or ip address.
      +/
-    @property void bind(string v) {
-        _http.bind(v);
-        _ftp.bind(v);
-    }
+    //@property void bind(string v) {
+    //    _http.bind(v);
+    //    _ftp.bind(v);
+    //}
 
     /++
      + Add headers to request
@@ -317,11 +327,40 @@ public struct Request {
      +    rq.addHeaders(["X-Header": "test"]);
      + ---
      +/
+    /// Add headers to request
+    /// Params:
+    /// headers = headers to send.
     void addHeaders(in string[string] headers) {
-        _http.addHeaders(headers);
+        foreach(pair; headers.byKeyValue) {
+            string _h = pair.key;
+            switch(toLower(_h)) {
+                case "host":
+                    _userHeaders.Host = true;
+                    break;
+                case "user-agent":
+                    _userHeaders.UserAgent = true;
+                    break;
+                case "content-length":
+                    _userHeaders.ContentLength = true;
+                    break;
+                case "content-type":
+                    _userHeaders.ContentType = true;
+                    break;
+                case "connection":
+                    _userHeaders.Connection = true;
+                    break;
+                case "cookie":
+                    _userHeaders.Cookie = true;
+                    break;
+                default:
+                    break;
+            }
+            _headers[pair.key] = pair.value;
+        }
     }
     void clearHeaders() {
-        _http.clearHeaders();
+        _headers = null;
+        _userHeaders = _UH.init;
     }
     /// Execute GET for http and retrieve file for FTP.
     /// You have to provide at least $(B uri). All other arguments should conform to HTTPRequest.get or FTPRequest.get depending on the URI scheme.
@@ -342,13 +381,49 @@ public struct Request {
         return "Request(%s, %s)".format(_method, _uri.uri());
     }
     string format(string fmt) const {
-        final switch(_uri.scheme) {
-            case "http", "https":
-            return _http.format(fmt);
-            case "ftp":
-            return _ftp.format(fmt);
+        import std.array;
+        import std.stdio;
+        auto a = appender!string();
+        auto f = FormatSpec!char(fmt);
+        while (f.writeUpToNextSpec(a)) {
+            switch(f.spec) {
+                case 'h':
+                // Remote hostname.
+                a.put(_uri.host);
+                break;
+                case 'm':
+                // method.
+                a.put(_method);
+                break;
+                case 'p':
+                // Remote port.
+                a.put("%d".format(_uri.port));
+                break;
+                case 'P':
+                // Path
+                a.put(_uri.path);
+                break;
+                case 'q':
+                // query parameters supplied with url.
+                a.put(_uri.query);
+                break;
+                case 'U':
+                a.put(_uri.uri());
+                break;
+                default:
+                throw new FormatException("Unknown Request format spec " ~ f.spec);
+            }
         }
+        return a.data();
     }
+    //string format(string fmt) const {
+    //    final switch(_uri.scheme) {
+    //        case "http", "https":
+    //        return _http.format(fmt);
+    //        case "ftp":
+    //        return _ftp.format(fmt);
+    //    }
+    //}
 
     /////////////////////////////////////////////////////////////////////
 

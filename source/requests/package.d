@@ -42,6 +42,16 @@ package unittest {
     infof("testing Request");
     Request rq;
     Response rs;
+    // moved from http.d
+
+    URI uri = URI(httpbinUrl);
+    rs = rq.get(httpbinUrl);
+    assert(rs.code==200);
+    assert(rs.responseBody.length > 0);
+    assert(rq.format("%m|%h|%p|%P|%q|%U") ==
+    "GET|%s|%d|%s||%s"
+    .format(uri.host, uri.port, uri.path, httpbinUrl));
+
     //
     rs = rq.get(httpbinUrl);
     assert(rs.code==200);
@@ -129,6 +139,30 @@ package unittest {
             assert(data==s);
         }
     }
+    info("Check POST from QueryParams");
+    {
+        rs = rq.post(httpbinUrl ~ "post", queryParams("name[]", "first", "name[]", 2));
+        assert(rs.code==200);
+        auto data = parseJSON(cast(string)rs.responseBody).object["form"].object;
+        string[] a;
+        try {
+            a = to!(string[])(data["name[]"].str);
+        }
+        catch (JSONException e) {
+            a = data["name[]"].array.map!"a.str".array;
+        }
+        assert(equal(["first", "2"], a));
+    }
+    info("Check POST json");
+    {
+        rs = rq.post(httpbinUrl ~ "post?b=x", `{"a":"a b", "c":[1,2,3]}`, "application/json");
+        assert(rs.code==200);
+        auto j = parseJSON(cast(string)rs.responseBody).object["args"].object;
+        assert(j["b"].str == "x");
+        j = parseJSON(cast(string)rs.responseBody).object["json"].object;
+        assert(j["a"].str == "a b");
+        assert(j["c"].array.map!(a=>a.integer).array == [1,2,3]);
+    }
     // associative array
     info("Check POST from AA");
     rs = rq.post(httpbinUrl ~ "post", ["a":"b ", "c":"d"]);
@@ -139,14 +173,22 @@ package unittest {
     info("Check HEAD");
     rs = rq.exec!"HEAD"(httpbinUrl);
     assert(rs.code==200);
+    rs = rq.execute("HEAD", httpbinUrl);
+    assert(rs.code==200);
     info("Check DELETE");
     rs = rq.exec!"DELETE"(httpbinUrl ~ "delete");
+    assert(rs.code==200);
+    rs = rq.execute("DELETE", httpbinUrl ~ "delete");
     assert(rs.code==200);
     info("Check PUT");
     rs = rq.exec!"PUT"(httpbinUrl ~ "put",  `{"a":"b", "c":[1,2,3]}`, "application/json");
     assert(rs.code==200);
+    rs = rq.execute("PUT", httpbinUrl ~ "put",  `{"a":"b", "c":[1,2,3]}`, "application/json");
+    assert(rs.code==200);
     info("Check PATCH");
     rs = rq.exec!"PATCH"(httpbinUrl ~ "patch", "привiт, свiт!", "application/octet-stream");
+    assert(rs.code==200);
+    rs = rq.execute("PATCH", httpbinUrl ~ "patch", "привiт, свiт!", "application/octet-stream");
     assert(rs.code==200);
 
     info("Check compressed content");
@@ -160,13 +202,6 @@ package unittest {
     assert(rs.code==200);
     info("deflate - ok");
     
-    info("Check redirects");
-    rq = Request();
-    rq.keepAlive = true;
-    rs = rq.get(httpbinUrl ~ "relative-redirect/2");
-    assert((cast(HTTPResponse)rs).history.length == 2);
-    assert((cast(HTTPResponse)rs).code==200);
-
     info("Check cookie");
     rq = Request();
     rs = rq.get(httpbinUrl ~ "cookies/set?A=abcd&b=cdef");
@@ -186,6 +221,12 @@ package unittest {
     }
 
     info("Check redirects");
+    rq = Request();
+    rq.keepAlive = true;
+    rs = rq.get(httpbinUrl ~ "relative-redirect/2");
+    assert((cast(HTTPResponse)rs).history.length == 2);
+    assert((cast(HTTPResponse)rs).code==200);
+
     rs = rq.get(httpbinUrl ~ "absolute-redirect/2");
     assert((cast(HTTPResponse)rs).history.length == 2);
     assert((cast(HTTPResponse)rs).code==200);
@@ -195,6 +236,10 @@ package unittest {
     rq.keepAlive = false;
     assertThrown!MaxRedirectsException(rq.get(httpbinUrl ~ "absolute-redirect/3"));
 
+    rq.maxRedirects = 0;
+    rs = rq.get(httpbinUrl ~ "absolute-redirect/1");
+    assert(rs.code==302);
+    rq.maxRedirects = 10;
 
     info("Check chunked content");
     rq = Request();
@@ -295,6 +340,44 @@ package unittest {
         streamedContent ~= stream.front;
         stream.popFront();
     }
+    info("Check POST files using multiPartForm");
+    {
+        /// This is example on usage files with MultipartForm data.
+        /// For this example we have to create files which will be sent.
+        import std.file;
+        import std.path;
+        /// preapare files
+        auto tmpd = tempDir();
+        auto tmpfname1 = tmpd ~ dirSeparator ~ "request_test1.txt";
+        auto f = File(tmpfname1, "wb");
+        f.rawWrite("file1 content\n");
+        f.close();
+        auto tmpfname2 = tmpd ~ dirSeparator ~ "request_test2.txt";
+        f = File(tmpfname2, "wb");
+        f.rawWrite("file2 content\n");
+        f.close();
+        ///
+        /// Ok, files ready.
+        /// Now we will prepare Form data
+        ///
+        File f1 = File(tmpfname1, "rb");
+        File f2 = File(tmpfname2, "rb");
+        scope(exit) {
+            f1.close();
+            f2.close();
+        }
+        ///
+        /// for each part we have to set field name, source (ubyte array or opened file) and optional filename and content-type
+        ///
+        MultipartForm mForm = MultipartForm().
+        add(formData("Field1", cast(ubyte[])"form field from memory")).
+        add(formData("Field2", cast(ubyte[])"file field from memory", ["filename":"data2"])).
+        add(formData("File1", f1, ["filename":"file1", "Content-Type": "application/octet-stream"])).
+        add(formData("File2", f2, ["filename":"file2", "Content-Type": "application/octet-stream"]));
+        /// everything ready, send request
+        rs = rq.post(httpbinUrl ~ "post", mForm);
+    }
+
     rq = Request();
     mpform = MultipartForm().add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
     rs = rq.post(httpbinUrl ~ "post", mpform);
@@ -314,6 +397,10 @@ package unittest {
         // internal httpbin server return array ob bytes
         assert(s.representation == flat_content.array.map!(i => i.integer).array);
     }
+
+    info("Check exception handling, error messages and timeous are OK");
+    rq.timeout = 1.seconds;
+    assertThrown!TimeoutException(rq.get(httpbinUrl ~ "delay/3"));
 
     info("Test get in parallel");
     {

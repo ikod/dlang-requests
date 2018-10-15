@@ -128,7 +128,8 @@ public class HTTPResponse : Response {
         _history.length = 0;
     }
 
-    mixin(Getter!string("status_line"));
+    mixin(Getter("status_line"));
+
     @property final string[string] responseHeaders() @safe @nogc nothrow {
         return _responseHeaders;
     }
@@ -225,12 +226,12 @@ public struct HTTPRequest {
     mixin(Getter_Setter!size_t     ("bufferSize"));
     mixin(Getter_Setter!uint       ("maxRedirects"));
     mixin(Getter_Setter!uint       ("verbosity"));
-    mixin(Getter!string            ("proxy"));
+    mixin(Getter                   ("proxy"));
     mixin(Getter_Setter!Duration   ("timeout"));
     mixin(Setter!Auth              ("authenticator"));
     mixin(Getter_Setter!bool       ("useStreaming"));
-    mixin(Getter!long              ("contentLength"));
-    mixin(Getter!long              ("contentReceived"));
+    mixin(Getter                   ("contentLength"));
+    mixin(Getter                   ("contentReceived"));
     mixin(Getter_Setter!SSLOptions ("sslOptions"));
     mixin(Getter_Setter!string     ("bind"));
     mixin(Setter!NetStreamFactory  ("socketFactory"));
@@ -837,6 +838,7 @@ public struct HTTPRequest {
                 auto __bufferSize = _bufferSize;
 
                 // set up response
+                _response._contentLength = _contentLength;
                 _response.receiveAsRange.activated = true;
                 _response.receiveAsRange.data = _response._responseBody.data;
                 _response.receiveAsRange.read = delegate ubyte[] () {
@@ -870,7 +872,7 @@ public struct HTTPRequest {
                         if ( verbosity>=3 ) {
                             writeln(b[0..read].dump.join("\n"));
                         }
-
+                        _response._contentReceived += read;
                         __contentReceived += read;
                         __bodyDecoder.putNoCopy(b[0..read]);
                         auto res = __bodyDecoder.getNoCopy();
@@ -1226,6 +1228,7 @@ public struct HTTPRequest {
     ///      auto f = File("tests/test.txt", "rb");
     ///      rs = rq.exec!"POST"("http://httpbin.org/post", f.byChunk(3), "application/octet-stream");
     ///  --------------------------------------------------------------------------------------------------------
+    deprecated("Use Request() instead of HTTPRequest(); will be removed 2019-07")
     HTTPResponse exec(string method="POST", R)(string url, R content, string contentType="application/octet-stream")
         if ( (rank!R == 1)
             || (rank!R == 2 && isSomeChar!(Unqual!(typeof(content.front.front))))
@@ -1426,6 +1429,7 @@ public struct HTTPRequest {
     ///     rs = Request().exec!"GET"("http://httpbin.org/get", ["c":"d", "a":"b"]);
     ///  ---------------------------------------------------------------------------------
     ///
+    deprecated("Use Request() instead of HTTPRequest; will be removed 2019-07")
     HTTPResponse exec(string method="GET")(string url = null, QueryParam[] params = null)
     do {
         debug(requests) tracef("started url=%s, this._uri=%s", url, _uri);
@@ -1642,6 +1646,7 @@ public struct HTTPRequest {
     ///    rs = rq.exec!"POST"("http://httpbin.org/post", files);
     /// ---------------------------------------------------------------
     ///
+    deprecated("Use Request() instead of HTTPRequest(); will be removed 2019-07")
     HTTPResponse exec(string method="POST")(string url, PostFile[] files) if (method=="POST") {
         MultipartForm multipart;
         File[]        toClose;
@@ -1664,6 +1669,7 @@ public struct HTTPRequest {
     ///     params = dictionary with field names as keys and field values as values.
     /// Returns:
     ///     Response
+    deprecated("Use Request() instead of HTTPRequest(); will be removed 2019-07")
     HTTPResponse exec(string method="GET")(string url, string[string] params) {
         return exec!method(url, params.byKeyValue.map!(p => QueryParam(p.key, p.value)).array);
     }
@@ -1672,6 +1678,7 @@ public struct HTTPRequest {
     /// Params:
     /// args = request parameters. see exec docs.
     ///
+    deprecated("Use Request() instead of HTTPRequest; will be removed 2019-07")
     HTTPResponse get(A...)(A args) {
         return exec!"GET"(args);
     }
@@ -1681,6 +1688,7 @@ public struct HTTPRequest {
     /// uri = endpoint uri
     /// args = request parameters. see exec docs.
     ///
+    deprecated("Use Request() instead of HTTPRequest; will be removed 2019-07")
     HTTPResponse post(A...)(string uri, A args) {
         return exec!"POST"(uri, args);
     }
@@ -1727,7 +1735,7 @@ public struct HTTPRequest {
         bool restartedRequest = false;
         bool send_flat;
 
-        connect:
+    connect:
         _contentReceived = 0;
         _response._startedAt = Clock.currTime;
 
@@ -1885,7 +1893,7 @@ public struct HTTPRequest {
             debug(requests) tracef("Redirected to %s", next_uri);
             if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
                 // 307 and 308 do not change method
-                return this.get(new_location);
+                return exec_from_parameters(r);
             }
             if ( restartedRequest ) {
                 debug(requests) trace("Rare event: clearing 'restartedRequest' on redirect");
@@ -2080,7 +2088,7 @@ public struct HTTPRequest {
             debug(requests) tracef("Redirected to %s", next_uri);
             if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
                 // 307 and 308 do not change method
-                return this.get(new_location);
+                return exec_from_parameters(r);
             }
             if ( restartedRequest ) {
                 debug(requests) trace("Rare event: clearing 'restartedRequest' on redirect");
@@ -2272,7 +2280,7 @@ public struct HTTPRequest {
             debug(requests) tracef("Redirected to %s", next_uri);
             if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
                 // 307 and 308 do not change method
-                return this.get(new_location);
+                return exec_from_parameters(r);
             }
             if ( restartedRequest ) {
                 debug(requests) trace("Rare event: clearing 'restartedRequest' on redirect");
@@ -2343,264 +2351,3 @@ else {
         return cast(string)(v.array.map!"cast(ubyte)a.integer".array);
     }
 }
-
-
-package unittest {
-    import std.json;
-    import std.array;
-
-    globalLogLevel(LogLevel.info);
-
-    string httpbinUrl = httpTestServer();
-    version(vibeD) {
-    }
-    else {
-        import httpbin;
-        auto server = httpbinApp();
-        server.start();
-        scope(exit) {
-            server.stop();
-        }
-    }
-    HTTPRequest  rq;
-    HTTPResponse rs;
-    info("Check GET");
-    URI uri = URI(httpbinUrl);
-    rs = rq.get(httpbinUrl);
-    assert(rs.code==200);
-    assert(rs.responseBody.length > 0);
-    assert(rq.format("%m|%h|%p|%P|%q|%U") ==
-            "GET|%s|%d|%s||%s"
-            .format(uri.host, uri.port, uri.path, httpbinUrl));
-    info("Check GET with AA params");
-    {
-        rs = rq.get(httpbinUrl ~ "get", ["c":" d", "a":"b"]);
-        assert(rs.code == 200);
-        auto json = parseJSON(cast(string)rs.responseBody.data).object["args"].object;
-        assert(json["c"].str == " d");
-        assert(json["a"].str == "b");
-    }
-    rq.keepAlive = false; // disable keepalive on non-idempotent requests
-    info("Check POST files");
-    {
-        import std.file;
-        import std.path;
-        auto tmpd = tempDir();
-        auto tmpfname = tmpd ~ dirSeparator ~ "request_test.txt";
-        auto f = File(tmpfname, "wb");
-        f.rawWrite("abcdefgh\n12345678\n");
-        f.close();
-        // files
-        PostFile[] files = [
-            {fileName: tmpfname, fieldName:"abc", contentType:"application/octet-stream"},
-            {fileName: tmpfname}
-        ];
-        rs = rq.post(httpbinUrl ~ "post", files);
-        assert(rs.code==200);
-    }
-    info("Check POST chunked from file.byChunk");
-    {
-        import std.file;
-        import std.path;
-        auto tmpd = tempDir();
-        auto tmpfname = tmpd ~ dirSeparator ~ "request_test.txt";
-        auto f = File(tmpfname, "wb");
-        f.rawWrite("abcdefgh\n12345678\n");
-        f.close();
-        f = File(tmpfname, "rb");
-        rs = rq.post(httpbinUrl ~ "post", f.byChunk(3), "application/octet-stream");
-        if (httpbinUrl != "http://httpbin.org/") {
-            assert(rs.code==200);
-            auto data = fromJsonArrayToStr(parseJSON(cast(string)rs.responseBody).object["data"]);
-            assert(data=="abcdefgh\n12345678\n");
-        }
-        f.close();
-    }
-    info("Check POST chunked from lineSplitter");
-    {
-        auto s = lineSplitter("one,\ntwo,\nthree.");
-        rs = rq.exec!"POST"(httpbinUrl ~ "post", s, "application/octet-stream");
-        if (httpbinUrl != "http://httpbin.org/") {
-            assert(rs.code==200);
-            auto data = fromJsonArrayToStr(parseJSON(cast(string)rs.responseBody).object["data"]);
-            assert(data=="one,two,three.");
-        }
-    }
-    info("Check POST chunked from array");
-    {
-        auto s = ["one,", "two,", "three."];
-        rs = rq.post(httpbinUrl ~ "post", s, "application/octet-stream");
-        if (httpbinUrl != "http://httpbin.org/") {
-            assert(rs.code==200);
-            auto data = fromJsonArrayToStr(parseJSON(cast(string)rs.responseBody).object["data"]);
-            assert(data=="one,two,three.");
-        }
-    }
-    info("Check POST chunked using std.range.chunks()");
-    {
-        auto s = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
-        if (httpbinUrl != "http://httpbin.org/") {
-            assert(rs.code==200);
-            auto data = fromJsonArrayToStr(parseJSON(cast(string)rs.responseBody.data).object["data"]);
-            assert(data==s);
-        }
-    }
-    info("Check POST from QueryParams");
-    {
-        rs = rq.post(httpbinUrl ~ "post", queryParams("name[]", "first", "name[]", 2));
-        assert(rs.code==200);
-        auto data = parseJSON(cast(string)rs.responseBody).object["form"].object;
-        string[] a;
-        try {
-            a = to!(string[])(data["name[]"].str);
-        }
-        catch (JSONException e) {
-            a = data["name[]"].array.map!"a.str".array;
-        }
-        assert(equal(["first", "2"], a));
-    }
-    info("Check POST from AA");
-    {
-        rs = rq.post(httpbinUrl ~ "post", ["a":"b ", "c":"d"]);
-        assert(rs.code==200);
-        auto form = parseJSON(cast(string)rs.responseBody.data).object["form"].object;
-        assert(form["a"].str == "b ");
-        assert(form["c"].str == "d");
-    }
-    info("Check POST json");
-    {
-        rs = rq.post(httpbinUrl ~ "post?b=x", `{"a":"a b", "c":[1,2,3]}`, "application/json");
-        assert(rs.code==200);
-        auto json = parseJSON(cast(string)rs.responseBody).object["args"].object;
-        assert(json["b"].str == "x");
-        json = parseJSON(cast(string)rs.responseBody).object["json"].object;
-        assert(json["a"].str == "a b");
-        assert(json["c"].array.map!(a=>a.integer).array == [1,2,3]);
-    }
-    info("Check DELETE");
-    rs = rq.exec!"DELETE"(httpbinUrl ~ "delete");
-    assert(rs.code==200);
-    info("Check PUT");
-    rs = rq.exec!"PUT"(httpbinUrl ~ "put",  `{"a":"b", "c":[1,2,3]}`, "application/json");
-    assert(rs.code==200);
-    assert(parseJSON(cast(string)rs.responseBody).object["json"].object["a"].str=="b");
-    info("Check PATCH");
-    rs = rq.exec!"PATCH"(httpbinUrl ~ "patch", "привiт, свiт!", "application/octet-stream");
-    assert(rs.code==200);
-    info("Check HEAD");
-    rs = rq.exec!"HEAD"(httpbinUrl);
-    assert(rs.code==200);
-
-    rq._keepAlive = true;
-    info("Check compressed content");
-    rs = rq.get(httpbinUrl ~ "gzip");
-    assert(rs.code==200);
-    bool gzipped = parseJSON(cast(string)rs.responseBody).object["gzipped"].type == JSON_TYPE.TRUE;
-    assert(gzipped);
-    info("gzip - ok");
-    rs = rq.get(httpbinUrl ~ "deflate");
-    assert(rs.code==200);
-    bool deflated = parseJSON(cast(string)rs.responseBody).object["deflated"].type == JSON_TYPE.TRUE;
-    assert(deflated);
-    info("deflate - ok");
-
-    info("Check redirects");
-    rs = rq.get(httpbinUrl ~ "relative-redirect/2");
-    assert(rs.history.length == 2);
-    assert(rs.code==200);
-    rs = rq.get(httpbinUrl ~ "absolute-redirect/2");
-    assert(rs.history.length == 2);
-    assert(rs.code==200);
-
-    rq.maxRedirects = 2;
-    assertThrown!MaxRedirectsException(rq.get(httpbinUrl ~ "absolute-redirect/3"));
-
-    rq.maxRedirects = 0;
-    rs = rq.get(httpbinUrl ~ "absolute-redirect/1");
-    assert(rs.code==302);
-
-    info("Check cookie");
-    {
-        rq.maxRedirects = 10;
-        rs = rq.get(httpbinUrl ~ "cookies/set?A=abcd&b=cdef");
-        assert(rs.code == 200);
-        auto json = parseJSON(cast(string)rs.responseBody.data).object["cookies"].object;
-        assert(json["A"].str == "abcd");
-        assert(json["b"].str == "cdef");
-        foreach(c; rq._cookie._array) {
-            final switch(c.attr) {
-                case "A":
-                    assert(c.value == "abcd");
-                    break;
-                case "b":
-                    assert(c.value == "cdef");
-                    break;
-            }
-        }
-    }
-    info("Check chunked content");
-    rs = rq.get(httpbinUrl ~ "range/1024");
-    assert(rs.code==200);
-    assert(rs.responseBody.length==1024);
-
-    info("Check basic auth");
-    rq.authenticator = new BasicAuthentication("user", "passwd");
-    rs = rq.get(httpbinUrl ~ "basic-auth/user/passwd");
-    assert(rs.code==200);
-
-    info("Check limits");
-    rq = HTTPRequest();
-    rq.maxContentLength = 1;
-    assertThrown!RequestException(rq.get(httpbinUrl));
-
-    rq = HTTPRequest();
-    rq.maxHeadersLength = 1;
-    assertThrown!RequestException(rq.get(httpbinUrl));
-
-    rq = HTTPRequest();
-    info("Check POST multiPartForm");
-    {
-        /// This is example on usage files with MultipartForm data.
-        /// For this example we have to create files which will be sent.
-        import std.file;
-        import std.path;
-        /// preapare files
-        auto tmpd = tempDir();
-        auto tmpfname1 = tmpd ~ dirSeparator ~ "request_test1.txt";
-        auto f = File(tmpfname1, "wb");
-        f.rawWrite("file1 content\n");
-        f.close();
-        auto tmpfname2 = tmpd ~ dirSeparator ~ "request_test2.txt";
-        f = File(tmpfname2, "wb");
-        f.rawWrite("file2 content\n");
-        f.close();
-        ///
-        /// Ok, files ready.
-        /// Now we will prepare Form data
-        ///
-        File f1 = File(tmpfname1, "rb");
-        File f2 = File(tmpfname2, "rb");
-        scope(exit) {
-            f1.close();
-            f2.close();
-        }
-        ///
-        /// for each part we have to set field name, source (ubyte array or opened file) and optional filename and content-type
-        ///
-        MultipartForm mForm = MultipartForm().
-            add(formData("Field1", cast(ubyte[])"form field from memory")).
-                add(formData("Field2", cast(ubyte[])"file field from memory", ["filename":"data2"])).
-                add(formData("File1", f1, ["filename":"file1", "Content-Type": "application/octet-stream"])).
-                add(formData("File2", f2, ["filename":"file2", "Content-Type": "application/octet-stream"]));
-        /// everything ready, send request
-        rs = rq.post(httpbinUrl ~ "post", mForm);
-    }
-    info("Check exception handling, error messages and timeous are OK");
-    rq.timeout = 1.seconds;
-    assertThrown!TimeoutException(rq.get(httpbinUrl ~ "delay/3"));
-//    assertThrown!ConnectError(rq.get("http://0.0.0.0:65000/"));
-//    assertThrown!ConnectError(rq.get("http://1.1.1.1/"));
-//    assertThrown!ConnectError(rq.get("http://gkhgkhgkjhgjhgfjhgfjhgf/"));
-}
-

@@ -37,9 +37,9 @@ string Setter(T)(string name) {
     `;
 }
 
-string Getter(T)(string name) {
+string Getter(string name) {
     return `
-        @property final ` ~ T.stringof ~ ` ` ~ name ~ `() pure const @safe @nogc nothrow {
+        @property final auto ` ~ name ~ `() pure inout @safe @nogc nothrow {
             return _` ~ name ~ `;
         }
     `;
@@ -69,9 +69,9 @@ unittest {
             string _s;
             bool   _b;
         }
-        mixin(Getter!int("i"));
+        mixin(Getter("i"));
         mixin(Setter!int("i"));
-        mixin(Getter!bool("b"));
+        mixin(Getter("b"));
     }
     S s;
     assert(s.i == 0);

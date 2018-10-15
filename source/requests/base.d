@@ -193,13 +193,17 @@ public class Response {
                          _connectedAt,
                          _requestSentAt,
                          _finishedAt;
+        long             _contentReceived;
+        long             _contentLength = -1;
         mixin(Setter!ushort("code"));
         mixin(Setter!URI("uri"));
         mixin(Setter!URI("finalURI"));
     }
-    mixin(Getter!ushort("code"));
-    mixin(Getter!URI("uri"));
-    mixin(Getter!URI("finalURI"));
+    mixin(Getter("code"));
+    mixin(Getter("contentReceived"));
+    mixin(Getter("contentLength"));
+    mixin(Getter("uri"));
+    mixin(Getter("finalURI"));
     @property auto ref responseBody() @safe nothrow {
         return _responseBody;
     }

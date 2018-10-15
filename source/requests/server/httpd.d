@@ -69,15 +69,15 @@ else {
             return _requestBody;
         }
         private mixin(Setter!string("method"));
-        mixin(Getter!string("method"));
+        mixin(Getter("method"));
         private mixin(Setter!string("requestLine"));
-        mixin(Getter!string("requestLine"));
+        mixin(Getter("requestLine"));
         private mixin(Setter!string("path"));
-        mixin(Getter!string("path"));
+        mixin(Getter("path"));
         private mixin(Setter!bool("keepAlive"));
-        mixin(Getter!bool("keepAlive"));
+        mixin(Getter("keepAlive"));
         private mixin(Setter!URI("uri"));
-        mixin(Getter!URI("uri"));
+        mixin(Getter("uri"));
 
         @property string json() {
             if ( _dataSource._readStarted ) {
@@ -569,7 +569,7 @@ else {
         Cookie[]        _cookies;
 
         mixin(Getter_Setter!ushort("status"));
-        mixin(Getter!Compression("compression"));
+        mixin(Getter("compression"));
         @property void compress(Compression c = Compression.yes) {
             _compression = c;
         }

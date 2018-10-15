@@ -84,8 +84,8 @@ public struct Request {
         string[URI]             _permanent_redirects;             // cache 301 redirects for GET requests
         //
 
-        HTTPRequest   _http;  // route all http/https requests here
-        FTPRequest    _ftp;   // route all ftp requests here
+        //HTTPRequest   _http;  // route all http/https requests here
+        //FTPRequest    _ftp;   // route all ftp requests here
     }
     /// Set timeout on connection and IO operation.
     /// $(B v) - timeout value
@@ -133,24 +133,20 @@ public struct Request {
     /// Note that we recognize proxy settings from process environment (see $(LINK https://github.com/ikod/dlang-requests/issues/46)):
     /// you can use http_proxy, https_proxy, all_proxy (as well as uppercase names).
     mixin(Getter_Setter!string("proxy"));
-    mixin(Getter_Setter!string("method"));
-    mixin(Getter_Setter!URI("uri"));
-    mixin(Getter_Setter!(QueryParam[])("params"));
-    mixin(Getter_Setter!string("contentType"));
-    mixin(Getter_Setter!InputRangeAdapter("postData"));
-    mixin(Getter_Setter!(string[URI])("permanent_redirects"));
-    mixin(Getter_Setter!MultipartForm("multipartForm"));
+    mixin(Getter("method"));
+    mixin(Getter("uri"));
+    mixin(Getter("params"));
+    mixin(Getter("contentType"));
+    mixin(Getter("postData"));
+    mixin(Getter("permanent_redirects"));
+    mixin(Getter("multipartForm"));
     mixin(Getter_Setter!NetStreamFactory("socketFactory"));
     mixin(Getter_Setter!bool("useStreaming"));
     mixin(Getter_Setter!(RefCounted!Cookies)("cookie"));
-    mixin(Getter!SSLOptions("sslOptions"));
     mixin(Getter_Setter!string("bind"));
     mixin(Getter_Setter!(string[string])("headers"));
 
-    package @property auto userHeaders() pure @safe nothrow @nogc
-    {
-        return _userHeaders;
-    }
+    mixin(Getter("sslOptions"));
     @property void sslSetVerifyPeer(bool v) pure @safe nothrow @nogc {
         _sslOptions.setVerifyPeer(v);
     }
@@ -162,6 +158,11 @@ public struct Request {
     }
     @property void sslSetCaCert(string path) pure @safe nothrow @nogc {
         _sslOptions.setCaCert(path);
+    }
+
+    package @property auto userHeaders() pure @safe nothrow @nogc
+    {
+        return _userHeaders;
     }
 
     //@property void socketFactory(NetworkStream delegate(string, string, ushort) f) {
@@ -237,23 +238,24 @@ public struct Request {
     /// get length og actually received content.
     /// this value increase over time, while we receive data
     ///
-    @property long contentReceived() pure @nogc nothrow {
-        final switch ( _uri.scheme ) {
-            case "http", "https":
-                return _http.contentReceived;
-            case "ftp":
-                return _ftp.contentReceived;
-        }
-    }
-    /// get contentLength of the responce
-    @property long contentLength() pure @nogc nothrow {
-        final switch ( _uri.scheme ) {
-            case "http", "https":
-                return _http.contentLength;
-            case "ftp":
-                return _ftp.contentLength;
-        }
-    }
+    // XXX document relocation to response
+    //@property long contentReceived() pure @nogc nothrow {
+    //    final switch ( _uri.scheme ) {
+    //        case "http", "https":
+    //            return _http.contentReceived;
+    //        case "ftp":
+    //            return _ftp.contentReceived;
+    //    }
+    //}
+    ///// get contentLength of the responce
+    //@property long contentLength() pure @nogc nothrow {
+    //    final switch ( _uri.scheme ) {
+    //        case "http", "https":
+    //            return _http.contentLength;
+    //        case "ftp":
+    //            return _ftp.contentLength;
+    //    }
+    //}
     /++
      + Enable or disable ssl peer verification.
      + $(B v) - enable if `true`, disable if `false`.
@@ -416,17 +418,6 @@ public struct Request {
         }
         return a.data();
     }
-    //string format(string fmt) const {
-    //    final switch(_uri.scheme) {
-    //        case "http", "https":
-    //        return _http.format(fmt);
-    //        case "ftp":
-    //        return _ftp.format(fmt);
-    //    }
-    //}
-
-    /////////////////////////////////////////////////////////////////////
-
     @property auto cm() {
         return _cm;
     }
@@ -442,15 +433,16 @@ public struct Request {
     {
         Response opCall(Request r, RequestHandler _)
         {
-            if ( r._uri.scheme == "ftp" )
+            switch (r._uri.scheme)
             {
-                FTPRequest ftp;
-                return ftp.execute(r);
-            }
-            else
-            {
-                HTTPRequest http;
-                return http.execute(r);
+                case "ftp":
+                    FTPRequest ftp;
+                    return ftp.execute(r);
+                case "https","http":
+                    HTTPRequest http;
+                    return http.execute(r);
+                default:
+                    assert(0, "".format(r._uri.scheme));
             }
         }
     }

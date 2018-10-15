@@ -109,8 +109,8 @@ struct URI {
     mixin(Getter_Setter!string("password"));
     mixin(Getter_Setter!ushort("port"));
     mixin(Getter_Setter!string("path"));
-    mixin(Getter!string("query"));
-    mixin(Getter!string("original_host"));
+    mixin(Getter("query"));
+    mixin(Getter("original_host"));
     @property void query(string s) {
         if ( s[0]=='?' ) {
             _query = s;

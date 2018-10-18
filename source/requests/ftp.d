@@ -576,6 +576,7 @@ public struct FTPRequest {
             _response.code = code;
             return _response;
         }
+        dataStream.readTimeout = _timeout;
         while ( true ) {
             auto b = new ubyte[_bufferSize];
             auto rc = dataStream.receive(b);
@@ -671,6 +672,7 @@ public struct FTPRequest {
         _bufferSize = r.bufferSize;
         _proxy = r.proxy;
         _bind = r.bind;
+        _timeout = r.timeout;
 
         if ( method == "GET" )
         {

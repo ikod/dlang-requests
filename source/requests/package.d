@@ -386,7 +386,6 @@ package unittest {
 
 
     info("Test POST'ing from Rank(2) range with user-provided Content-Length");
-    rq = Request();
     rq.addHeaders(["content-length": to!string(s.length)]);
     rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
     auto flat_content = parseJSON(cast(string)rs.responseBody().data).object["data"];
@@ -398,7 +397,8 @@ package unittest {
         assert(s.representation == flat_content.array.map!(i => i.integer).array);
     }
 
-    info("Check exception handling, error messages and timeous are OK");
+    info("Check exception handling, error messages and timeouts are OK");
+    rq.clearHeaders();
     rq.timeout = 1.seconds;
     assertThrown!TimeoutException(rq.get(httpbinUrl ~ "delay/3"));
 

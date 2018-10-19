@@ -379,6 +379,10 @@ public struct Request {
     {
         return execute(method, url, args);
     }
+    Response exec(string method="GET")(string url, string[string] query)
+    {
+        return execute(method, url, aa2params(query));
+    }
     string toString() const {
         return "Request(%s, %s)".format(_method, _uri.uri());
     }
@@ -544,7 +548,6 @@ public struct Request {
         auto r = handler.handle(this);
         return r;
     }
-    ///////////////////////////////////////////////////////////////////////
 }
 
 unittest {

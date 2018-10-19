@@ -1720,12 +1720,12 @@ public struct HTTPRequest {
         _stream.send("0\r\n\r\n");
     }
 
-    HTTPResponse exec_from_range(const Request r)
+    HTTPResponse exec_from_range(InputRangeAdapter postData)
     do {
 
-        _postData = r.postData;
+        _postData = postData;
 
-        debug(requests) tracef("exec from range request: %s", r);
+        debug(requests) tracef("exec from range");
 
         NetworkStream _stream;
         _response = new HTTPResponse;
@@ -1878,8 +1878,35 @@ public struct HTTPRequest {
             immutable new_location = *("location" in _response.responseHeaders);
             immutable current_uri = _uri, next_uri = uriFromLocation(_uri, new_location);
 
+            immutable get_or_head = _method == "GET" || _method == "HEAD";
+            immutable code = _response.code;
+
             // save current response for history
             _history ~= _response;
+
+            if ( code == 301 )
+            {
+                // permanent redirect and change method
+                _permanent_redirects[_uri] = new_location;
+                if ( !get_or_head )
+                {
+                    _method = "GET";
+                }
+            }
+            if ( (code == 302 || code == 303) && !get_or_head)
+            {
+                // only change method
+                _method = "GET";
+            }
+            if ( code == 307 )
+            {
+                // no change method, no permanent
+            }
+            if ( code == 308 )
+            {
+                // permanent redirection and do not change method
+                _permanent_redirects[_uri] = new_location;
+            }
 
             // prepare new response (for redirected request)
             _response = new HTTPResponse;
@@ -1891,13 +1918,13 @@ public struct HTTPRequest {
             // set new uri
             this._uri = next_uri;
             debug(requests) tracef("Redirected to %s", next_uri);
-            if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
-                // 307 and 308 do not change method
-                return exec_from_parameters(r);
-            }
             if ( restartedRequest ) {
                 debug(requests) trace("Rare event: clearing 'restartedRequest' on redirect");
                 restartedRequest = false;
+            }
+            if ( _method == "GET")
+            {
+                return exec_from_parameters();
             }
             goto connect;
         }
@@ -1906,15 +1933,13 @@ public struct HTTPRequest {
         return _response;
     }
 
-    HTTPResponse exec_from_multipart_form(ref Request r) {
+    HTTPResponse exec_from_multipart_form(MultipartForm form) {
         import std.uuid;
         import std.file;
 
-        _method = r.method;
-        _uri = r.uri;
-        _multipartForm = r.multipartForm; // can't use const Request r bacause this can be changed
+        _multipartForm = form;
 
-        debug(requests) tracef("exec from multipart form request: %s", r);
+        debug(requests) tracef("exec from multipart form");
 
         NetworkStream _stream;
         _response = new HTTPResponse;
@@ -2074,8 +2099,35 @@ public struct HTTPRequest {
             immutable current_uri = _uri;
             immutable next_uri = uriFromLocation(_uri, new_location);
 
+            immutable get_or_head = _method == "GET" || _method == "HEAD";
+            immutable code = _response.code;
+
             // save current response for history
             _history ~= _response;
+
+            if ( code == 301 )
+            {
+                // permanent redirect and change method
+                _permanent_redirects[_uri] = new_location;
+                if ( !get_or_head )
+                {
+                    _method = "GET";
+                }
+            }
+            if ( (code == 302 || code == 303) && !get_or_head)
+            {
+                // only change method
+                _method = "GET";
+            }
+            if ( code == 307 )
+            {
+                // no change method, no permanent
+            }
+            if ( code == 308 )
+            {
+                // permanent redirection and do not change method
+                _permanent_redirects[_uri] = new_location;
+            }
 
             // prepare new response (for redirected request)
             _response = new HTTPResponse;
@@ -2086,13 +2138,13 @@ public struct HTTPRequest {
             // set new uri
             this._uri = next_uri;
             debug(requests) tracef("Redirected to %s", next_uri);
-            if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
-                // 307 and 308 do not change method
-                return exec_from_parameters(r);
-            }
             if ( restartedRequest ) {
                 debug(requests) trace("Rare event: clearing 'restartedRequest' on redirect");
                 restartedRequest = false;
+            }
+            if ( _method == "GET")
+            {
+                return exec_from_parameters();
             }
             goto connect;
         }
@@ -2101,10 +2153,9 @@ public struct HTTPRequest {
         return _response;
     }
 
-    HTTPResponse exec_from_parameters(const Request r) {
-        _params = r.params.dup;
+    HTTPResponse exec_from_parameters() {
 
-        debug(requests) tracef("exec from parameters request: %s", r);
+        debug(requests) tracef("exec from parameters request");
 
         assert(_uri != URI.init);
         NetworkStream _stream;
@@ -2260,14 +2311,37 @@ public struct HTTPRequest {
             // "location" in response already checked in canFollowRedirect
             immutable new_location = *("location" in _response.responseHeaders);
             immutable current_uri = _uri;
-            immutable next_uri =    uriFromLocation(_uri, new_location);
+            immutable next_uri = uriFromLocation(_uri, new_location);
 
-            if ( _method == "GET" && _response.code == 301 ) {
-                _permanent_redirects[_uri] = new_location;
-            }
+            immutable get_or_head = _method == "GET" || _method == "HEAD";
+            immutable code = _response.code;
 
             // save current response for history
             _history ~= _response;
+
+            if ( code == 301 )
+            {
+                // permanent redirect and change method
+                _permanent_redirects[_uri] = new_location;
+                if ( !get_or_head )
+                {
+                    _method = "GET";
+                }
+            }
+            if ( (code == 302 || code == 303) && !get_or_head)
+            {
+                // only change method
+                _method = "GET";
+            }
+            if ( code == 307 )
+            {
+                // no change method, no permanent
+            }
+            if ( code == 308 )
+            {
+                // permanent redirection and do not change method
+                _permanent_redirects[_uri] = new_location;
+            }
 
             // prepare new response (for redirected request)
             _response = new HTTPResponse;
@@ -2278,10 +2352,10 @@ public struct HTTPRequest {
             // set new uri
             _uri = next_uri;
             debug(requests) tracef("Redirected to %s", next_uri);
-            if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
-                // 307 and 308 do not change method
-                return exec_from_parameters(r);
-            }
+            //if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
+            //    // 307 and 308 do not change method
+            //    return exec_from_parameters(r);
+            //}
             if ( restartedRequest ) {
                 debug(requests) trace("Rare event: clearing 'restartedRequest' on redirect");
                 restartedRequest = false;
@@ -2313,6 +2387,9 @@ public struct HTTPRequest {
         _bind = r.bind;
         _headers = r.headers;
         _userHeaders = r.userHeaders;
+
+        _params = r.params;
+
         // this assignments increments refCounts, so we can't use const Request
         // but Request is anyway struct and called by-value
         _cm = r.cm;
@@ -2321,16 +2398,15 @@ public struct HTTPRequest {
         debug(requests) trace("serving %s".format(r));
         if ( !r.postData.empty)
         {
-            return exec_from_range(r);
+            return exec_from_range(r.postData);
         }
         if ( r.hasMultipartForm )
         {
-            return exec_from_multipart_form(r);
+            return exec_from_multipart_form(r.multipartForm);
         }
-        auto rs = exec_from_parameters(r);
+        auto rs = exec_from_parameters();
         return rs;
     }
-    // XXX interceptors
 }
 
 version(vibeD) {

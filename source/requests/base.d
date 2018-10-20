@@ -214,7 +214,7 @@ public class Response {
         return _receiveAsRange;
     }
     override string toString() const {
-        return "Response(%d, %s)".format(_code, _uri.uri());
+        return "Response(%d, %s)".format(_code, _finalURI.uri());
     }
     string format(string fmt) const {
         import std.array;
@@ -239,7 +239,7 @@ public class Response {
                     a.put(_uri.query);
                     break;
                 case 's':
-                    a.put("Response(%d, %s)".format(_code, _uri.uri()));
+                    a.put("Response(%d, %s)".format(_code, _finalURI.uri()));
                     break;
                 case 'B': // received bytes
                     a.put("%d".format(_responseBody.length));

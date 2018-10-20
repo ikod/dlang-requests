@@ -44,6 +44,12 @@ class RequestHandler {
     }
 }
 
+private Interceptor[] _static_interceptors;
+public void addInterceptor(Interceptor i)
+{
+    _static_interceptors ~= i;
+}
+
 public struct Request {
     private {
         // request configuration
@@ -145,6 +151,20 @@ public struct Request {
     mixin(Getter_Setter!(RefCounted!Cookies)("cookie"));
     mixin(Getter_Setter!string("bind"));
     mixin(Getter_Setter!(string[string])("headers"));
+
+    @property void uri(string u) pure @safe
+    {
+        _uri = URI(u);
+    }
+
+    @property string path() const @safe pure @nogc
+    {
+        return _uri.path;
+    }
+    @property void path(string p) pure @nogc
+    {
+        _uri.path = p;
+    }
 
     mixin(Getter("sslOptions"));
     @property void sslSetVerifyPeer(bool v) pure @safe nothrow @nogc {
@@ -495,7 +515,7 @@ public struct Request {
         {
             _cookie = RefCounted!Cookies();
         }
-        auto interceptors = _interceptors ~ new LastInterceptor();
+        auto interceptors = _static_interceptors ~ _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);
         return handler.handle(this);
         
@@ -520,7 +540,7 @@ public struct Request {
         {
             _cookie = RefCounted!Cookies();
         }
-        auto interceptors = _interceptors ~ new LastInterceptor();
+        auto interceptors = _static_interceptors ~ _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);
         return handler.handle(this);
     }
@@ -543,7 +563,7 @@ public struct Request {
         {
             _cookie = RefCounted!Cookies(Cookies());
         }
-        auto interceptors = _interceptors ~ new LastInterceptor();
+        auto interceptors = _static_interceptors ~ _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);
         auto r = handler.handle(this);
         return r;
@@ -567,10 +587,10 @@ unittest {
     Response rs;
     rq.addInterceptor(new DummyInterceptor());
 
-    rs = rq.execute("GET", "http://google.com");
+    rs = rq.execute("GET", "http://httpbin.org/");
     rq.useStreaming = true;
     rq.bufferSize = 128;
-    rs = rq.execute("GET", "http://google.com");
+    rs = rq.execute("GET", "http://httpbin.org/");
     auto s = rs.receiveAsRange;
     while (!s.empty)
     {
@@ -578,5 +598,32 @@ unittest {
         s.popFront();
     }
     assert(interceptorCalls == 2, "Expected interceptorCalls==2, got %d".format(interceptorCalls));
-    globalLogLevel = LogLevel.info;
+
+    class PathModifier : Interceptor {
+        Response opCall(Request r, RequestHandler next)
+        {
+            r.path = r.path ~ "get";
+            auto rs = next.handle(r);
+            return rs;
+        }
+    }
+    // test global/static interceptors
+    //
+    // save and clear static_interceptors
+    Interceptor[] saved_interceptors = _static_interceptors;
+    scope(exit)
+    {
+        _static_interceptors = saved_interceptors;
+    }
+    _static_interceptors.length = 0;
+
+    // add PathMoifier to  static_interceptors
+    addInterceptor(new PathModifier());
+    // from now any request will pass through Pathmodifier without changing your code:
+    rq = Request();
+    rs = rq.get("http://httpbin.org/");
+    assert(rs.uri.path == "/get", "Expected /get, but got %s".format(rs.uri.path));
+
+    rs = rq.post("http://httpbin.org/post", "abc"); // real request will be to http://httpbin.org/postget
+    assert(rs.code == 404);
 }

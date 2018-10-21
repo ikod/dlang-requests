@@ -1,15 +1,15 @@
 module requests.rangeadapter;
 
 
-/+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++/
-/*                                                                       */
-/* I need this module to unify input content for POST/PUT requests.      */
-/* Input content must be converted to ubyte[] or ubyte[][].              */
-/* In latter case it will be transferred in transfer-Encoding: chunked.  */
-/* I need to erase type of input range and convert it to bytes, because  */
-/* interceptors have no access to input range type.                      */
-/*                                                                       */
-/+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++/
+/************************************************************************\
+/*                                                                       *
+/* I need this module to unify input content for POST/PUT requests.      *
+/* Input content must be converted to ubyte[] or ubyte[][].              *
+/* In latter case it will be transferred in transfer-Encoding: chunked.  *
+/* I need to erase type of input range and convert it to bytes, because  *
+/* interceptors have no access to input range type.                      *
+/*                                                                       *
+ ************************************************************************/
 
 import std.format;
 import std.range.primitives;
@@ -22,6 +22,11 @@ private template rank(R) {
     }
 }
 
+/*
+ * Convert rank 1 and 2 ranges to rank(2) range.
+ * Rank(1) converted to [[chunk]]
+ * Rank(2) used as is: [[chunk],[chunk],...]
+ */
 private struct Adapter(R) {
     R       _r;
     long    _length = -1;
@@ -41,11 +46,11 @@ private struct Adapter(R) {
     {
         static if ( _rank == 1 )
         {
-            return cast(immutable(ubyte)[])_r[0..$];
+            return cast(immutable(ubyte)[])_r[0..$]; // return whole array
         }
         static if ( _rank == 2 )
         {
-            return cast(immutable(ubyte)[])_r.front;
+            return cast(immutable(ubyte)[])_r.front; // return front chunk
         }
     }
     bool empty()
@@ -63,7 +68,7 @@ private struct Adapter(R) {
     {
         static if ( _rank == 1 )
         {
-            _empty = true;
+            _empty = true;  // no data after pop for rank1
         }
         static if ( _rank == 2 )
         {
@@ -87,6 +92,15 @@ package InputRangeAdapter makeAdapter(R)(R r) {
     return result;
 }
 
+/********************************************
+ * This struct erase Type of the input range
+ * for POST requests, so that I can avoid
+ * templated functions for these requests.
+ * It is important for Interceptors which
+ * have no idea about user input types.
+ * Also it convert any rank 1 or 2 ranges to
+ * rank(2) so that I can use unified code later
+ ********************************************/
 struct InputRangeAdapter {
     private {
         immutable(ubyte)[]  delegate() _front;

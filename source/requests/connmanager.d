@@ -10,12 +10,13 @@ import std.experimental.logger;
 
 import requests.streams;
 
-///
-/// Keep opened connections for HTTP
-/// it is cache over tuple(schema, host, port) -> connection
-///
-/// Evict least used
-///
+/**
+ * Keep opened connections for HTTP.
+ * It is actually cache over tuple(schema, host, port) -> connection
+ * with limited number of items.
+ *
+ * Evict least used.
+*/
 package struct ConnManager {
     package alias  CMKey = Tuple!(string, string, ushort);
     package struct CMValue {
@@ -46,8 +47,9 @@ package struct ConnManager {
         return _cache.byKeyValue().array.sort!"a.value.timestamp < b.value.timestamp".front().key;
     }
     ///
-    /// put new stream in cache, evict old stream and return it
-    /// If nothing evicted return null
+    /// put new stream in cache, evict old stream and return it.
+    /// If nothing evicted return null. Returned(evicted) connection can be
+    /// closed.
     ///
     NetworkStream put(string schema, string host, ushort port, NetworkStream stream)
     in { assert(stream !is null);}
@@ -76,7 +78,9 @@ package struct ConnManager {
         (*value_ptr).timestamp = Clock.currTime;
         return e;
     }
-
+    /**
+        Lookup connection.
+     */
     NetworkStream get(string schema, string host, ushort port) {
         if ( auto value_ptr = CMKey(schema, host, port) in _cache ) {
             return (*value_ptr).stream;
@@ -84,6 +88,9 @@ package struct ConnManager {
         return null;
     }
 
+    /**
+        Remove connection from cache (without close).
+     */
     NetworkStream del(string schema, string host, ushort port) {
         NetworkStream s;
         CMKey key = CMKey(schema, host, port);
@@ -94,6 +101,9 @@ package struct ConnManager {
         return s;
     }
 
+    /**
+        clear cache (and close connections)
+     */
     void clear()
     out { assert(_cache.length == 0); }
     do  {

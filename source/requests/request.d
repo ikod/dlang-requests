@@ -1,3 +1,10 @@
+/**
+ * This module provides API using Request structure.
+ *
+ * Structure Request provides configuration, connection pooling, cookie
+ * persistance. You can consider it as 'Session'.
+ * 
+*/
 module requests.request;
 import requests.http;
 import requests.ftp;
@@ -19,14 +26,33 @@ import requests.utils;
 import requests.connmanager;
 import requests.rangeadapter;
 
-/**
-   This is simplest interface to both http and ftp protocols.
-   Request has methods get, post and exec which routed to proper concrete handler (http or ftp, etc).
-   To enable some protocol-specific featutes you have to use protocol interface directly (see docs for HTTPRequest or FTPRequest)
-*/
-
 alias NetStreamFactory = NetworkStream delegate(string, string, ushort);
 
+/**
+ *  Intercepror can modify Request, pass it to next request handler  
+ *  and/or modify response.                                          
+ *                                                                    
+ *   Example:                                                       
+ *   ---
+ *   class ChangePath : Interceptor                              
+ *   {                                                                
+ *      Response opCall(Request r, RequestHandler next)
+ *         {
+ *             r.path = r.path ~ "get";
+ *             auto rs = next.handle(r);
+ *             return rs;
+ *         }                                                                 
+ *   }                                                                
+ *   ---                                                              
+ *   Later in the code you can use this class:    
+ *   Example:                                                        
+ *   ---
+ *   Request rq;
+ *   rq.addInterceptor(new ChangePath());
+ *   rq.get("http://example.com");
+ *   ---
+ *
+*/
 interface Interceptor {
     Response opCall(Request r, RequestHandler next);
 }
@@ -45,14 +71,23 @@ class RequestHandler {
 }
 
 private Interceptor[] _static_interceptors;
+/**
+ * Add module-level interceptor. Each Request will include it in the processing.
+ * it is handy as you can change behaviour of your requests without any changes
+ * in your code, just install interceptor before any call to Request().
+*/
 public void addInterceptor(Interceptor i)
 {
     _static_interceptors ~= i;
 }
 
+/**
+ * Structure Request provides configuration, connection pooling, cookie
+ * persistance. You can consider it as 'Session'.
+*/
 public struct Request {
     private {
-        // request configuration
+        /// request configuration
         bool                    _useStreaming;
         uint                    _maxRedirects = 10;
         Auth                    _authenticator;
@@ -90,15 +125,14 @@ public struct Request {
         string[URI]             _permanent_redirects;             // cache 301 redirects for GET requests
         //
 
-        //HTTPRequest   _http;  // route all http/https requests here
-        //FTPRequest    _ftp;   // route all ftp requests here
     }
-    /// Set timeout on connection and IO operation.
-    /// $(B v) - timeout value
-    /// If timeout expired Request operation will throw $(B TimeoutException).
+    /** Get/Set timeout on connection and IO operation.
+     *  **v** - timeout value
+     *  If timeout expired Request operation will throw $(B TimeoutException).
+     */
     mixin(Getter_Setter!Duration("timeout"));
     /// Set http keepAlive value
-    /// $(B v) - use keepalive requests - $(B true), or not - $(B false)
+    /// *v* - use keepalive requests - $(B true), or not - $(B false)
     /// Request will automatically reopen connection when host, protocol
     /// or port change (so it is safe to send different requests through
     /// single instance of Request).
@@ -110,7 +144,7 @@ public struct Request {
     mixin(Getter_Setter!uint("maxRedirects"));
     /// Set maximum content lenth both for http and ftp requests
     /// $(B v) - maximum content length in bytes. When limit reached - throws $(B RequestException)
-    mixin(Getter_Setter!uint("maxContentLength"));
+    mixin(Getter_Setter!size_t("maxContentLength"));
     /// Set maximum length for HTTP headers
     /// $(B v) - maximum length of the HTTP response. When limit reached - throws $(B RequestException)
     mixin(Getter_Setter!size_t("maxHeadersLength"));
@@ -139,7 +173,7 @@ public struct Request {
     /// Note that we recognize proxy settings from process environment (see $(LINK https://github.com/ikod/dlang-requests/issues/46)):
     /// you can use http_proxy, https_proxy, all_proxy (as well as uppercase names).
     mixin(Getter_Setter!string("proxy"));
-    mixin(Getter("method"));
+    mixin(Getter_Setter!string("method"));
     mixin(Getter("uri"));
     mixin(Getter("params"));
     mixin(Getter("contentType"));
@@ -152,34 +186,58 @@ public struct Request {
     mixin(Getter_Setter!string("bind"));
     mixin(Getter_Setter!(string[string])("headers"));
 
+    /**
+        Set and Get uri for next request.
+     */
     @property void uri(string u) pure @safe
     {
         _uri = URI(u);
     }
 
-    @property string path() const @safe pure @nogc
-    {
-        return _uri.path;
-    }
+    /**
+        Set/Get path for next request.
+    */
     @property void path(string p) pure @nogc
     {
         _uri.path = p;
     }
+    /**
+        ditto
+    */
+    @property string path() const @safe pure @nogc
+    {
+        return _uri.path;
+    }
 
     mixin(Getter("sslOptions"));
+    /**
+        Enable/disable ssl peer verification..
+    */
     @property void sslSetVerifyPeer(bool v) pure @safe nothrow @nogc {
         _sslOptions.setVerifyPeer(v);
     }
+    /**
+        Set path and format for ssl key file.
+    */
     @property void sslSetKeyFile(string p, SSLOptions.filetype t = SSLOptions.filetype.pem) pure @safe nothrow @nogc {
         _sslOptions.setKeyFile(p, t);
     }
+    /**
+        Set path and format for ssl certificate file.
+    */
     @property void sslSetCertFile(string p, SSLOptions.filetype t = SSLOptions.filetype.pem) pure @safe nothrow @nogc {
         _sslOptions.setCertFile(p, t);
     }
+    /**
+        Set path to certificate authority file.
+    */
     @property void sslSetCaCert(string path) pure @safe nothrow @nogc {
         _sslOptions.setCaCert(path);
     }
 
+    /*
+        userHeaders keep bitflags for user-setted important headers
+    */
     package @property auto userHeaders() pure @safe nothrow @nogc
     {
         return _userHeaders;
@@ -349,9 +407,6 @@ public struct Request {
      +    rq.addHeaders(["X-Header": "test"]);
      + ---
      +/
-    /// Add headers to request
-    /// Params:
-    /// headers = headers to send.
     void addHeaders(in string[string] headers) {
         foreach(pair; headers.byKeyValue) {
             string _h = pair.key;
@@ -380,6 +435,9 @@ public struct Request {
             _headers[pair.key] = pair.value;
         }
     }
+    ///
+    /// Remove any previously added headers.
+    ///
     void clearHeaders() {
         _headers = null;
         _userHeaders = _UH.init;
@@ -599,14 +657,6 @@ unittest {
     }
     assert(interceptorCalls == 2, "Expected interceptorCalls==2, got %d".format(interceptorCalls));
 
-    class PathModifier : Interceptor {
-        Response opCall(Request r, RequestHandler next)
-        {
-            r.path = r.path ~ "get";
-            auto rs = next.handle(r);
-            return rs;
-        }
-    }
     // test global/static interceptors
     //
     // save and clear static_interceptors
@@ -617,13 +667,23 @@ unittest {
     }
     _static_interceptors.length = 0;
 
-    // add PathMoifier to  static_interceptors
-    addInterceptor(new PathModifier());
+    // add RqModifier to  static_interceptors
+    class RqModifier : Interceptor {
+        Response opCall(Request r, RequestHandler next)
+        {
+            r.path = "/get";
+            r.method = "GET";
+            auto rs = next.handle(r);
+            return rs;
+        }
+    }
+    addInterceptor(new RqModifier());
     // from now any request will pass through Pathmodifier without changing your code:
     rq = Request();
     rs = rq.get("http://httpbin.org/");
     assert(rs.uri.path == "/get", "Expected /get, but got %s".format(rs.uri.path));
 
-    rs = rq.post("http://httpbin.org/post", "abc"); // real request will be to http://httpbin.org/postget
-    assert(rs.code == 404);
+    rs = rq.post("http://httpbin.org/post", "abc");
+    assert(rs.code == 200);
+    assert(rs.uri().path() == "/get");
 }

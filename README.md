@@ -11,6 +11,23 @@ HTTP client library, inspired by python-requests with goals:
 
 API docs: [Wiki](https://github.com/ikod/dlang-requests/wiki)
 
+## Table of contents
+
+- [Library configurations (std.socket and vibe sockets)](#library-configurations)
+- [Levels of API](#two-levels-of-api)
+- [Quick start](#make-a-simple-request)
+- [Requests with parameters](#request-with-parameters)
+- [Posting data](#posting-data-to-server)
+   - [Posting url-encoded](#form-urlencode)
+   - [Posting multipart](#multipart-form)
+   - [Posting raw data](#posting-raw-data-without-forms)
+- [Properties of Request structure](#request-structure)
+- [Streaming response](#streaming-server-response)
+- [Modifying request(headers, etc.)](#addingreplacing-request-headers)
+- [SSL](#ssl-settings)
+- [FTP](#ftp-requests)
+- [Request pool](#requests-pool)
+
 
 ### Library configurations ###
 
@@ -25,7 +42,7 @@ This library can either use standard `std.socket` library or [`vibe.d`](http://v
 }
 ```
 
-### Three levels of API ###
+### Two levels of API ###
 * At the highest API level you interested only in retrieving or posting document content.
 Use it when you don't need to add headers, set timeouts, or change any other defaults, 
 if you don't interested in result codes or any details of request and/or
@@ -40,7 +57,6 @@ calls are `Request.get()`, `Reuest.post` or `Request.exec!"method"` and so
 on (you will find examples below). You will receive `Response` with all available
 details -document body, status code, headers, timings, etc.
 
-* At the lowest level you will find `HTTPRequest` and `FTPRequest`, which have some specific setting. You will almost never need this level.
 
 #### Windows ssl notes ####
 In case `requests` can't find opsn ssl library on Windows, here is several steps that can help:
@@ -395,7 +411,7 @@ This way you can implement (outside of this library) lot of useful things: vario
 `Request` keep results of Permanent redirections in small cache. It also keep map
 `(schema,host,port) -> connection` of opened connections, for subsequent usage.
 
-#### Streaming server response ####
+### Streaming server response ###
 With `useStreaming`, you can receive response body as input range.
 `contentLength` and `contentReceived` can be used to monitor progress:
 
@@ -411,7 +427,7 @@ void main()
     auto rs = rq.get("http://httpbin.org/image/jpeg");
     auto stream = rs.receiveAsRange();
     while(!stream.empty) {
-        writefln("Received %d bytes, total received %d from document legth %d", stream.front.length, rq.contentReceived, rq.contentLength);
+        writefln("Received %d bytes, total received %d from document legth %d", stream.front.length, rs.contentReceived, rs.contentLength);
         stream.popFront;
     }
 }
@@ -592,7 +608,7 @@ Output:
 [F7EC2FAB:F7ED6FAB 2016.07.05 16:55:57.856 INF] Google request finished
 ```
 
-#### Adding/replacing request headers ###
+### Adding/replacing request headers ###
 
 Use `string[string]` and `addHeaders()` method to add or replace some request headers.
 
@@ -628,7 +644,7 @@ Output:
 ...
 ```
 
-#### SSL settings ####
+### SSL settings ###
 
 HTTP requests can be configured for SSL options: you can enable or disable remote server certificate verification, set key and certificate to use for authorizing to remote server:
 
@@ -706,67 +722,7 @@ Most frequently needed parts of `Response` are:
 * `receiveAsRange` - if you set `useStreaming` in the `Request`, then `receiveAsRange` will provide elements (type `ubyte[]`) of `InputRange` while receiving data from the server.
 
 
-### Low level details ###
-
-At the lowest level `Request` uses several templated overloads of a single `exec()` call. Using this method, you can call HTTP methods other than GET or POST (Attention: you have to use `HTTPRequest` instead of just `Request`, as these methods calls are specific to HTTP):
-
-```d
-#!/usr/bin/env rdmd -I./source librequests.a -L-lssl -L-lcrypto y.d
-import std.stdio;
-import requests;
-import std.algorithm;
-
-void main()
-{
-    auto file = File("y.d", "rb");
-    auto rq = HTTPRequest();
-    rq.verbosity = 2;
-    auto rs = rq.exec!"PUT"("http://httpbin.org/put?exampleTitle=PUT%20content", file.byChunk(1024));
-    writeln(rs.responseBody);
-}
-```
-
-Output(please note that httpbin.org can change it's behaviour):
-
-```
-> PUT /put?exampleTitle=PUT%20content HTTP/1.1
-> Transfer-Encoding: chunked
-> Connection: Keep-Alive
-> User-Agent: dlang-requests
-> Accept-Encoding: gzip, deflate
-> Host: httpbin.org
-> Content-Type: text/html
->
-< HTTP/1.1 200 OK
-< server: nginx
-< date: Sat, 11 Jun 2016 22:28:13 GMT
-< content-type: application/json
-< content-length: 780
-< connection: keep-alive
-< access-control-allow-origin: *
-< access-control-allow-credentials: true
-< 780 bytes of body received
-{
-  "args": {
-    "exampleTitle": "PUT content"
-  },
-  "data": "#!/usr/bin/env rdmd -I./source librequests.a -L-lssl -L-lcrypto y.d\nimport std.stdio;\nimport requests;\nimport std.algorithm;\n\nvoid main()\n{\n    auto file = File(\"y.d\", \"rb\");\n    auto rq = HTTPRequest();\n    rq.verbosity = 2;\n    auto rs = rq.exec!\"PUT\"(\"http://httpbin.org/put?exampleTitle=PUT%20content\", file.byChunk(1024));\n    writeln(rs.responseBody);\n}\n\n",
-  "files": {},
-  "form": {},
-  "headers": {
-    "Accept-Encoding": "gzip, deflate",
-    "Content-Length": "361",
-    "Content-Type": "text/html",
-    "Host": "httpbin.org",
-    "User-Agent": "dlang-requests"
-  },
-  "json": null,
-  "origin": "xxx.xxx.xxx.xxx",
-  "url": "http://httpbin.org/put?exampleTitle=PUT content"
-}
-```
-
-#### Requests Pool ####
+### Requests Pool ###
 
 When you have a large number of requests to execute, you can use a request pool to speed things up.
 

@@ -24,6 +24,8 @@ API docs: [Wiki](https://github.com/ikod/dlang-requests/wiki)
 - [Properties of Request structure](#request-structure)
 - [Streaming response](#streaming-server-response)
 - [Modifying request(headers, etc.)](#addingreplacing-request-headers)
+- [Interceptors](#interceptors)
+- [SocketFactory](#socketfactory)
 - [SSL](#ssl-settings)
 - [FTP](#ftp-requests)
 - [Request pool](#requests-pool)
@@ -390,12 +392,9 @@ Here is a short description of some `Request` options you can set:
 | cookie              | `Cookie[]`       | cookies you will send to server         | null       |
 | authenticator       | `Auth`           | authenticatior                          | null       |
 | bind                | `string`         | use local address whan connect          | null       |
-| socketFactory**)    | (see below)      | user-provided connection factory        | null       |
+| socketFactory       | [NetworkStream](#socketfactory)      | user-provided connection factory        | null       |
 
 *) Throws exception when limit is reached.
-
-**) If provided - each time `Request` need new connection it will call factory to create instance of NetworkStream.
-This way you can implement (outside of this library) lot of useful things: various proxies, unix-socket connections, etc.
 
 `Request` properties that are read-only:
 
@@ -709,6 +708,37 @@ Second argument for FTP posts can be anything that can be casted to `ubyte[]` or
 If the path in the post request doesn't exist, it will try to create all the required directories.
 As with HTTP, you can call several FTP requests using the same `Request` structure - it will reuse established connection (and authorization as well).
 
+### Interceptors ###
+
+Interceptors provide a way to modify/log/cache request. They can form a chain attached to Request structure so that
+each request will pass through whole chain.
+
+Each interceptor receive request as input, do whatever it need and pass request to the handler, which finaly serve request and
+return `Response` back.
+
+Here is small example of interceptor:
+
+```d
+class DummyInterceptor : Interceptor {
+    Response opCall(Request r, RequestHandler next)
+    {
+        writefln("Request  %s", r);
+        auto rs = next.handle(r);
+        writefln("Response %s", rs);
+        return rs;
+    }
+}
+```
+
+You can change Request `r`, using Request() getters/setters before you pass it to next handler.
+Authentication methods can be added to library using interceptors and headers injection.
+In case of something like cache you can return cached response immediately.
+
+### SocketFactory ###
+
+If configured - each time when `Request` need new connection it will call factory to create instance of NetworkStream.
+This way you can implement (outside of this library) lot of useful things: various proxies, unix-socket connections, etc.
+
 
 ### `Response` structure ###
 
@@ -751,25 +781,24 @@ void main() {
                         ]),
         Job("http://httpbin.org/gzip"),
         Job("http://httpbin.org/deflate"),
+        Job("http://httpbin.org/absolute-redirect/3")
+                .maxRedirects(2),
         Job("http://httpbin.org/range/1024"),
-        Job("http://httpbin.org/post")
+        Job("http://httpbin.org/post")                                                                               
                 .method("POST")                     // change default GET to POST
                 .data("test".representation())      // attach data for POST
                 .opaque("id".representation),       // opaque data - you will receive the same in Result
         Job("http://httpbin.org/delay/3")
                 .timeout(1.seconds),                // set timeout to 1.seconds - this request will throw exception and fails
         Job("http://httpbin.org/stream/1024"),
-        Job("ftp://speedtest.tele2.net/1KB.zip"),   // ftp requests too
     ];
 
     auto count = jobs.
-        pool(5).
+        pool(6).
         filter!(r => r.code==200).
         count();
 
-    assert(count == jobs.length - 2, "failed");
-    // generate post data from input range
-    // and process in 10 workers pool
+    assert(count == jobs.length - 2, "pool test failed");
     iota(20)
         .map!(n => Job("http://httpbin.org/post")
                         .data("%d".format(n).representation))

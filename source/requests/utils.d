@@ -23,16 +23,16 @@ string Getter_Setter(T)(string name) {
         @property final auto ` ~ name ~ `() pure inout @safe @nogc nothrow {
             return _` ~ name ~ `;
         }
-        @property final void ` ~ name ~ `(` ~ T.stringof ~ ` s) pure @nogc nothrow { 
-            _` ~ name ~ `=s;
+        @property final void ` ~ name ~ `(` ~ T.stringof ~ ` setter_arg) pure @nogc nothrow { 
+            _` ~ name ~ `= setter_arg;
         }
     `;
 }
 
 string Setter(T)(string name) {
     return `
-        @property final void ` ~ name ~ `(` ~ T.stringof ~ ` s) pure @nogc nothrow { 
-            _` ~ name ~ `=s;
+        @property final void ` ~ name ~ `(` ~ T.stringof ~ ` setter_arg) pure @nogc nothrow { 
+            _` ~ name ~ `= setter_arg;
         }
     `;
 }

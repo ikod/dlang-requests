@@ -2,8 +2,122 @@
  * This module provides API using Request structure.
  *
  * Structure Request provides configuration, connection pooling, cookie
- * persistance. You can consider it as 'Session'.
- * 
+ * persistance. You can consider it as 'Session' and reuse it - all caches and settings will effective
+ * for next requests.
+
+ * Some most usefull settings:
+
+$(TABLE
+ $(TR
+  $(TH name)
+  $(TH type)
+  $(TH meaning)
+  $(TH default)
+ )
+ $(TR
+  $(TD keepAlive)
+  $(TD `bool`)
+  $(TD use keepalive connection)
+  $(TD `true`)
+ )
+ $(TR
+  $(TD verbosity)
+  $(TD `uint`)
+  $(TD verbosity level $(LPAREN)0, 1, 2 or 3$(RPAREN))
+  $(TD `16KB`)
+ )
+ $(TR
+  $(TD maxRedirects)
+  $(TD `uint`)
+  $(TD maximum redirects allowed $(LPAREN)0 to disable redirects$(RPAREN))
+  $(TD `true`)
+ )
+ $(TR
+  $(TD maxHeadersLength)
+  $(TD `size_t`)
+  $(TD max. acceptable response headers length)
+  $(TD `32KB`)
+ )
+ $(TR
+  $(TD maxContentLength)
+  $(TD `size_t`)
+  $(TD max. acceptable content length)
+  $(TD `0` - unlimited)
+ )
+ $(TR
+  $(TD bufferSize)
+  $(TD `size_t`)
+  $(TD socket io buffer size)
+  $(TD `16KB`)
+ )
+ $(TR
+  $(TD timeout)
+  $(TD `Duration`)
+  $(TD timeout on connect or data transfer)
+  $(TD `30.seconds`)
+ )
+ $(TR
+  $(TD proxy)
+  $(TD `string`)
+  $(TD url of the HTTP/HTTPS/FTP proxy)
+  $(TD `null`)
+ )
+ $(TR
+  $(TD bind)
+  $(TD `string`)
+  $(TD use local address for outgoing connections)
+  $(TD `null`)
+ )
+ $(TR
+  $(TD useStreaming)
+  $(TD `bool`)
+  $(TD receive response data as `InputRange` in case it can't fit memory)
+  $(TD `false`)
+ )
+ $(TR
+  $(TD addHeaders)
+  $(TD `string[string]`)
+  $(TD custom headers)
+  $(TD `null`)
+ )
+ $(TR
+  $(TD cookie)
+  $(TD `Cookie[]`)
+  $(TD cookies you will send to server)
+  $(TD `null`)
+ )
+ $(TR
+  $(TD authenticator)
+  $(TD `Auth`)
+  $(TD authenticator)
+  $(TD `null`)
+ )
+ $(TR
+  $(TD socketFactory)
+  $(TD see doc for socketFactory)
+  $(TD user-provided connection factory)
+  $(TD `null`)
+ )
+)
+
+ * Example:
+ * ---
+ * import requests;
+ * import std.datetime;
+ *
+ * void main()
+ * {
+ *     Request rq = Request();
+ *     Response rs;
+ *     rq.timeout = 10.seconds;
+ *     rq.addHeaders(["User-Agent": "unknown"]);
+ *     rs = rq.get("https://httpbin.org/get");
+ *     assert(rs.code==200);
+ *     rs = rq.post("http://httpbin.org/post", "abc");
+ *     assert(rs.code==200);
+ * }
+ * ---
+
 */
 module requests.request;
 import requests.http;
@@ -29,8 +143,9 @@ import requests.rangeadapter;
 alias NetStreamFactory = NetworkStream delegate(string, string, ushort);
 
 /**
- *  Intercepror can modify Request, pass it to next request handler  
- *  and/or modify response.                                          
+ *  'Intercepror' intercepts Request. It can modify request, or log it, or cache it
+ *  or do whatever you need. When done it can return response or
+ *  pass it to next request handler.
  *                                                                    
  *   Example:                                                       
  *   ---
@@ -87,41 +202,79 @@ public void addInterceptor(Interceptor i)
 */
 public struct Request {
     private {
-        /// request configuration
+        /// use streaming when receive response
         bool                    _useStreaming;
+
+        /// limit redirect number
         uint                    _maxRedirects = 10;
+
+        /// Auth provider
         Auth                    _authenticator;
+
+        /// maximum headers length
         size_t                  _maxHeadersLength = 32 * 1024;   // 32 KB
+
+        /// maximum content length
         size_t                  _maxContentLength;               // 0 - Unlimited
+
+        /// logging verbosity
         uint                    _verbosity = 0;
+
+        /// use keepalive requests
         bool                    _keepAlive = true;
+
+        /// io buffer size
         size_t                  _bufferSize = 16*1024;
+
+        /// http/https proxy
         string                  _proxy;
+
+        /// content type for POST/PUT requests
         string                  _contentType;                     // content type for POST/PUT payloads
+
+        /// timeout for connect/send/receive
         Duration                _timeout = 30.seconds;
+
+        /// verify peer when using ssl
         bool                    _sslSetVerifyPeer = true;
         SSLOptions              _sslOptions;
+
+        /// bind outgoing connections to this addr (name or ip)
         string                  _bind;
+
         _UH                     _userHeaders;
+
+        /// user-provided headers(use addHeader to add)
         string[string]          _headers;
         //
 
         // instrumentation
+        /// user-provided socket factory
         NetStreamFactory        _socketFactory;
+
+        /// user-provided interceptors
         Interceptor[]           _interceptors;
         //
 
         // parameters for each request
+        /// uri for the request
         URI                     _uri;
+        /// method (GET, POST, ...)
         string                  _method;
+        /// request parameters
         QueryParam[]            _params;
+        /// multipart form (for multipart POST requests)
         MultipartForm           _multipartForm;
+        /// unified interface for post data
         InputRangeAdapter       _postData;
         //
 
         // can be changed during execution
+        /// connection cache
         RefCounted!ConnManager  _cm;                              // connection manager
+        /// cookie storage
         RefCounted!Cookies      _cookie;                          // cookies received
+        /// permanent redirect cache
         string[URI]             _permanent_redirects;             // cache 301 redirects for GET requests
         //
 
@@ -131,41 +284,12 @@ public struct Request {
      *  If timeout expired Request operation will throw $(B TimeoutException).
      */
     mixin(Getter_Setter!Duration("timeout"));
-    /// Set http keepAlive value
-    /// *v* - use keepalive requests - $(B true), or not - $(B false)
-    /// Request will automatically reopen connection when host, protocol
-    /// or port change (so it is safe to send different requests through
-    /// single instance of Request).
-    /// It also recovers if server prematurely close keep-alive connection.
     mixin(Getter_Setter!bool("keepAlive"));
-    /// Set limit on HTTP redirects
-    /// $(B v) - limit on redirect depth
-    /// Throws $(B MaxRedirectsException) when limit is reached.
     mixin(Getter_Setter!uint("maxRedirects"));
-    /// Set maximum content lenth both for http and ftp requests
-    /// $(B v) - maximum content length in bytes. When limit reached - throws $(B RequestException)
     mixin(Getter_Setter!size_t("maxContentLength"));
-    /// Set maximum length for HTTP headers
-    /// $(B v) - maximum length of the HTTP response. When limit reached - throws $(B RequestException)
     mixin(Getter_Setter!size_t("maxHeadersLength"));
-    /// Set IO buffer size for http and ftp requests
-    /// $(B v) - buffer size in bytes.
     mixin(Getter_Setter!size_t("bufferSize"));
-    /// Set verbosity for HTTP or FTP requests.
-    /// $(B v) - verbosity level (0 - no output, 1 - headers to stdout, 2 - headers and data hexdump to stdout). default = 0.
     mixin(Getter_Setter!uint("verbosity"));
-    /++ Set authenticator for http requests.
-     +   $(B v) - Auth instance.
-     +   Example:
-     +   ---
-     +   import requests;
-     +   void main() {
-     +       rq = Request();
-     +       rq.authenticator = new BasicAuthentication("user", "passwd");
-     +       rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
-     +   }
-     +   ---
-     +/
     mixin(Getter_Setter!Auth("authenticator"));
     /// set proxy property.
     /// $(B v) - full url to proxy.
@@ -242,159 +366,6 @@ public struct Request {
     {
         return _userHeaders;
     }
-
-    //@property void socketFactory(NetworkStream delegate(string, string, ushort) f) {
-    //    _http.socketFactory = f;
-    //}
-    /++ Set Cookie for http requests.
-        $(B v) - array of cookie.
-
-        You can set and read cookies. In the next example server set cookie and we read it.
-        Example:
-        ---
-        void main() {
-           rs = rq.get("http://httpbin.org/cookies/set?A=abcd&b=cdef");
-           assert(rs.code == 200);
-           auto json = parseJSON(cast(string)rs.responseBody.data).object["cookies"].object;
-           assert(json["A"].str == "abcd");
-           assert(json["b"].str == "cdef");
-           foreach(c; rq.cookie) {
-               final switch(c.attr) {
-                   case "A":
-                        assert(c.value == "abcd");
-                        break;
-                   case "b":
-                        assert(c.value == "cdef");
-                        break;
-                }
-            }
-        }
-        ---
-    +/
-    //@property void cookie(Cookie[] v) pure @nogc nothrow {
-    //    _http.cookie = v;
-    //}
-    ///// Get Cookie for http requests.
-    //@property Cookie[] cookie()  pure @nogc nothrow {
-    //    return _http.cookie;
-    //}
-    /++
-     set "streaming" property
-     $(B v) = value to set (true - use streaming).
-
-     Use streaming when you do not want to keep whole response in memory.
-     Example:
-     ---
-     import requests;
-     import std.stdio;
-
-     void main() {
-         Request rq = Request();
-
-         rq.useStreaming = true;
-         auto rs = rq.get("http://example.com/SomeHugePicture.png");
-         auto stream = rs.receiveAsRange();
-         File file = File("SomeHugePicture.png", "wb");
-
-         while(!stream.empty)  {
-             file.rawWrite(stream.front);
-             stream.popFront;
-         }
-         file.close();
-     }
-     ---
-    +/
-
-    //@property void useStreaming(bool v) pure @nogc nothrow {
-    //    _useStreaming = v;
-    //}
-    //@property bool useStreaming() pure @nogc nothrow {
-    //    return _useStreaming;
-    //}
-
-    ///
-    /// get length og actually received content.
-    /// this value increase over time, while we receive data
-    ///
-    // XXX document relocation to response
-    //@property long contentReceived() pure @nogc nothrow {
-    //    final switch ( _uri.scheme ) {
-    //        case "http", "https":
-    //            return _http.contentReceived;
-    //        case "ftp":
-    //            return _ftp.contentReceived;
-    //    }
-    //}
-    ///// get contentLength of the responce
-    //@property long contentLength() pure @nogc nothrow {
-    //    final switch ( _uri.scheme ) {
-    //        case "http", "https":
-    //            return _http.contentLength;
-    //        case "ftp":
-    //            return _ftp.contentLength;
-    //    }
-    //}
-    /++
-     + Enable or disable ssl peer verification.
-     + $(B v) - enable if `true`, disable if `false`.
-     +
-     + Default - false.
-     + Example:
-     + ---
-     +     auto rq = Request();
-     +     rq.sslSetVerifyPeer(true);
-     +     auto rs = rq.get("https://localhost:4443/");
-     + ---
-     +/
-    //@property void sslSetVerifyPeer(bool v) {
-    //    _http.sslSetVerifyPeer(v);
-    //}
-
-    /++
-     + Set path to ssl key file.
-     +
-     + file type can be SSLOptions.filetype.pem (default) or SSLOptions.filetype.der or SSLOptions.filetype.asn1.
-     +
-     + if you configured only key file or only cert file, we will try to load counterpart from the same file.
-     +
-     + Example:
-     + ---
-     +     auto rq = Request();
-     +     rq.sslSetKeyFile("client01.key");
-     +     auto rs = rq.get("https://localhost:4443/");
-     + ---
-     +/
-    /++
-     + Set path to ssl cert file.
-     +
-     + file type can be SSLOptions.filetype.pem (default) or SSLOptions.filetype.der or SSLOptions.filetype.asn1.
-     +
-     + if you configured only key file or only cert file, we will try to load counterpart from the same file.
-     +
-     + Example:
-     + ---
-     +     auto rq = Request();
-     +     rq.sslSetCertFile("client01.crt");
-     +     auto rs = rq.get("https://localhost:4443/");
-     + ---
-     +/
-    /++
-     + Set path to ssl ca cert file.
-     + Example:
-     + ---
-     +     auto rq = Request();
-     +     rq.sslSetCaCert("/opt/local/etc/openssl/cert.pem");
-     +     auto rs = rq.get("https://localhost:4443/");
-     + ---
-     +/
-    /++
-     + Set local address for any outgoing requests.
-     + $(B v) can be string with hostname or ip address.
-     +/
-    //@property void bind(string v) {
-    //    _http.bind(v);
-    //    _ftp.bind(v);
-    //}
 
     /++
      + Add headers to request
@@ -503,15 +474,18 @@ public struct Request {
     @property auto cm() {
         return _cm;
     }
+    /// helper
     @property bool hasMultipartForm() const
     {
         return !_multipartForm.empty;
     }
+    /// Add interceptor to request.
     void addInterceptor(Interceptor i)
     {
         _interceptors ~= i;
     }
-    class LastInterceptor : Interceptor
+
+    package class LastInterceptor : Interceptor
     {
         Response opCall(Request r, RequestHandler _)
         {

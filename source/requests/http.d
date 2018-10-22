@@ -47,39 +47,6 @@ public class MaxRedirectsException: Exception {
     }
 }
 
-/**
- * Basic authentication.
- * Adds $(B Authorization: Basic) header to request.
- */
-public class BasicAuthentication: Auth {
-    private {
-        string   _username, _password;
-        string[] _domains;
-    }
-    /// Constructor.
-    /// Params:
-    /// username = username
-    /// password = password
-    /// domains = not used now
-    ///
-    this(string username, string password, string[] domains = []) {
-        _username = username;
-        _password = password;
-        _domains = domains;
-    }
-    override string[string] authHeaders(string domain) {
-        import std.base64;
-        string[string] auth;
-        auth["Authorization"] = "Basic " ~ to!string(Base64.encode(cast(ubyte[])"%s:%s".format(_username, _password)));
-        return auth;
-    }
-    override string userName() {
-        return _username;
-    }
-    override string password() {
-        return _password;
-    }
-}
 ///
 ///
 ///

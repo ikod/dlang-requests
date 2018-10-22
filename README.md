@@ -18,7 +18,7 @@ This library can either use standard `std.socket` library or [`vibe.d`](http://v
 
 ```json
 "dependencies": {
-    "requests": "~>0.3.2"
+    "requests": "~>1"
 },
 "subConfigurations": {
     "requests": "vibed"
@@ -270,9 +270,6 @@ Output:
 ```d
 import std.stdio;
 import requests;
-
-pragma(lib, "ssl");
-pragma(lib, "crypto");
 
 void main() {
     auto f = File("test.txt", "rb");

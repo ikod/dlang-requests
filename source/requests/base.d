@@ -12,11 +12,60 @@ import std.algorithm;
 import std.string;
 import std.exception;
 import std.bitmanip;
+import std.conv;
 
+/++ 
+    Interface to provide user info and http headers requred for server auth.
++/
 public interface Auth {
-    string[string] authHeaders(string domain);
-    string         userName();
-    string         password();
+    string[string] authHeaders(string domain); /// Create headers for authentication
+    string         userName();                 /// Returns user name
+    string         password();                 /// Returns user password
+}
+/**
+ * Basic authentication.
+ * Adds $(B Authorization: Basic) header to request
+ * Example:
+ * ---
+ * import requests;
+ * void main() {
+ * rq = Request();
+ * rq.authenticator = new BasicAuthentication("user", "passwd");
+ * rs = rq.get("http://httpbin.org/basic-auth/user/passwd");
+ * }
+ * ---
+*/
+public class BasicAuthentication: Auth {
+    private {
+        string   _username, _password;
+        string[] _domains;
+    }
+    /// Constructor.
+    /// Params:
+    /// username = username
+    /// password = password
+    /// domains = not used now
+    ///
+    this(string username, string password, string[] domains = []) {
+        _username = username;
+        _password = password;
+        _domains = domains;
+    }
+    /// create Basic Auth header
+    override string[string] authHeaders(string domain) {
+        import std.base64;
+        string[string] auth;
+        auth["Authorization"] = "Basic " ~ to!string(Base64.encode(cast(ubyte[])"%s:%s".format(_username, _password)));
+        return auth;
+    }
+    /// returns username
+    override string userName() {
+        return _username;
+    }
+    /// return user password
+    override string password() {
+        return _password;
+    }
 }
 
 /**
@@ -31,7 +80,7 @@ public struct PostFile {
     string contentType;
 }
 ///
-/// This is File-like interface for sending data to multipart fotms
+/// This is File-like interface for sending data to multipart forms
 ///
 public interface FiniteReadable {
     /// size of the content
@@ -64,6 +113,7 @@ public auto formData(string name, string b, string[string] parameters = null) {
 }
 
 private immutable uint defaultBufferSize = 12*1024;
+/// Class to provide FiniteReadable from user-provided ubyte[]
 public class FormDataBytes : FiniteReadable {
     private {
         ulong   _size;
@@ -71,6 +121,7 @@ public class FormDataBytes : FiniteReadable {
         size_t  _offset;
         bool    _exhausted;
     }
+    /// constructor from ubyte[]
     this(ubyte[] data) {
         _data = data;
         _size = data.length;
@@ -89,6 +140,7 @@ public class FormDataBytes : FiniteReadable {
         return result;
     }
 }
+/// Class to provide FiniteReadable from File
 public class FormDataFile : FiniteReadable {
     import  std.file;
     private {
@@ -97,6 +149,7 @@ public class FormDataFile : FiniteReadable {
         size_t  _processed;
         bool    _exhausted;
     }
+    /// constructor from File object
     this(File file) {
         import std.file;
         _fileHandle = file;
@@ -150,12 +203,17 @@ public struct MultipartForm {
 }
 ///
 
+/// General type exception from Request
 public class RequestException: Exception {
     this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable next = null) @safe pure nothrow {
         super(msg, file, line, next);
     }
 }
 
+/**
+    ReceiveAsRange is InputRange used to supply client with data from response.
+    Each popFront fetch next data portion.
+*/
 public struct ReceiveAsRange {
     bool empty() {
         return data.length == 0;
@@ -175,25 +233,35 @@ public struct ReceiveAsRange {
     package {
         bool            activated;
         ubyte[]         data;
+        /// HTTP or FTP module set up delegate read() for reading next portion of data.
         ubyte[]         delegate() read;
     }
 }
 
+/**
+    Response
+*/
 public class Response {
     package {
+        /// Server status code
         ushort           _code;
+        /// Response body
         Buffer!ubyte     _responseBody;
+        /// Response headers
         string[string]   _responseHeaders;
         /// Initial URI
         URI              _uri;
-        /// Final URI. Can differ from __URI if request go through redirections.
+        /// Final URI. Can differ from uri() if request go through redirections.
         URI              _finalURI;
+        /// stream range stored here
         ReceiveAsRange   _receiveAsRange;
         SysTime          _startedAt,
                          _connectedAt,
                          _requestSentAt,
                          _finishedAt;
+        /// Length of received content
         long             _contentReceived;
+        /// Server-supplied content length (can be -1 when unknown)
         long             _contentLength = -1;
         mixin(Setter!ushort("code"));
         mixin(Setter!URI("uri"));
@@ -213,9 +281,31 @@ public class Response {
     @property auto ref receiveAsRange() pure @safe nothrow {
         return _receiveAsRange;
     }
+    /// string representation of response
     override string toString() const {
         return "Response(%d, %s)".format(_code, _finalURI.uri());
     }
+    /// format response to string (hpPqsBTUS).
+    /**
+
+        %h - remote hostname
+
+        %p - remote port
+
+        %P - remote path
+
+        %q - query parameters
+
+        %s - string representation
+
+        %B - received bytes
+
+        %T - resquest total time
+
+        %U - request uri()
+
+        %S - status code
+    */
     string format(string fmt) const {
         import std.array;
         auto a = appender!string();

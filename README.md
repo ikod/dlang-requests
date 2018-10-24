@@ -710,13 +710,13 @@ As with HTTP, you can call several FTP requests using the same `Request` structu
 
 ### Interceptors ###
 
-Interceptors provide a way to modify/log/cache request. They can form a chain attached to Request structure so that
+Interceptors provide a way to modify or log, or cache request. They can form a chain attached to Request structure so that
 each request will pass through whole chain.
 
-Each interceptor receive request as input, do whatever it need and pass request to the handler, which finaly serve request and
+Each interceptor receive request as input, do whatever it need and pass request to the handler, which finally serve request and
 return `Response` back.
 
-Here is small example of interceptor:
+Here is small example of interceptor which just prints request and response:
 
 ```d
 class DummyInterceptor : Interceptor {
@@ -731,8 +731,8 @@ class DummyInterceptor : Interceptor {
 ```
 
 You can change Request `r`, using Request() getters/setters before you pass it to next handler.
-Authentication methods can be added to library using interceptors and headers injection.
-In case of something like cache you can return cached response immediately.
+For example, authentication methods can be added to library using interceptors and headers injection.
+You can implement some kind of cache and return cached response immediately.
 
 ### SocketFactory ###
 

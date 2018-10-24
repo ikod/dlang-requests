@@ -1,3 +1,14 @@
+/**********************************************************************************
+
+HTTP client library, inspired by python-requests with goals:
+
+ $(UL
+   $(LI small memory footprint)
+   $(LI performance)
+   $(LI simple, high level API)
+   $(LI native D implementation)
+ )
+*/
 module requests;
 
 public import requests.http;
@@ -431,45 +442,38 @@ package unittest {
         
     }
 }
-///
-/// Create array of query params from args
-///
-auto queryParams(A...)(A args) pure @safe nothrow {
-    QueryParam[] res;
-    static if ( args.length >= 2 ) {
-        res = [QueryParam(args[0].to!string, args[1].to!string)] ~ queryParams(args[2..$]);
-    }
-    return res;
-}
 /**
  * Call GET, and return response content.
+ *
  * This is the simplest case, when all you need is the response body and have no parameters.
  * Returns:
  * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
  */
-public auto ref getContent(A...)(string url) {
+public auto ref getContent(string url) {
     auto rq = Request();
     auto rs = rq.get(url);
     return rs.responseBody;
 }
 /**
- * Call GET, and return response content.
+ * Call GET, with parameters, and return response content.
+ *
  * args = string[string] fo query parameters.
  * Returns:
  * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
  */
-public auto ref getContent(A...)(string url, string[string] args) {
+public auto ref getContent(string url, string[string] args) {
     auto rq = Request();
     auto rs = rq.get(url, args);
     return rs.responseBody;
 }
 /**
- * Call GET, and return response content.
+ * Call GET, with parameters, and return response content.
+ * 
  * args = QueryParam[] of parameters.
  * Returns:
  * Buffer!ubyte which you can use as ForwardRange or DirectAccessRange, or extract data with .data() method.
  */
-public auto ref getContent(A...)(string url, QueryParam[] args) {
+public auto ref getContent(string url, QueryParam[] args) {
     auto rq = Request();
     auto rs = rq.get(url, args);
     return rs.responseBody;

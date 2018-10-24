@@ -137,4 +137,10 @@
 <url><loc>http://127.0.0.1/requests/request/RequestHandler.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/RequestHandler.handle.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/RequestHandler.this.html</loc></url>
+<url><loc>http://127.0.0.1/requests.html</loc></url>
+<url><loc>http://127.0.0.1/requests/getContent.html</loc></url>
+<url><loc>http://127.0.0.1/requests/getContent.html</loc></url>
+<url><loc>http://127.0.0.1/requests/getContent.html</loc></url>
+<url><loc>http://127.0.0.1/requests/getContent.html</loc></url>
+<url><loc>http://127.0.0.1/requests/postContent.html</loc></url>
 </urlset>

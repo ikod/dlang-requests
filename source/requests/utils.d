@@ -7,6 +7,7 @@ import std.algorithm.sorting;
 import std.experimental.logger;
 import std.typecons;
 import std.algorithm;
+import std.conv;
 
 //import requests.streams;
 
@@ -213,7 +214,21 @@ struct Cookies {
     Cookie[]    _array;
 }
 
+///
+/// create QueryParam[] from assoc.array string[string]
+//
 QueryParam[] aa2params(string[string] aa)
 {
     return aa.byKeyValue.map!(p => QueryParam(p.key, p.value)).array;
+}
+
+///
+/// Create QueryParam[] from any args
+///
+auto queryParams(A...)(A args) pure @safe nothrow {
+    QueryParam[] res;
+    static if ( args.length >= 2 ) {
+        res = [QueryParam(args[0].to!string, args[1].to!string)] ~ queryParams(args[2..$]);
+    }
+    return res;
 }

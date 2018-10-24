@@ -50,25 +50,25 @@ public class MaxRedirectsException: Exception {
 ///
 ///
 ///
-public auto queryParams(T...)(T params) pure nothrow @safe
-{
-    static assert (T.length % 2 == 0, "wrong args count");
-
-    QueryParam[] output;
-    output.reserve = T.length / 2;
-
-    void queryParamsHelper(T...)(T params, ref QueryParam[] output)
-    {
-        static if (T.length > 0)
-        {
-            output ~= QueryParam(params[0].to!string, params[1].to!string);
-            queryParamsHelper(params[2..$], output);
-        }
-    }
-
-    queryParamsHelper(params, output);
-    return output;
-}
+//public auto queryParams(T...)(T params) pure nothrow @safe
+//{
+//    static assert (T.length % 2 == 0, "wrong args count");
+//
+//    QueryParam[] output;
+//    output.reserve = T.length / 2;
+//
+//    void queryParamsHelper(T...)(T params, ref QueryParam[] output)
+//    {
+//        static if (T.length > 0)
+//        {
+//            output ~= QueryParam(params[0].to!string, params[1].to!string);
+//            queryParamsHelper(params[2..$], output);
+//        }
+//    }
+//
+//    queryParamsHelper(params, output);
+//    return output;
+//}
 
 ///
 /// Response - result of request execution.

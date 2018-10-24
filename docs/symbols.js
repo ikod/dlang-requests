@@ -101,4 +101,7 @@ var symbols = [
 {name: 'requests.request.RequestHandler', kind: "classdeclaration", path: './requests/request/RequestHandler.html', attributes: []},
 {name: 'requests.request.RequestHandler.handle', kind: "functiondeclaration", path: './requests/request/RequestHandler.handle.html', attributes: []},
 {name: 'requests.request.RequestHandler.this', kind: "functiondeclaration", path: './requests/request/RequestHandler.this.html', attributes: []},
+{name: 'requests', kind: "module", path: './requests.html', attributes: []},
+{name: 'requests.getContent', kind: "functiondeclaration", path: './requests/getContent.html', attributes: []},
+{name: 'requests.postContent', kind: "functiondeclaration", path: './requests/postContent.html', attributes: ["auto"]},
 ];

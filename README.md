@@ -9,7 +9,7 @@ HTTP client library, inspired by python-requests with goals:
 * simple, high level API
 * native D implementation
 
-API docs: [Wiki](https://github.com/ikod/dlang-requests/wiki)
+API docs: [Wiki](https://ikod.github.io/dlang-requests/)
 
 ## Table of contents
 

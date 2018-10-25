@@ -743,7 +743,7 @@ auto doSomething()
 One day you decide that you need to log every http request to external services.
 
 One solution is to add logging code to each 
-function of `mymodule` where external http calls executed. This can require lot of work and code changes, and sometime
+function of `mymodule` where external http calls executed. This can require lot of work and code changes, and sometimes
 even not really possible.
 
 Another, and more effective solution is to use interceptors. First we have to create `logger` class:

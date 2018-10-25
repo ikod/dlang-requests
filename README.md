@@ -710,16 +710,46 @@ As with HTTP, you can call several FTP requests using the same `Request` structu
 
 ### Interceptors ###
 
-Interceptors provide a way to modify or log, or cache request. They can form a chain attached to Request structure so that
+Interceptors provide a way to modify, or log, or cache request. They can form a chain attached to Request structure so that
 each request will pass through whole chain.
 
 Each interceptor receive request as input, do whatever it need and pass request to the handler, which finally serve request and
 return `Response` back.
 
-Here is small example of interceptor which just prints request and response:
+
+Here is small example how interceptors can be used. Consider situation where you have  main app and some module. Main code:
 
 ```d
-class DummyInterceptor : Interceptor {
+import std.stdio;
+import mymodule;
+
+void main()
+{
+    auto r = mymodule.doSomething();
+    writeln(r.length);
+}
+```
+module:
+```d
+module mymodule;
+
+import requests;
+
+auto doSomething()
+{
+    return getContent("http://google.com");                                                                              
+}
+```
+One day you decide that you need to log every http request to external services.
+
+One solution is to add logging code to each 
+function of `mymodule` where external http calls executed. This can require lot of work and code changes, and sometime
+even not really possible.
+
+Another, and more effective solution is to use interceptors. First we have to create `logger` class:
+
+```d
+class LoggerInterceptor : Interceptor {
     Response opCall(Request r, RequestHandler next)
     {
         writefln("Request  %s", r);
@@ -729,9 +759,42 @@ class DummyInterceptor : Interceptor {
     }
 }
 ```
+Then we can instrument every call to `request` with this call:
 
-You can change Request `r`, using Request() getters/setters before you pass it to next handler.
-For example, authentication methods can be added to library using interceptors and headers injection.
+```d
+import std.stdio;
+import requests;
+import mymodule;
+
+class LoggerInterceptor : Interceptor {
+    Response opCall(Request r, RequestHandler next)
+    {
+        writefln("Request  %s", r);
+        auto rs = next.handle(r);
+        writefln("Response %s", rs);
+        return rs;
+    }
+}
+
+void main()
+{
+    requests.addInterceptor(new LoggerInterceptor());
+    auto r = mymodule.doSomething();
+    writeln(r.length);
+}
+```
+
+The only change required is call addInterceptor().
+
+You may intercept single Request structure (instead of whole `requests` module) attaching interceptors directly to this structure:
+```d
+Request rq;
+rq.addInterceptor(new LoggerInterceptor());
+
+```
+
+Interceptor can change Request `r`, using Request() getters/setters before pass it to next handler.
+For example, authentication methods can be added using interceptors and headers injection.
 You can implement some kind of cache and return cached response immediately.
 
 ### SocketFactory ###

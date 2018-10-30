@@ -411,7 +411,9 @@ Here is a short description of some `Request` options you can set:
 `(schema,host,port) -> connection` of opened connections, for subsequent usage.
 
 ### Streaming server response ###
-With `useStreaming`, you can receive response body as input range.
+When you plan to receive something really large in response (file download) you don't want to receive
+gigabytes of content into the response buffer. With `useStreaming`, you can receive response from server as input range.
+Elements of the range are chunks of data (of type ubyte[]).
 `contentLength` and `contentReceived` can be used to monitor progress:
 
 ```d
@@ -468,7 +470,7 @@ Received 2896 bytes, total received 34536 from document legth 35588
 Received 1052 bytes, total received 35588 from document legth 35588
 ```
 
-With `verbosity >= 3`, you will also receive a dump of each data portion received from sockets:
+With `verbosity >= 3`, you will also receive a dump of each data portion received from server:
 
 ```
 00000  48 54 54 50 2F 31 2E 31  20 32 30 30 20 4F 4B 0D  |HTTP/1.1 200 OK.|
@@ -487,15 +489,17 @@ With `verbosity >= 3`, you will also receive a dump of each data portion receive
 Just for fun: with streaming you can forward content between servers in just two code lines. `postContent` will automatically receive next data portion from source and send it to destination:
 
 ```d
-import requests;
-
-void main()
-{
-    auto rq = Request();
-    rq.useStreaming = true;
-    auto stream = rq.get("https://api.github.com/search/repositories?order=desc&sort=updated&q=language:D").receiveAsRange();
-    postContent("http://httpbin.org/post", stream);
-}
+import requests;                                                                                                            
+import std.stdio;                                                                                                           
+                                                                                                                            
+void main()                                                                                                                 
+{                                                                                                                           
+    auto rq = Request();                                                                                                    
+    rq.useStreaming = true;                                                                                                 
+    auto stream = rq.get("http://httpbin.org/get").receiveAsRange();                                                        
+    auto content = postContent("http://httpbin.org/post", stream);                                                          
+    writeln(content);                                                                                                       
+}                                                                                                                           
 ```
 
 You can use `dlang-requests` in parallel tasks (but you can't share the same `Request` structure between threads):

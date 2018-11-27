@@ -1,12 +1,14 @@
 project('dlang-requests', 'd',
     meson_version: '>=0.46',
     license: 'BSL-1.0',
-    version: '0.8.0',
+    version: '1.0.0',
 )
 
-project_soversion = '0'
+project_soversion = '1'
 
 pkgc = import('pkgconfig')
+
+requests_dep = dependency('cachetools', method : 'dub')
 
 #
 # Sources
@@ -32,14 +34,14 @@ requests_src = [
 ]
 
 src_dir = include_directories('source/')
-
+cachetools_dir = include_directories('cachetools-0.0.3/cachetools/source')
 #
 # Targets
 #
 
 dlang_requests_lib = library('dlang-requests',
         [requests_src],
-        include_directories: [src_dir],
+        include_directories: [src_dir, cachetools_dir],
         install: true,
         version: meson.project_version(),
         soversion: project_soversion,

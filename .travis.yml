@@ -24,6 +24,7 @@ before_script:
 
 script:
     - dub test --config=std
+    - dub fetch cachetools --cache=local --version=0.0.3
     - meson build && ninja -j6 -C build
     # FIXME: Tests with Meson are currently broken (requests/streams.d(1026): Can't connect to 0.0.0.0:23035)
     #- ninja -j8 -C build test

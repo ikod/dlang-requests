@@ -10,6 +10,7 @@
         {
             "name": "std",
             "dependencies": {
+                "cachetools": "~>0"
             }
         },
         {
@@ -17,6 +18,7 @@
             "versions": ["vibeD"],
             "dependencies": {
                 "vibe-d": "~>0.8",
+                "cachetools": "~>0"
             }
         }
     ],

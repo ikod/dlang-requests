@@ -954,6 +954,7 @@ public struct HTTPRequest {
     /// Params:
     ///     url = url
     ///     sources = array of sources.
+    deprecated("Use Request() instead of HTTPRequest(); will be removed 2019-07")
     HTTPResponse exec(string method="POST")(string url, MultipartForm sources) {
         import std.uuid;
         import std.file;
@@ -1660,7 +1661,7 @@ public struct HTTPRequest {
     HTTPResponse post(A...)(string uri, A args) {
         return exec!"POST"(uri, args);
     }
-    // XXX interceptors
+
     import requests.request;
 
     // we use this if we send from ubyte[][] and user provided Content-Length
@@ -1777,15 +1778,11 @@ public struct HTTPRequest {
             // send headers
             _stream.send(req.data());
             // send body
-            //static if ( rank!R == 1) {
-            //    _stream.send(content);
-            //} else {
             if ( send_flat ) {
                 sendFlattenContent(_stream);
             } else {
                 sendChunkedContent(_stream);
             }
-            //}
             _response._requestSentAt = Clock.currTime;
             debug(requests) trace("starting receive response");
             receiveResponse(_stream);

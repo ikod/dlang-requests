@@ -10,6 +10,8 @@ import std.experimental.logger;
 
 import requests.streams;
 
+import cachetools.cache;
+
 /**
  * Keep opened connections for HTTP.
  * It is actually cache over tuple(schema, host, port) -> connection
@@ -24,27 +26,18 @@ package struct ConnManager {
         SysTime         timestamp;
     }
     private {
-        int              _limit = 10;
-        CMValue[CMKey]   _cache;
+        CacheLRU!(CMKey, CMValue) __cache;
     }
     this(int limit) {
-        _limit = limit;
+        __cache = new CacheLRU!(CMKey, CMValue);
+        __cache.size = limit;
+        __cache.enableCacheEvents();
     }
     ~this() {
-        //assert(0);
         clear();
     }
     @property auto length() {
-        return _cache.length;
-    }
-    ///
-    /// evict oldest connection
-    ///
-    private CMKey evict()
-    in { assert(_cache.length>0); }
-    do {
-        debug(requests) trace("looking something to evict");
-        return _cache.byKeyValue().array.sort!"a.value.timestamp < b.value.timestamp".front().key;
+        return __cache.length;
     }
     ///
     /// put new stream in cache, evict old stream and return it.
@@ -53,37 +46,34 @@ package struct ConnManager {
     ///
     NetworkStream put(string schema, string host, ushort port, NetworkStream stream)
     in { assert(stream !is null);}
-    out{ assert(_cache.length>0);}
+    out{ assert(__cache.length>0);}
     do {
         NetworkStream e;
-        auto key = CMKey(schema, host, port);
-        auto value_ptr = key in _cache;
-
-        if ( value_ptr is null ) {
-            CMValue v = {stream: stream, timestamp: Clock.currTime};
-            if ( _cache.length >= _limit ) {
-                CMKey k = evict();
-                e = _cache[k].stream;
-                _cache.remove(k);
-            }
-            _cache[key] = v;
-            return e;
+        CMKey     key = CMKey(schema, host, port);
+        CMValue value = {stream: stream, timestamp: Clock.currTime};
+        __cache.put(key, value);
+        auto cacheEvents = __cache.cacheEvents();
+        switch( cacheEvents.length )
+        {
+            case 0:
+                return null;
+            case 1:
+                return cacheEvents.front.val.stream;
+            default:
+                assert(0);
         }
-        auto old_stream = (*value_ptr).stream;
-        if (  old_stream != stream ) {
-            debug(requests) trace("old stream != new stream");
-            e = old_stream;
-            (*value_ptr).stream = stream;
-        }
-        (*value_ptr).timestamp = Clock.currTime;
-        return e;
     }
     /**
         Lookup connection.
      */
-    NetworkStream get(string schema, string host, ushort port) {
-        if ( auto value_ptr = CMKey(schema, host, port) in _cache ) {
-            return (*value_ptr).stream;
+    NetworkStream get(string schema, string host, ushort port)
+    do
+    {
+        if ( __cache is null ) return null;
+        auto v = __cache.get(CMKey(schema, host, port));
+        if ( ! v.isNull() )
+        {
+            return v.get.stream;
         }
         return null;
     }
@@ -94,30 +84,41 @@ package struct ConnManager {
     NetworkStream del(string schema, string host, ushort port) {
         NetworkStream s;
         CMKey key = CMKey(schema, host, port);
-        if ( auto value_ptr = key in _cache ) {
-            s = (*value_ptr).stream;
+        __cache.remove(key);
+        auto cacheEvents = __cache.cacheEvents();
+        switch( cacheEvents.length )
+        {
+            case 0:
+                return null;
+            case 1:
+                return cacheEvents.front.val.stream;
+            default:
+                assert(0);
         }
-        _cache.remove(key);
-        return s;
     }
 
     /**
         clear cache (and close connections)
      */
     void clear()
-    out { assert(_cache.length == 0); }
+    out { assert(__cache is null || __cache.length == 0); }
     do  {
-        foreach(k,ref v; _cache) {
-            debug(requests) tracef("Clear ConnManager entry %s", k);
-            try {
-                v.stream.close();
-            } catch (Exception e) {
+        if ( __cache is null ) return;
+
+        __cache.clear();
+        foreach(e; __cache.cacheEvents )
+        {
+            try
+            {
+                e.val.stream.close();
+            }
+            catch(Exception e)
+            {
                 debug(requests) tracef("%s while clear connmanager", e.msg);
             }
-            _cache.remove(k);
         }
+        __cache = null;
     }
-
 }
 
 unittest {

@@ -1278,7 +1278,10 @@ version (vibeD) {
         }
 
         override void close() @trusted {
-            _sslStream.finalize();
+            if ( _sslStream )
+            {
+                _sslStream.finalize();
+            }
             _conn.close();
             _isOpen = false;
         }

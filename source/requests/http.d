@@ -24,6 +24,8 @@ import requests.connmanager;
 import requests.rangeadapter;
 
 static immutable ushort[] redirectCodes = [301, 302, 303, 307, 308];
+static immutable ushort[] returnToUserCodes = [304];
+
 enum   HTTP11 = 101;
 enum   HTTP10 = 100;
 
@@ -777,6 +779,12 @@ public struct HTTPRequest {
 
         auto v = _bodyDecoder.get();
         _response._responseBody.putNoCopy(v);
+
+        if ( returnToUserCodes.canFind(_response.code))
+        {
+            debug(requests) tracef("return to user by response code");
+            return;
+        }
 
         if ( _verbosity >= 2 ) writefln("< %d bytes of body received", partialBody.length);
 

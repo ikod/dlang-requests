@@ -780,7 +780,7 @@ public struct HTTPRequest {
         auto v = _bodyDecoder.get();
         _response._responseBody.putNoCopy(v);
 
-        if ( returnToUserCodes.canFind(_response.code))
+        if ( returnToUserCodes.canFind(_response.code) && (_contentLength < 0 && _unChunker is null) )
         {
             debug(requests) tracef("return to user by response code");
             return;

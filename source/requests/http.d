@@ -24,7 +24,6 @@ import requests.connmanager;
 import requests.rangeadapter;
 
 static immutable ushort[] redirectCodes = [301, 302, 303, 307, 308];
-static immutable ushort[] returnToUserCodes = [304];
 
 enum   HTTP11 = 101;
 enum   HTTP10 = 100;
@@ -780,18 +779,17 @@ public struct HTTPRequest {
         auto v = _bodyDecoder.get();
         _response._responseBody.putNoCopy(v);
 
-        if ( returnToUserCodes.canFind(_response.code) && (_contentLength < 0 && _unChunker is null) )
+        // https://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4
+        if ( (_method == "HEAD") || responseMustNotIncludeBody(_response.code) || (_contentLength < 0 && _unChunker is null) )
         {
-            debug(requests) tracef("return to user by response code");
+            debug(requests) tracef("response without body");
             return;
         }
+
+        _response._contentLength = _contentLength;
+        _response._contentReceived = _contentReceived;
 
         if ( _verbosity >= 2 ) writefln("< %d bytes of body received", partialBody.length);
-
-        if ( _method == "HEAD" ) {
-            // HEAD response have ContentLength, but have no body
-            return;
-        }
 
         while( true ) {
             if ( _contentLength >= 0 && _contentReceived >= _contentLength ) {
@@ -911,6 +909,7 @@ public struct HTTPRequest {
         }
         _bodyDecoder.flush();
         _response._responseBody.putNoCopy(_bodyDecoder.get());
+        _response._contentReceived = _contentReceived;
     }
     ///
     /// Check that we received anything.

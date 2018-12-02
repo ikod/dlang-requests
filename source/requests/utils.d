@@ -232,3 +232,10 @@ auto queryParams(A...)(A args) pure @safe nothrow {
     }
     return res;
 }
+
+bool responseMustNotIncludeBody(ushort code) pure nothrow @nogc @safe
+{
+    // https://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4
+    if ((code / 100 == 1) || code == 204 || code == 304 ) return true;
+    return false;
+}

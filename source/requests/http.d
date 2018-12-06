@@ -105,16 +105,6 @@ public class HTTPResponse : Response {
         return _history;
     }
 
-    @property auto getStats() const pure @safe {
-        alias statTuple = Tuple!(Duration, "connectTime",
-                                 Duration, "sendTime",
-                                 Duration, "recvTime");
-        statTuple stat;
-        stat.connectTime = _connectedAt - _startedAt;
-        stat.sendTime = _requestSentAt - _connectedAt;
-        stat.recvTime = _finishedAt - _requestSentAt;
-        return stat;
-    }
     private int parse_version(in string v) pure const nothrow @safe {
         // try to parse HTTP/1.x to version
         try if ( v.length > 5 ) {
@@ -1315,9 +1305,9 @@ public struct HTTPRequest {
         }
 
         if ( serverPrematurelyClosedConnection()
-        && !restartedRequest
-        && isIdempotent(_method)
-        ) {
+            && !restartedRequest
+            && isIdempotent(_method))
+        {
             ///
             /// We didn't receive any data (keepalive connectioin closed?)
             /// and we can restart this request.

@@ -272,6 +272,18 @@ public class Response {
     mixin(Getter("contentLength"));
     mixin(Getter("uri"));
     mixin(Getter("finalURI"));
+
+    @property auto getStats() const pure @safe {
+        import std.typecons: Tuple;
+        alias statTuple = Tuple!(Duration, "connectTime",
+            Duration, "sendTime",
+            Duration, "recvTime");
+        statTuple stat;
+        stat.connectTime = _connectedAt - _startedAt;
+        stat.sendTime = _requestSentAt - _connectedAt;
+        stat.recvTime = _finishedAt - _requestSentAt;
+        return stat;
+    }
     @property auto ref responseBody() @safe nothrow {
         return _responseBody;
     }

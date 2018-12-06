@@ -570,6 +570,8 @@ public struct FTPRequest {
         }
         dataStream.bind(_bind);
         dataStream.connect(host, port, _timeout);
+
+        _response._requestSentAt = Clock.currTime;
         
         code = sendCmdGetResponse("RETR " ~ baseName(_uri.path) ~ "\r\n", _controlChannel);
         if ( code/100 > 1 ) {

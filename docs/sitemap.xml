@@ -61,6 +61,7 @@
 <url><loc>http://127.0.0.1/requests/base/Response.contentReceived.html</loc></url>
 <url><loc>http://127.0.0.1/requests/base/Response.finalURI.html</loc></url>
 <url><loc>http://127.0.0.1/requests/base/Response.format.html</loc></url>
+<url><loc>http://127.0.0.1/requests/base/Response.getStats.html</loc></url>
 <url><loc>http://127.0.0.1/requests/base/Response.receiveAsRange.html</loc></url>
 <url><loc>http://127.0.0.1/requests/base/Response.responseBody.html</loc></url>
 <url><loc>http://127.0.0.1/requests/base/Response.responseHeaders.html</loc></url>

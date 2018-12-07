@@ -49,6 +49,7 @@ var symbols = [
 {name: 'requests.base.Response.contentReceived', kind: "functiondeclaration", path: './requests/base/Response.contentReceived.html', attributes: ["auto", "final", "pure", "nothrow", "property", "nogc", "safe", "inout"]},
 {name: 'requests.base.Response.finalURI', kind: "functiondeclaration", path: './requests/base/Response.finalURI.html', attributes: ["auto", "final", "pure", "nothrow", "property", "nogc", "safe", "inout"]},
 {name: 'requests.base.Response.format', kind: "functiondeclaration", path: './requests/base/Response.format.html', attributes: ["const"]},
+{name: 'requests.base.Response.getStats', kind: "functiondeclaration", path: './requests/base/Response.getStats.html', attributes: ["auto", "pure", "property", "safe", "const"]},
 {name: 'requests.base.Response.receiveAsRange', kind: "functiondeclaration", path: './requests/base/Response.receiveAsRange.html', attributes: ["pure", "nothrow", "ref", "property", "safe"]},
 {name: 'requests.base.Response.responseBody', kind: "functiondeclaration", path: './requests/base/Response.responseBody.html', attributes: ["nothrow", "ref", "property", "safe"]},
 {name: 'requests.base.Response.responseHeaders', kind: "functiondeclaration", path: './requests/base/Response.responseHeaders.html', attributes: ["pure", "nothrow", "ref", "property", "safe"]},

@@ -62,7 +62,7 @@ details -document body, status code, headers, timings, etc.
 
 #### Windows ssl notes ####
 In case `requests` can't find opsn ssl library on Windows, here is several steps that can help:
-1. From the [slproweb](https://slproweb.com/products/Win32OpenSSL.html) download [openssl](https://slproweb.com/download/Win32OpenSSL_Light-1_0_2o.exe) binaries for Windows.
+1. From the [slproweb](https://slproweb.com/products/Win32OpenSSL.html) download latest Win32OpenSSL_Light installer binaries for Windows.
 1. Install it. **Important**: allow installer to install libraries in system folders.
 
 See step-by-step instructions [here](https://github.com/ikod/dlang-requests/issues/77#issuecomment-405911012).

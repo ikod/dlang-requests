@@ -177,9 +177,9 @@ public struct FTPRequest {
         scope(exit) {
             __controlChannel.readTimeout = 0.seconds;
         }
-        auto b = new ubyte[_bufferSize];
+        debug(requests) trace("Wait on control channel");
+        auto b = new ubyte[1];
         while ( __controlChannel && __controlChannel.isConnected && buffer.length < bufferLimit ) {
-            debug(requests) trace("Wait on control channel");
             ptrdiff_t rc;
             try {
                 rc = __controlChannel.receive(b);
@@ -188,18 +188,18 @@ public struct FTPRequest {
                 error("Failed to read response from server");
                 throw new FTPServerResponseError("Failed to read server responce over control channel", __FILE__, __LINE__, e);
             }
-            debug(requests) tracef("Got %d bytes from control socket", rc);
+            //debug(requests) tracef("Got %d bytes from control socket", rc);
             if ( rc == 0 ) {
                 error("Failed to read response from server");
                 throw new FTPServerResponseError("Failed to read server responce over control channel", __FILE__, __LINE__);
             }
-            if ( _verbosity >= 1 ) {
-                (cast(string)b[0..rc]).
-                    splitLines.
-                    each!(l=>writefln("< %s", l));
-            }
             buffer ~= b[0..rc];
             if ( buffer.endsWith('\n') ){
+                if ( _verbosity >= 1 ) {
+                    buffer.
+                    splitLines.
+                    each!(l=>writefln("< %s", l));
+                }
                 auto responseLines = buffer.
                     splitLines.
                     filter!(l => l.length>3 && l[3]==' ' && l[0..3].all!isDigit);
@@ -384,31 +384,6 @@ public struct FTPRequest {
             _postData.popFront;
         }
         debug(requests) tracef("sent");
-        //static if ( __traits(compiles, cast(ubyte[])content) ) {
-        //    auto data = cast(ubyte[])content;
-        //    auto b = new ubyte[_bufferSize];
-        //    for(size_t pos = 0; pos < data.length;) {
-        //        auto chunk = data.take(_bufferSize).array;
-        //        auto rc = dataStream.send(chunk);
-        //        if ( rc <= 0 ) {
-        //            debug(requests) trace("done");
-        //            break;
-        //        }
-        //        debug(requests) tracef("sent %d bytes to data channel", rc);
-        //        pos += rc;
-        //    }
-        //} else {
-        //    while (!content.empty) {
-        //        auto chunk = content.front;
-        //        debug(requests) trace("ftp posting %d of data chunk".format(chunk.length));
-        //        auto rc = dataStream.send(chunk);
-        //        if ( rc <= 0 ) {
-        //            debug(requests) trace("done");
-        //            break;
-        //        }
-        //        content.popFront;
-        //    }
-        //}
         dataStream.close();
         dataStream = null;
         response = serverResponse(_controlChannel);
@@ -418,6 +393,21 @@ public struct FTPRequest {
         }
         _response.code = code;
         return _response;
+    }
+    private auto connectData(string v)
+    {
+        string host;
+        ushort port;
+
+        ubyte a1,a2,a3,a4,p1,p2;
+        formattedRead(v, "%d,%d,%d,%d,%d,%d", &a1, &a2, &a3, &a4, &p1, &p2);
+        host = std.format.format("%d.%d.%d.%d", a1, a2, a3, a4);
+        port = (p1<<8) + p2;
+
+        auto dataStream = new TCPStream();
+        dataStream.bind(_bind);
+        dataStream.connect(host, port, _timeout);
+        return dataStream;
     }
 
     FTPResponse get(string uri = null) {
@@ -549,35 +539,44 @@ public struct FTPRequest {
         // in last response.
         // Cut anything between ( and )
         auto v = _responseHistory[$-1].findSplitBefore(")")[0].findSplitAfter("(")[1];
-        string host;
-        ushort port;
-        try {
-            ubyte a1,a2,a3,a4,p1,p2;
-            formattedRead(v, "%d,%d,%d,%d,%d,%d", &a1, &a2, &a3, &a4, &p1, &p2);
-            host = std.format.format("%d.%d.%d.%d", a1, a2, a3, a4);
-            port = (p1<<8) + p2;
+
+        TCPStream dataStream;
+        try{
+            dataStream = connectData(v);
         } catch (FormatException e) {
             error("Failed to parse ", v);
             _response.code = 500;
             return _response;
         }
-        
-        auto dataStream = new TCPStream();
         scope (exit ) {
             if ( dataStream !is null && !_response._receiveAsRange.activated ) {
                 dataStream.close();
             }
         }
-        dataStream.bind(_bind);
-        dataStream.connect(host, port, _timeout);
 
         _response._requestSentAt = Clock.currTime;
         
         code = sendCmdGetResponse("RETR " ~ baseName(_uri.path) ~ "\r\n", _controlChannel);
-        if ( code/100 > 1 ) {
+        if ( code/100 > 1 && code/100 < 5) {
             _response.code = code;
             return _response;
         }
+        if ( code/100 == 5) {
+            dataStream.close();
+            code = sendCmdGetResponse("PASV\r\n", _controlChannel);
+            if ( code/100 > 2 ) {
+                _response.code = code;
+                return _response;
+            }
+            v = _responseHistory[$-1].findSplitBefore(")")[0].findSplitAfter("(")[1];
+            dataStream = connectData(v);
+            code = sendCmdGetResponse("NLST " ~ _uri.path ~ "\r\n", _controlChannel);
+            if ( code/100 > 1 ) {
+                _response.code = code;
+                return _response;
+            }
+        }
+
         dataStream.readTimeout = _timeout;
         while ( true ) {
             auto b = new ubyte[_bufferSize];

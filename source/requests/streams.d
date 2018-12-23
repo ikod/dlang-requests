@@ -375,10 +375,6 @@ unittest {
  *  $(LI data method: return collected data (like Appender.data))
  * )
  */
-static this() {
-}
-static ~this() {
-}
 enum   CACHESIZE = 1024;
 
 static long reprAlloc;

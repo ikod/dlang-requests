@@ -1020,7 +1020,7 @@ public abstract class SocketStream : NetworkStream {
                 __isConnected = true;
                 break;
             } catch (SocketException e) {
-                warningf("Failed to connect to %s:%d(%s): %s", host, port, a, e.msg);
+                debug(requests) warningf("Failed to connect to %s:%d(%s): %s", host, port, a, e.msg);
                 s.close();
             }
         }

@@ -92,11 +92,11 @@ static this() {
         throw new Exception("loading openssl: unsupported system");
     }
     if ( openssl._libssl is null ) {
-        error("warning: failed to load libssl - first access over https will fail");
+        debug(requests) trace("warning: failed to load libssl - first access over https will fail");
         return;
     }
     if ( openssl._libcrypto is null ) {
-        error("warning: failed to load libcrypto - first access over https will fail");
+        debug(requests) trace("warning: failed to load libcrypto - first access over https will fail");
         return;
     }
     openssl._ver = openssl.OpenSSL_version_detect();

@@ -212,6 +212,7 @@ public alias QueryParam = Tuple!(string, "key", string, "value");
 
 struct Cookies {
     Cookie[]    _array;
+    alias _array this;
 }
 
 ///

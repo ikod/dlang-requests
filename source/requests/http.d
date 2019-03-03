@@ -540,6 +540,8 @@ public struct HTTPRequest {
                     break;
                 case "expires":
                     continue;
+                case "max-age":
+                    continue;
                 default:
                     break;
             }

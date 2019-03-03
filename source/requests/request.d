@@ -545,7 +545,7 @@ public struct Request {
         }
         if ( _cookie.refCountedStore().refCount() == 0)
         {
-            _cookie = RefCounted!Cookies();
+            _cookie = RefCounted!Cookies(Cookies());
         }
         auto interceptors = _static_interceptors ~ _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);
@@ -570,7 +570,7 @@ public struct Request {
         }
         if ( _cookie.refCountedStore().refCount() == 0)
         {
-            _cookie = RefCounted!Cookies();
+            _cookie = RefCounted!Cookies(Cookies());
         }
         auto interceptors = _static_interceptors ~ _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);

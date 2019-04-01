@@ -136,6 +136,7 @@ static this() {
     void delegate()[Version] init_matrix;
     init_matrix[Version(1,0)] = &openssl.init1_0;
     init_matrix[Version(1,1)] = &openssl.init1_1;
+    init_matrix[Version(0,2)] = &openssl.init1_1; // libressl >= 2.7.1
     auto init = init_matrix.get(openssl._ver, null);
     if ( init is null ) {
         throw new Exception("loading openssl: unknown version for init");

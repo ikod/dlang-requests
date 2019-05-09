@@ -47,10 +47,7 @@ private alias Version = Tuple!(int, "major", int, "minor");
 
 immutable static OpenSSL openssl;
 
-static this() {
-    if ( openssl._libssl !is null ) {
-        return;
-    }
+shared static this() {
     version(OSX) {
         openssl._libssl = cast(typeof(openssl._libssl))dlopen("libssl.dylib", RTLD_LAZY);
         openssl._libcrypto = cast(typeof(openssl._libcrypto))dlopen("libcrypto.dylib", RTLD_LAZY);

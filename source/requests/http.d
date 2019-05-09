@@ -29,7 +29,7 @@ enum   HTTP11 = 101;
 enum   HTTP10 = 100;
 
 static immutable string[string] proxies;
-static this() {
+shared static this() {
     import std.process;
     proxies["http"] = environment.get("http_proxy", environment.get("HTTP_PROXY"));
     proxies["https"] = environment.get("https_proxy", environment.get("HTTPS_PROXY"));
@@ -170,7 +170,7 @@ public struct HTTPRequest {
         MultipartForm               _multipartForm;
 
         NetStreamFactory  _socketFactory;
-        
+
         QueryParam[]        _params;
         string              _contentType;
         InputRangeAdapter   _postData;

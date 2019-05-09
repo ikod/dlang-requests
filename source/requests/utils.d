@@ -170,7 +170,7 @@ package unittest {
 }
 
 private static immutable char[string] hex2chr;
-static this() {
+shared static this() {
     foreach(c; 0..255) {
         hex2chr["%02X".format(c)] = cast(char)c;
     }

@@ -528,7 +528,7 @@ else {
     }
 
     string[int] codes;
-    static this() {
+    shared static this() {
         codes = [
             200: "OK",
             302: "Found",

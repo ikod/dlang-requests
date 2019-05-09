@@ -170,7 +170,7 @@ public struct HTTPRequest {
         MultipartForm               _multipartForm;
 
         NetStreamFactory  _socketFactory;
-        
+
         QueryParam[]        _params;
         string              _contentType;
         InputRangeAdapter   _postData;

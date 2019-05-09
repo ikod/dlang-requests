@@ -24,7 +24,7 @@ string Getter_Setter(T)(string name) {
         @property final auto ` ~ name ~ `() pure inout @safe @nogc nothrow {
             return _` ~ name ~ `;
         }
-        @property final void ` ~ name ~ `(` ~ T.stringof ~ ` setter_arg) pure @nogc nothrow { 
+        @property final void ` ~ name ~ `(` ~ T.stringof ~ ` setter_arg) pure @nogc nothrow {
             _` ~ name ~ `= setter_arg;
         }
     `;
@@ -32,7 +32,7 @@ string Getter_Setter(T)(string name) {
 
 string Setter(T)(string name) {
     return `
-        @property final void ` ~ name ~ `(` ~ T.stringof ~ ` setter_arg) pure @nogc nothrow { 
+        @property final void ` ~ name ~ `(` ~ T.stringof ~ ` setter_arg) pure @nogc nothrow {
             _` ~ name ~ `= setter_arg;
         }
     `;
@@ -57,7 +57,7 @@ string Getter(string name) {
 //    string member = "__" ~ name;
 //    string t = "typeof(this."~member~")";
 //    return `
-//        @property final void ` ~ name ~`(` ~ t ~ ` s) pure @nogc nothrow {`~ 
+//        @property final void ` ~ name ~`(` ~ t ~ ` s) pure @nogc nothrow {`~
 //             member ~`=s;
 //        }
 //    `;
@@ -110,13 +110,13 @@ package unittest {
 //    Host names can be specified either as an IP address or a HDN string.
 //    Sometimes we compare one host name with another.  (Such comparisons
 //    SHALL be case-insensitive.)  Host A's name domain-matches host B's if
-//        
+//
 //    *  their host name strings string-compare equal; or
-//    
+//
 //    * A is a HDN string and has the form NB, where N is a non-empty
 //        name string, B has the form .B', and B' is a HDN string.  (So,
 //            x.y.com domain-matches .Y.com but not Y.com.)
-        
+
 package bool domainMatches(string d1, string d2) pure @safe @nogc {
     import std.algorithm;
     return d1==d2 ||

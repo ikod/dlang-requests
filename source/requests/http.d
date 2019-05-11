@@ -802,6 +802,7 @@ public struct HTTPRequest {
                 auto __contentLength = _contentLength;
                 auto __bufferSize = _bufferSize;
                 auto __response = _response;
+                auto __verbosity = _verbosity;
 
                 // set up response
                 _response._contentLength = _contentLength;
@@ -835,7 +836,7 @@ public struct HTTPRequest {
                             return __bodyDecoder.get();
                         }
 
-                        if ( verbosity>=3 ) {
+                        if ( __verbosity>=3 ) {
                             writeln(b[0..read].dump.join("\n"));
                         }
                         __response._contentReceived += read;

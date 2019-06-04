@@ -120,13 +120,16 @@ package unittest {
 package bool domainMatches(string d1, string d2) pure @safe @nogc {
     import std.algorithm;
     return d1==d2 ||
-           (d2[0] == '.' && d1.endsWith(d2));
+           (d2.startsWith(".") && d1.endsWith(d2));
 }
 
 package unittest {
     assert("x.example.com".domainMatches(".example.com"));
     assert(!"x.example.com".domainMatches("example.com"));
+    assert(!"example.com".domainMatches(".x.example.com"));
     assert("example.com".domainMatches("example.com"));
+    assert(!"example.com".domainMatches(""));
+    assert(!"".domainMatches("example.com"));
 }
 
 string[] dump(in ubyte[] data) {

@@ -427,7 +427,9 @@ public struct HTTPRequest {
         auto contentLength = "content-length" in headers;
         if ( contentLength ) {
             try {
-                _contentLength = to!long(*contentLength);
+                string l = *contentLength;
+                _contentLength = parse!long(l);
+                // TODO: maybe add a strict mode that checks if l was parsed completely
                 if ( _maxContentLength && _contentLength > _maxContentLength) {
                     throw new RequestException("ContentLength > maxContentLength (%d>%d)".
                                 format(_contentLength, _maxContentLength));
@@ -462,11 +464,11 @@ public struct HTTPRequest {
     /// 3. unfold headers if needed
     /// 4. store headers
     ///
-    private void parseResponseHeaders(in ubyte[] input) {
+    private void parseResponseHeaders(in ubyte[] input, string lineSep) {
         string lastHeader;
         auto buffer = cast(string)input;
 
-        foreach(line; buffer.split("\n").map!(l => l.stripRight)) {
+        foreach(line; buffer.split(lineSep).map!(l => l.stripRight)) {
             if ( ! _response.status_line.length ) {
                 debug (requests) tracef("statusLine: %s", line);
                 _response.status_line = line;
@@ -562,18 +564,6 @@ public struct HTTPRequest {
             res ~= cookie;
         }
         return res;
-    }
-    ///
-    /// Do we received \r\n\r\n?
-    ///
-    private bool headersHaveBeenReceived(in ubyte[] data, ref Buffer!ubyte buffer, out string separator) const @safe {
-        foreach(s; ["\r\n\r\n", "\n\n"]) {
-            if ( data.canFind(s) || buffer.canFind(s) ) {
-                separator = s;
-                return true;
-            }
-        }
-        return false;
     }
 
     private bool willFollowRedirect() {
@@ -734,9 +724,10 @@ public struct HTTPRequest {
         auto buffer = Buffer!ubyte();
         Buffer!ubyte partialBody;
         ptrdiff_t read;
-        string separator;
+        string lineSep = null, headersEnd = null;
+        bool headersHaveBeenReceived;
 
-        while(true) {
+        while( !headersHaveBeenReceived ) {
 
             auto b = new ubyte[_bufferSize];
             read = _stream.receive(b);
@@ -754,13 +745,41 @@ public struct HTTPRequest {
             if ( buffer.length > maxHeadersLength ) {
                 throw new RequestException("Headers length > maxHeadersLength (%d > %d)".format(buffer.length, maxHeadersLength));
             }
-            if ( headersHaveBeenReceived(data, buffer, separator) ) {
-                auto s = buffer.data.findSplit(separator);
-                auto ResponseHeaders = s[0];
-                partialBody = Buffer!ubyte(s[2]);
-                _contentReceived += partialBody.length;
-                parseResponseHeaders(ResponseHeaders);
-                break;
+
+            // Proper HTTP uses "\r\n" as a line separator, but broken servers sometimes use "\n".
+            // Servers that use "\r\n" might have "\n" inside a header.
+            // For any half-sane server, the first '\n' should be at the end of the status line, so this can be used to detect the line separator.
+            // In any case, all the interesting points in the header for now are at '\n' characters, so scan the newly read data for them.
+            foreach (idx; buffer.length-read..buffer.length)
+            {
+                if ( buffer[idx] == '\n' )
+                {
+                    if ( lineSep is null )
+                    {
+                        // First '\n'. Detect line/header endings.
+                        // HTTP header sections end with a double line separator
+                        lineSep = "\n";
+                        headersEnd = "\n\n";
+                        if ( idx > 0 && buffer[idx-1] == '\r' )
+                        {
+                            lineSep = "\r\n";
+                            headersEnd = "\r\n\r\n";
+                        }
+                    }
+                    else
+                    {
+                        // Potential header ending.
+                        if ( buffer.data[0..idx+1].endsWith(headersEnd) )
+                        {
+                            auto ResponseHeaders = buffer.data[0..idx+1-headersEnd.length];
+                            partialBody = buffer[idx+1..$];
+                            _contentReceived += partialBody.length;
+                            parseResponseHeaders(ResponseHeaders, lineSep);
+                            headersHaveBeenReceived = true;
+                            break;
+                        }
+                    }
+                }
             }
         }
 

@@ -27,7 +27,7 @@
             "buildOptions": ["debugMode", "debugInfo"],
             "dflags-dmd": ["-debug=requests", "-debug=httpd", "-g"],
             "dflags-ldc": ["-d-debug=requests"],
-            "versions": ["httpbin"],
+            "versions": ["httpbin"]
         },
         "docs": {
             "buildOptions": ["syntaxOnly"],

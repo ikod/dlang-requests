@@ -408,6 +408,34 @@ package unittest {
         assert(s.representation == flat_content.array.map!(i => i.integer).array);
     }
 
+    /// Putting to forms (for small data)
+    ///
+    /// putting query parameters using "application/x-www-form-urlencoded"
+    info("Test putContent using query params");
+    r = putContent(httpbinUrl ~ "put", queryParams("first", "a", "second", 2));
+    assert(parseJSON(cast(string)r).object["form"].object["first"].str == "a");
+    
+    /// putting using multipart/form-data (large data and files). See docs fot HTTPRequest
+    info("Test putContent form");
+    mpform = MultipartForm();
+    mpform.add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
+    r = putContent(httpbinUrl ~ "put", mpform);
+    assert(parseJSON(cast(string)r).object["form"].object["greeting"].str == "hello");
+
+    /// Patching to forms (for small data)
+    ///
+    /// patching query parameters using "application/x-www-form-urlencoded"
+    info("Test patchContent using query params");
+    r = patchContent(httpbinUrl ~ "patch", queryParams("first", "a", "second", 2));
+    assert(parseJSON(cast(string)r).object["form"].object["first"].str == "a");
+    
+    /// patching using multipart/form-data (large data and files). See docs fot HTTPRequest
+    info("Test patchContent form");
+    mpform = MultipartForm();
+    mpform.add(formData(/* field name */ "greeting", /* content */ cast(ubyte[])"hello"));
+    r = patchContent(httpbinUrl ~ "patch", mpform);
+    assert(parseJSON(cast(string)r).object["form"].object["greeting"].str == "hello");
+
     info("Check exception handling, error messages and timeouts are OK");
     rq.clearHeaders();
     rq.timeout = 1.seconds;
@@ -496,6 +524,24 @@ public auto ref getContent(A...)(string url, A args) if (args.length > 1 && args
 public auto postContent(A...)(string url, A args) {
     auto rq = Request();
     auto rs = rq.post(url, args);
+    return rs.responseBody;
+}
+
+///
+/// Call put and return response content.
+///
+public auto putContent(A...)(string url, A args) {
+    auto rq = Request();
+    auto rs = rq.put(url, args);
+    return rs.responseBody;
+}
+
+///
+/// Call patch and return response content.
+///
+public auto patchContent(A...)(string url, A args) {
+    auto rq = Request();
+    auto rs = rq.patch(url, args);
     return rs.responseBody;
 }
 

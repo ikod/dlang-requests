@@ -527,6 +527,38 @@ public struct Request {
     {
         return execute("GET", uri, params);
     }
+    Response put(string uri, QueryParam[] query)
+    {
+        return execute("PUT", uri, query);
+    }
+    Response put(string uri, MultipartForm form)
+    {
+        return execute("PUT", uri, form);
+    }
+    Response put(R)(string uri, R content, string contentType="application/octet-stream")
+    {
+        return execute("PUT", uri, content, contentType);
+    }
+    Response patch(string uri, QueryParam[] query)
+    {
+        return execute("PATCH", uri, query);
+    }
+    Response patch(string uri, MultipartForm form)
+    {
+        return execute("PATCH", uri, form);
+    }
+    Response patch(R)(string uri, R content, string contentType="application/octet-stream")
+    {
+        return execute("PATCH", uri, content, contentType);
+    }
+    Response deleteRequest(string uri, string[string] query)
+    {
+        return execute("DELETE", uri, aa2params(query));
+    }
+    Response deleteRequest(string uri, QueryParam[] params = null)
+    {
+        return execute("DELETE", uri, params);
+    }
     Response execute(R)(string method, string url, R content, string ct = "application/octet-stream")
     {
         _method = method;
@@ -660,4 +692,15 @@ unittest {
     rs = rq.post("http://httpbin.org/post", "abc");
     assert(rs.code == 200);
     assert(rs.uri().path() == "/get");
+
+    rs = rq.put("http://httpbin.org/put", "abc");
+    assert(rs.code == 200);
+    assert(rs.uri().path() == "/get");
+
+    rs = rq.patch("http://httpbin.org/patch", "abc");
+    assert(rs.code == 200);
+    assert(rs.uri().path() == "/get");
+
+    rs = rq.deleteRequest("http://httpbin.org/delete");
+    assert(rs.uri.path == "/get", "Expected /get, but got %s".format(rs.uri.path));
 }

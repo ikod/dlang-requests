@@ -1483,7 +1483,7 @@ public struct HTTPRequest {
         string encoded;
 
         switch (_method) {
-            case "POST","PUT":
+            case "POST","PUT","PATCH":
                 encoded = params2query(params);
                 safeSetHeader(h, _userHeaders.ContentType, "Content-Type", "application/x-www-form-urlencoded");
                 if ( encoded.length > 0) {
@@ -2197,7 +2197,7 @@ public struct HTTPRequest {
         string encoded;
 
         switch (_method) {
-            case "POST","PUT":
+            case "POST","PUT","PATCH":
                 encoded = params2query(_params);
                 safeSetHeader(h, _userHeaders.ContentType, "Content-Type", "application/x-www-form-urlencoded");
                 if ( encoded.length > 0) {

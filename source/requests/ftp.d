@@ -437,11 +437,7 @@ public struct FTPRequest {
             _controlChannel = new TCPStream();
             _controlChannel.bind(_bind);
             _controlChannel.connect(_uri.host, _uri.port, _timeout);
-            if ( auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _controlChannel) )
-            {
-                debug(requests) tracef("closing purged connection %s", purged_connection);
-                purged_connection.close();
-            }
+            _cm.put(_uri.scheme, _uri.host, _uri.port, _controlChannel);
             _response._connectedAt = Clock.currTime;
             response = serverResponse(_controlChannel);
             _responseHistory ~= response;

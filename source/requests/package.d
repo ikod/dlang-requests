@@ -59,9 +59,9 @@ package unittest {
     rs = rq.get(httpbinUrl);
     assert(rs.code==200);
     assert(rs.responseBody.length > 0);
-    assert(rq.format("%m|%h|%p|%P|%q|%U") ==
-    "GET|%s|%d|%s||%s"
-    .format(uri.host, uri.port, uri.path, httpbinUrl));
+    // assert(rq.format("%m|%h|%p|%P|%q|%U") ==
+    // "GET|%s|%d|%s||%s"
+    // .format(uri.host, uri.port, uri.path, httpbinUrl));
 
     //
     rs = rq.get(httpbinUrl);
@@ -73,7 +73,6 @@ package unittest {
     assert(json["c"].str == " d");
     assert(json["a"].str == "b");
 
-    
     rq = Request();
     rq.keepAlive = false; // disable keepalive on idempotents requests
     {
@@ -404,7 +403,7 @@ package unittest {
         // httpbin.org returns string in "data"
         assert(s == flat_content.str);
     } else {
-        // internal httpbin server return array ob bytes
+        // internal httpbin server return array of bytes
         assert(s.representation == flat_content.array.map!(i => i.integer).array);
     }
 

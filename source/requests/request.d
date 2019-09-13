@@ -561,13 +561,6 @@ public struct Request {
     }
     Response execute(R)(string method, string url, R content, string ct = "application/octet-stream")
     {
-        _method = method;
-        _uri = URI(url);
-        _uri.idn_encode();
-        _params = null;
-        _multipartForm = MultipartForm.init;
-        _contentType = ct;
-        _postData = makeAdapter(content);
         // https://issues.dlang.org/show_bug.cgi?id=10535
         _permanent_redirects[URI.init] = ""; _permanent_redirects.remove(URI.init);
         //
@@ -579,18 +572,21 @@ public struct Request {
         {
             _cookie = RefCounted!Cookies(Cookies());
         }
+        Request tmp = this;
+        tmp._method = method;
+        tmp._uri = URI(url);
+        tmp._uri.idn_encode();
+        tmp._params = null;
+        tmp._multipartForm = MultipartForm.init;
+        tmp._contentType = ct;
+        tmp._postData = makeAdapter(content);
         auto interceptors = _static_interceptors ~ _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);
-        return handler.handle(this);
+        return handler.handle(tmp);
         
     }
     Response execute(string method, string url, MultipartForm form)
     {
-        _method = method;
-        _uri = URI(url);
-        _uri.idn_encode();
-        _params = null;
-        _multipartForm = form;
 
         // https://issues.dlang.org/show_bug.cgi?id=10535
         _permanent_redirects[URI.init] = ""; _permanent_redirects.remove(URI.init);
@@ -604,17 +600,20 @@ public struct Request {
         {
             _cookie = RefCounted!Cookies(Cookies());
         }
+        Request tmp = this;
+        tmp._method = method;
+        tmp._uri = URI(url);
+        tmp._uri.idn_encode();
+        tmp._params = null;
+        tmp._multipartForm = form;
+
         auto interceptors = _static_interceptors ~ _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);
-        return handler.handle(this);
+        return handler.handle(tmp);
     }
+
     Response execute(string method, string url, QueryParam[] params = null)
     {
-        _method = method;
-        _uri = URI(url);
-        _uri.idn_encode();
-        _multipartForm = MultipartForm.init;
-        _params = params;
 
         // https://issues.dlang.org/show_bug.cgi?id=10535
         _permanent_redirects[URI.init] = ""; _permanent_redirects.remove(URI.init);
@@ -627,9 +626,15 @@ public struct Request {
         {
             _cookie = RefCounted!Cookies(Cookies());
         }
+        Request tmp = this;
+        tmp._method = method;
+        tmp._uri = URI(url);
+        tmp._uri.idn_encode();
+        tmp._multipartForm = MultipartForm.init;
+        tmp._params = params;
         auto interceptors = _static_interceptors ~ _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);
-        auto r = handler.handle(this);
+        auto r = handler.handle(tmp);
         return r;
     }
 }

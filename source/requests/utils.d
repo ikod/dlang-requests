@@ -214,8 +214,11 @@ public alias Cookie     = Tuple!(string, "path", string, "domain", string, "attr
 public alias QueryParam = Tuple!(string, "key", string, "value");
 
 struct Cookies {
-    Cookie[]    _array;
-    alias _array this;
+    Cookie[string] _map;
+    Cookie[] _array() {
+        return _map.byPair.map!(p => Cookie(p.value.path, p.value.domain, p.key, p.value.value)).array;
+    }
+    //alias _array this;
 }
 
 ///

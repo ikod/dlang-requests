@@ -96,12 +96,12 @@ package struct ConnManager {
             auto v = *c;
             auto s = v[$-1].stream;
             v = v[0..$-1];
+            counter--;
             debug (requests) {
                 tracef("Get connection from pool: %s://%s:%s - %s", schema, host, port, s);
             }
             if ( v.length == 0 ) {
                 map.remove(key);
-                counter--;
             }
             return s;
         }

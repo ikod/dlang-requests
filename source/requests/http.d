@@ -807,6 +807,7 @@ public struct HTTPRequest {
                 auto __response = _response;
                 auto __verbosity = _verbosity;
                 auto __uri = _uri;
+                auto __cm = _cm;
 
                 // set up response
                 _response._contentLength = _contentLength;
@@ -824,7 +825,7 @@ public struct HTTPRequest {
                             __bodyDecoder.flush();
                             if (_stream && _stream.isConnected) {
                                 // return to pool
-                                _cm.put(__uri.scheme, __uri.host, __uri.port, __stream);
+                                __cm.put(__uri.scheme, __uri.host, __uri.port, __stream);
                             } else {
                                 _stream.close();
                             }
@@ -958,209 +959,7 @@ public struct HTTPRequest {
                 break;
         }
     }
-    ///
-    /// Send multipart for request.
-    /// You would like to use this method for sending large portions of mixed data or uploading files to forms.
-    /// Content of the posted form consist of sources. Each source have at least name and value (can be string-like object or opened file, see more docs for MultipartForm struct)
-    /// Params:
-    ///     url = url
-    ///     sources = array of sources.
-    // deprecated("Use Request() instead of HTTPRequest(); will be removed 2019-07")
-    // HTTPResponse exec(string method="POST")(string url, MultipartForm sources) {
-    //     import std.uuid;
-    //     import std.file;
 
-    //     checkURL(url);
-    //     //if ( _cm is null ) {
-    //     //    _cm = new ConnManager();
-    //     //}
-
-    //     NetworkStream _stream;
-    //     _method = method;
-    //     _response = new HTTPResponse;
-    //     _response.uri = _uri;
-    //     _response.finalURI = _uri;
-    //     bool restartedRequest = false;
-
-    // connect:
-    //     _contentReceived = 0;
-    //     _response._startedAt = Clock.currTime;
-
-    //     assert(_stream is null);
-
-    //     _stream = _cm.get(_uri.scheme, _uri.host, _uri.port);
-
-    //     if ( _stream is null ) {
-    //         debug(requests) trace("create new connection");
-    //         _stream = setupConnection();
-    //     } else {
-    //         debug(requests) trace("reuse old connection");
-    //     }
-
-    //     assert(_stream !is null);
-
-    //     if ( !_stream.isConnected ) {
-    //         debug(requests) trace("disconnected stream on enter");
-    //         if ( !restartedRequest ) {
-    //             debug(requests) trace("disconnected stream on enter: retry");
-    //             assert(_cm.get(_uri.scheme, _uri.host, _uri.port) == _stream);
-
-    //             _cm.del(_uri.scheme, _uri.host, _uri.port, _stream);
-    //             _stream.close();
-    //             _stream = null;
-
-    //             restartedRequest = true;
-    //             goto connect;
-    //         }
-    //         debug(requests) trace("disconnected stream on enter: return response");
-    //         //_stream = null;
-    //         return _response;
-    //     }
-    //     _response._connectedAt = Clock.currTime;
-
-    //     Appender!string req;
-    //     req.put(requestString());
-
-    //     string   boundary = randomUUID().toString;
-    //     string[] partHeaders;
-    //     size_t   contentLength;
-
-    //     foreach(ref part; sources._sources) {
-    //         string h = "--" ~ boundary ~ "\r\n";
-    //         string disposition = `form-data; name="%s"`.format(part.name);
-    //         string optionals = part.
-    //             parameters.byKeyValue().
-    //             filter!(p => p.key!="Content-Type").
-    //             map!   (p => "%s=%s".format(p.key, p.value)).
-    //             join("; ");
-
-    //         h ~= `Content-Disposition: ` ~ [disposition, optionals].join("; ") ~ "\r\n";
-
-    //         auto contentType = "Content-Type" in part.parameters;
-    //         if ( contentType ) {
-    //             h ~= "Content-Type: " ~ *contentType ~ "\r\n";
-    //         }
-
-    //         h ~= "\r\n";
-    //         partHeaders ~= h;
-    //         contentLength += h.length + part.input.getSize() + "\r\n".length;
-    //     }
-    //     contentLength += "--".length + boundary.length + "--\r\n".length;
-
-    //     auto h = requestHeaders();
-    //     safeSetHeader(h, _userHeaders.ContentType, "Content-Type", "multipart/form-data; boundary=" ~ boundary);
-    //     safeSetHeader(h, _userHeaders.ContentLength, "Content-Length", to!string(contentLength));
-
-    //     h.byKeyValue.
-    //         map!(kv => kv.key ~ ": " ~ kv.value ~ "\r\n").
-    //             each!(h => req.put(h));
-    //     req.put("\r\n");
-
-    //     debug(requests) trace(req.data);
-    //     if ( _verbosity >= 1 ) req.data.splitLines.each!(a => writeln("> " ~ a));
-
-    //     try {
-    //         _stream.send(req.data());
-    //         foreach(ref source; sources._sources) {
-    //             debug(requests) tracef("sending part headers <%s>", partHeaders.front);
-    //             _stream.send(partHeaders.front);
-    //             partHeaders.popFront;
-    //             while (true) {
-    //                 auto chunk = source.input.read();
-    //                 if ( chunk.length <= 0 ) {
-    //                     break;
-    //                 }
-    //                 _stream.send(chunk);
-    //             }
-    //             _stream.send("\r\n");
-    //         }
-    //         _stream.send("--" ~ boundary ~ "--\r\n");
-    //         _response._requestSentAt = Clock.currTime;
-    //         receiveResponse(_stream);
-    //         _response._finishedAt = Clock.currTime;
-    //     }
-    //     catch (NetworkException e) {
-    //         errorf("Error sending request: ", e.msg);
-    //         _stream.close();
-    //         return _response;
-    //     }
-
-    //     if ( serverPrematurelyClosedConnection()
-    //     && !restartedRequest
-    //     && isIdempotent(_method)
-    //     ) {
-    //         ///
-    //         /// We didn't receive any data (keepalive connectioin closed?)
-    //         /// and we can restart this request.
-    //         /// Go ahead.
-    //         ///
-    //         debug(requests) tracef("Server closed keepalive connection");
-
-    //         assert(_cm.get(_uri.scheme, _uri.host, _uri.port) == _stream);
-
-    //         _cm.del(_uri.scheme, _uri.host, _uri.port);
-    //         _stream.close();
-    //         _stream = null;
-
-    //         restartedRequest = true;
-    //         goto connect;
-    //     }
-
-    //     if ( _useStreaming ) {
-    //         if ( _response._receiveAsRange.activated ) {
-    //             debug(requests) trace("streaming_in activated");
-    //             return _response;
-    //         } else {
-    //             // this can happen if whole response body received together with headers
-    //             _response._receiveAsRange.data = _response.responseBody.data;
-    //         }
-    //     }
-
-    //     close_connection_if_not_keepalive(_stream);
-
-    //     if ( _verbosity >= 1 ) {
-    //         writeln(">> Connect time: ", _response._connectedAt - _response._startedAt);
-    //         writeln(">> Request send time: ", _response._requestSentAt - _response._connectedAt);
-    //         writeln(">> Response recv time: ", _response._finishedAt - _response._requestSentAt);
-    //     }
-
-    //     if ( willFollowRedirect ) {
-    //         if ( _history.length >= _maxRedirects ) {
-    //             _stream = null;
-    //             throw new MaxRedirectsException("%d redirects reached maxRedirects %d.".format(_history.length, _maxRedirects));
-    //         }
-    //         // "location" in response already checked in canFollowRedirect
-    //         immutable new_location = *("location" in _response.responseHeaders);
-    //         immutable current_uri = _uri, next_uri = uriFromLocation(_uri, new_location);
-
-    //         // save current response for history
-    //         _history ~= _response;
-
-    //         // prepare new response (for redirected request)
-    //         _response = new HTTPResponse;
-    //         _response.uri = current_uri;
-    //         _response.finalURI = next_uri;
-    //         _stream = null;
-
-    //         // set new uri
-    //         this._uri = next_uri;
-    //         debug(requests) tracef("Redirected to %s", next_uri);
-    //         if ( _method != "GET" && _response.code != 307 && _response.code != 308 ) {
-    //             // 307 and 308 do not change method
-    //             return this.get();
-    //         }
-    //         if ( restartedRequest ) {
-    //             debug(requests) trace("Rare event: clearing 'restartedRequest' on redirect");
-    //             restartedRequest = false;
-    //         }
-    //         goto connect;
-    //     }
-
-    //     _response._history = _history;
-    //     return _response;
-    // }
-
-    // we use this if we send from ubyte[][] and user provided Content-Length
     private void sendFlattenContent(T)(NetworkStream _stream, T content) {
         while ( !content.empty ) {
             auto chunk = content.front;
@@ -1485,6 +1284,14 @@ public struct HTTPRequest {
         return _response;
     }
 
+    ///
+    /// Send multipart request.
+    /// You would like to use this method for sending large portions of mixed data or uploading files to forms.
+    /// Content of the posted form consist of sources. Each source have at least name and value (can be string-like object or opened file, see more docs for MultipartForm struct)
+    /// Params:
+    ///     url = url
+    ///     sources = array of sources.
+    // we use this if we send from ubyte[][] and user provided Content-Length
     HTTPResponse exec_from_multipart_form(MultipartForm form) {
         import std.uuid;
         import std.file;
@@ -1709,6 +1516,7 @@ public struct HTTPRequest {
         return _response;
     }
 
+    ///
     HTTPResponse exec_from_parameters() {
 
         debug(requests) tracef("exec from parameters request");

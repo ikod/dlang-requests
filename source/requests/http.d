@@ -31,14 +31,15 @@ enum   HTTP10 = 100;
 static immutable string[string] proxies;
 shared static this() {
     import std.process;
-    proxies["http"] = environment.get("http_proxy", environment.get("HTTP_PROXY"));
-    proxies["https"] = environment.get("https_proxy", environment.get("HTTPS_PROXY"));
-    proxies["all"] = environment.get("all_proxy", environment.get("ALL_PROXY"));
-    foreach(p; proxies.byKey()) {
-        if (proxies[p] is null) {
-            continue;
+    import std.string;
+    foreach(p; ["http", "https", "all"])
+    {
+        auto v = environment.get(p ~ "_proxy", environment.get(p.toUpper() ~ "_PROXY"));
+        if ( v !is null && v.length > 0 )
+        {
+            debug(requests) tracef("will use %s for %s as proxy", v, p);
+            proxies[p] = v;
         }
-        URI u = URI(proxies[p]);
     }
 }
 

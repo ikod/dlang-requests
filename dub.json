@@ -4,8 +4,8 @@
     "copyright": "Copyright © 2016, igor",
     "authors": ["ikod"],
     "license": "BSL-1.0",
-    "sourcePaths": ["tests", "source"],
-    "importPaths": ["tests", "source"],
+    "sourcePaths": ["source"],
+    "importPaths": ["source"],
     "configurations": [
         {
             "name": "std",
@@ -36,11 +36,13 @@
         "unittest": {
             "buildOptions": ["unittests", "debugMode", "debugInfo"],
             "versions": ["httpbin"],
-            "debugVersions": ["requests", "httpd"]
+            "debugVersions": ["requests", "httpd"],
+            "sourcePaths": ["source", "tests"]
         },
         "localtest": {
             "buildOptions": ["unittests", "debugMode", "debugInfo"],
-            "versions": ["localtest"]
+            "versions": ["localtest"],
+            "sourcePaths": ["source", "tests"]
         }
     }
 }

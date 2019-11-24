@@ -6,19 +6,18 @@
     "license": "BSL-1.0",
     "sourcePaths": ["source"],
     "importPaths": ["source"],
+    "dependencies": {
+        "cachetools": "~>0"
+    },
     "configurations": [
         {
-            "name": "std",
-            "dependencies": {
-                "cachetools": "~>0"
-            }
+            "name": "std"
         },
         {
             "name": "vibed",
             "versions": ["vibeD"],
             "dependencies": {
-                "vibe-d": "~>0.8",
-                "cachetools": "~>0"
+                "vibe-d": "~>0.8"
             }
         }
     ],

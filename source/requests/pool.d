@@ -278,7 +278,7 @@ public:
         assert(_m._busy.length > 0 || _m._range.empty || _m._result.isNull);
         assert(_m._busy.length + _m._idle.length <= _m._workers);
     }
-    body
+    do
     {
         auto owner = thisTid();
         Nullable!Tid  idle;
@@ -367,7 +367,7 @@ public:
     out {
         assert(_m._busy.length > 0 || _m._range.empty);
     }
-    body {
+    do {
         if ( !_m._result.isNull ) {
             return _m._result;
         }

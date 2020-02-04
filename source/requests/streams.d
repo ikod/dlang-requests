@@ -1032,7 +1032,7 @@ public abstract class SocketStream : NetworkStream {
 
     ptrdiff_t send(const(void)[] buff)
     in {assert(isConnected);}
-    body {
+    do {
         auto rc = s.send(buff);
         if (rc < 0) {
             close();

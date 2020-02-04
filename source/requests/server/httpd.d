@@ -187,7 +187,7 @@ else {
             }
             ///
             /// raplace current front with another value
-            /// 
+            ///
             void unPop(ubyte[] data) {
                 assert(data.length > 0);
                 _content = data;
@@ -199,7 +199,7 @@ else {
             /// return empty data if we receiving needle
             /// if needle found in stream, then acc == needle
             /// if end of stream happened, then eos = true
-            /// 
+            ///
             ubyte[] scanUntilR(string needle, ref ubyte[] acc, out bool eos) {
                 auto d = needle.representation;
                 ubyte[] l;
@@ -330,7 +330,7 @@ else {
             ubyte[]        _acc;
             bool           _done;
             bool           _eos;
-            
+
             this(_DataSource ds, string boundary) {
                 _ds = ds;
                 _boundary = "\r\n" ~ boundary;
@@ -364,7 +364,7 @@ else {
             _DataSource    _ds;
             string[string] _headers;
             string         _boundary;
-            
+
             this(_DataSource ds, string[string] h, string boundary) {
                 _ds = ds;
                 _headers = h;
@@ -431,7 +431,7 @@ else {
             auto skipHeaders() {
                 ubyte[] buf;
                 string[string] headers;
-                
+
                 debug(httpd) tracef("Search for headers");
                 _ds.scanUntil("\r\n\r\n", delegate void (ubyte[] data) {
                         buf ~= data;
@@ -447,7 +447,7 @@ else {
             /// Find boundary from request headers,
             /// skip to begin of the first part,
             /// create first part(read/parse headers, stop on the body begin)
-            /// 
+            ///
             this(HTTPD_Request rq) {
                 ubyte[] buf, rest;
                 string separator;
@@ -505,7 +505,7 @@ else {
                     foreach(p; parts) {
                         auto disposition = p.disposition;
                         auto data = p.data.joiner.array;
-                        
+
                         if ( !("name" in disposition) ) {
                             continue;
                         }
@@ -546,7 +546,7 @@ else {
     };
 
     auto response(C)(HTTPD_Request rq, C content, ushort code = 200)
-        if ( isSomeString!C 
+        if ( isSomeString!C
             || (__traits(compiles, cast(ubyte[])content))
             || (__traits(compiles, cast(ubyte[])content.front))
             )
@@ -1145,7 +1145,7 @@ else {
         }
     }
 
-    
+
     version(none) private unittest {
         import std.json;
         import std.conv;

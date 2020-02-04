@@ -55,17 +55,17 @@ else {
             string[string]  _cookies;
         }
         private mixin(Setter!(string[string])("requestHeaders"));
-        auto inout ref requestHeaders() @property @safe @nogc nothrow {
+        auto ref requestHeaders() inout @property @safe @nogc nothrow {
             return _requestHeaders;
         }
-        auto inout ref cookies() @property @safe @nogc nothrow {
+        auto ref cookies() inout @property @safe @nogc nothrow {
             return _cookies;
         }
         private mixin(Setter!(string[string])("query"));
-        inout auto ref query() @property @safe @nogc nothrow {
+        auto ref query() inout @property @safe @nogc nothrow {
             return _query;
         }
-        inout auto ref requestBody() @property @safe @nogc nothrow {
+        auto ref requestBody() inout @property @safe @nogc nothrow {
             return _requestBody;
         }
         private mixin(Setter!string("method"));

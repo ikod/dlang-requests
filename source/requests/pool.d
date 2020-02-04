@@ -121,13 +121,13 @@ struct Route {
         port = parsed.port;
     }
     bool opEquals(Route other) {
-        bool r =  this.scheme == other.scheme 
+        bool r =  this.scheme == other.scheme
             && this.host == other.host
             && this.port == other.port;
         return r;
     }
     bool opEquals(ref Route other) {
-        bool r = this.scheme == other.scheme 
+        bool r = this.scheme == other.scheme
             && this.host == other.host
             && this.port == other.port;
         return r;
@@ -278,7 +278,7 @@ public:
         assert(_m._busy.length > 0 || _m._range.empty || _m._result.isNull);
         assert(_m._busy.length + _m._idle.length <= _m._workers);
     }
-    body
+    do
     {
         auto owner = thisTid();
         Nullable!Tid  idle;
@@ -319,7 +319,7 @@ public:
             Job j = _m._range.front();
             _m._range.popFront();
             Route route = Route(j._url);
-            /* 
+            /*
             find best route.
             1. look up for idle worker that served same route.
             2. if 1. failed - look up for busy worker who server same route and have empty box
@@ -336,7 +336,7 @@ public:
             if ( t in _m._idle ) {
                 debug(requests) tracef("found best for %s in idle %s", route, _m._idle[t]);
                 fromIdleToBusy(t, route);
-            } else 
+            } else
             if ( !idle.isNull ) {
                 debug(requests) tracef("use just released idle (prev job %s) for %s", _m._idle[t], route);
                 t = idle;
@@ -367,7 +367,7 @@ public:
     out {
         assert(_m._busy.length > 0 || _m._range.empty);
     }
-    body {
+    do {
         if ( !_m._result.isNull ) {
             return _m._result;
         }

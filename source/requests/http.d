@@ -666,7 +666,15 @@ public struct HTTPRequest {
                     if ( verbosity>=1 ) {
                         writeln("> CONNECT %s:%d HTTP/1.1".format(_uri.host, _uri.port));
                     }
-                    stream.send("CONNECT %s:%d HTTP/1.1\r\n\r\n".format(_uri.host, _uri.port));
+                    stream.send("CONNECT %s:%d HTTP/1.1\r\n".format(_uri.host, _uri.port));
+                    if (uri.username)
+                    {
+                        debug(requests) tracef("Add Proxy-Authorization header");
+                        auto auth = new BasicAuthentication(uri.username, uri.password);
+                        auto header = auth.authHeaders("");
+                        stream.send("Proxy-Authorization: %s\r\n".format(header["Authorization"]));
+                    }
+                    stream.send("\r\n");
                     while ( stream.isConnected ) {
                         ubyte[1024] b;
                         auto read = stream.receive(b);

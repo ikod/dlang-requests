@@ -559,7 +559,7 @@ public struct Request {
     {
         return execute("DELETE", uri, params);
     }
-    Response execute(R)(string method, string url, R content, string ct = "application/octet-stream")
+    Response execute(R)(string method, string url, R content, string ct = "application/octet-stream") if (isInputRange!R)
     {
         _method = method;
         _uri = URI(url);

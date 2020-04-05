@@ -48,9 +48,11 @@ This library can either use standard `std.socket` library or [`vibe.d`](http://v
 * At the highest API level you interested only in retrieving or posting document content.
 Use it when you don't need to add headers, set timeouts, or change any other defaults, 
 if you don't interested in result codes or any details of request and/or
-response. This level propose only two calls: `getContent` and `postContent`.
-What you receive is a Buffer, which you can use as range, but you can easily 
-convert it to `ubyte[]` using `.data` property.
+response. This level propose next calls: `getContent`, `postContent`, `putContent`
+and `patchContent`. What you receive is a Buffer, which you can use as range, but you can easily 
+convert it to `ubyte[]` using `.data` property. These calls also have `ByLine` counterparts which
+will lazily receive response from server, split it on `\n` and convert it into InputRange of ubyte[] (so that something like
+`getContentByLine("https://httpbin.org/stream/50").map!"cast(string)a".filter!(a => a.canFind("\"id\": 28"))` should work.
 
 * At the next level we have `Request` structure, which encapsulate all details and settings 
 required for http(s)/ftp transfer. Operating on `Request` instance you can 

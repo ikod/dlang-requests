@@ -704,3 +704,63 @@ unittest {
     rs = rq.deleteRequest("http://httpbin.org/delete");
     assert(rs.uri.path == "/get", "Expected /get, but got %s".format(rs.uri.path));
 }
+
+struct _LineReader
+{
+    private
+    {
+        Request        _rq;
+        ReceiveAsRange _stream;
+        LineSplitter   _lineSplitter;
+        ubyte[]        _data;
+    }
+    this(ref Request rq, ref Response rs)
+    {
+        _rq = rq;
+        _stream = rs.receiveAsRange();
+        _lineSplitter = new LineSplitter();
+        while(_lineSplitter.empty && !_stream.empty)
+        {
+            auto d = _stream.front();
+            _lineSplitter.putNoCopy(d);
+            _stream.popFront();
+        }
+        if (_lineSplitter.empty && _stream.empty)
+        {
+            _lineSplitter.flush();
+        }
+        _data = _lineSplitter.get();
+    }
+    bool empty()
+    {
+        return _data.length == 0;
+    }
+    ubyte[] front()
+    {
+        return _data;
+    }
+    void popFront()
+    {
+        if (!_lineSplitter.empty)
+        {
+            _data = _lineSplitter.get();
+            debug tracef("data1 = <<<%s>>>", cast(string)_data);
+            return;
+        }
+        if ( _stream.empty )
+        {
+            _lineSplitter.flush();
+            _data = _lineSplitter.get();
+            debug tracef("data2 = <<<%s>>>", cast(string)_data);
+            return;
+        }
+        while(_lineSplitter.empty && !_stream.empty)
+        {
+            auto d = _stream.front();
+            _lineSplitter.putNoCopy(d);
+            _stream.popFront();
+        }
+        _data = _lineSplitter.get();
+        debug tracef("data3 = <<<%s>>>", cast(string)_data);
+    }
+}

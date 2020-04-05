@@ -365,6 +365,72 @@ unittest {
     info("unchunker zero copy - ok");
     info("Testing DataPipe - done");
 }
+
+public class LineSplitter : DataPipeIface!ubyte
+{
+    private
+    {
+        Buffer!ubyte    buff;
+        long            NL = -1;
+        long            scanned;
+    }
+    bool empty()
+    {
+        return NL == -1;
+    }
+    void putNoCopy(ubyte[] s)
+    {
+        debug tracef("put data: <<%s>>", cast(string)s);
+        buff.putNoCopy(s);
+        if (NL == -1)
+        {
+            auto new_NL = buff.indexOf(cast(ubyte)'\n', scanned);
+            NL = new_NL;
+            debug tracef("new nl=%d", NL);
+        }
+        scanned = buff.length;
+    }
+    ubyte[] get()
+    {
+        if (NL>=0)
+        {
+            auto res = buff[0..NL+1].data;
+            buff.popFrontN(NL+1);
+            NL = buff.indexOf(cast(ubyte)'\n', 0);
+            if (NL == -1)
+            {
+                scanned = buff.length;
+            }
+            return res;
+        }
+        return new ubyte[](0);
+    }
+    void flush()
+    {
+        NL = buff.length - 1;
+    }
+}
+unittest
+{
+    info("testing LineSplitter");
+    LineSplitter ls = new LineSplitter();
+    ls.putNoCopy("abc".representation.dup);
+    assert(ls.empty);
+    ls.putNoCopy("\n".representation.dup);
+    assert(!ls.empty);
+    assert(equal(ls.get, "abc\n"));
+    assert(ls.empty);
+    assert(equal(ls.get,""));
+    ls.putNoCopy("def\n".representation.dup);
+    ls.putNoCopy("ghi\njk".representation.dup);
+    assert(!ls.empty);
+    assert(equal(ls.get, "def\n"));
+    assert(!ls.empty);
+    assert(equal(ls.get, "ghi\n"));
+    assert(ls.empty);
+    ls.flush();
+    assert(equal(ls.get, "jk"));
+}
 /**
  * Buffer used to collect and process data from network. It remainds Appender, but support
  * also Range interface.
@@ -550,6 +616,34 @@ public struct Buffer(T) {
         }
         assert(false, "Impossible");
     }
+    long indexOf(ubyte needle, long pos)
+    {
+        if ( pos >= length || !__repr || !__repr.__buffer)
+        {
+            return -1;
+        }
+        // skip pos bytes
+        debug tracef("search %d from pos %d", needle, pos);
+        long cp;
+        foreach (ref b; __repr.__buffer)
+        {
+            if ( pos >= b.length )
+            {
+                pos -= b.length;
+                cp += b.length;
+                continue;
+            }
+            auto i = b[pos..$].countUntil(needle);
+            pos = 0;
+            if (i>=0)
+            {
+                debug tracef("found at %d", i+cp);
+                return i+cp;
+            }
+            cp += b.length;
+        }
+        return -1;
+    }
     Buffer!T opSlice(size_t m, size_t n) {
         if ( empty || m == n ) {
             return Buffer!T();
@@ -627,11 +721,14 @@ public unittest {
     auto c_length = c.length;
     auto eoh = countUntil(c, "\n\n");
     assert(eoh == 47);
-    foreach(header; c[0..eoh].splitter('\n') ) {
-        writeln(cast(string)header.data);
-    }
+    // foreach(header; c[0..eoh].splitter('\n') ) {
+    //     writeln(cast(string)header.data);
+    // }
     assert(equal(findSplit(c, "\n\n")[2], "body"));
     assert(c.length == c_length);
+    assert(c.indexOf('\n', 0) == 15);
+    assert(c.indexOf('\n', 16) == 31);
+    assert(c.indexOf('X', 16) == -1);
 }
 
 public struct SSLOptions {

@@ -483,6 +483,17 @@ public auto ref getContent(string url) {
     return rs.responseBody;
 }
 /**
+  Call GET and lazily convert server response into InputRange of ubyte[], splitted by '\n'.
+ */
+public auto getContentByLine(string url)
+{
+    auto rq = Request();
+    rq.useStreaming = true;
+    auto rs = rq.get(url);
+    _LineReader lr = _LineReader(rq, rs);
+    return lr;
+}
+/**
  * Call GET, with parameters, and return response content.
  *
  * args = string[string] fo query parameters.
@@ -493,6 +504,17 @@ public auto ref getContent(string url, string[string] args) {
     auto rq = Request();
     auto rs = rq.get(url, args);
     return rs.responseBody;
+}
+/**
+  Call GET and lazily convert server response into InputRange of ubyte[], splitted by '\n'.
+ */
+public auto getContentByLine(string url, string[string] args)
+{
+    auto rq = Request();
+    rq.useStreaming = true;
+    auto rs = rq.get(url, args);
+    _LineReader lr = _LineReader(rq, rs);
+    return lr;
 }
 /**
  * Call GET, with parameters, and return response content.
@@ -507,6 +529,17 @@ public auto ref getContent(string url, QueryParam[] args) {
     return rs.responseBody;
 }
 /**
+  Call GET and lazily convert server response into InputRange of ubyte[], splitted by '\n'.
+ */
+public auto getContentByLine(string url, QueryParam[] args)
+{
+    auto rq = Request();
+    rq.useStreaming = true;
+    auto rs = rq.get(url, args);
+    _LineReader lr = _LineReader(rq, rs);
+    return lr;
+}
+/**
  * Call GET, and return response content.
  * args = variadic args to supply parameter names and values.
  * Returns:
@@ -517,7 +550,17 @@ public auto ref getContent(A...)(string url, A args) if (args.length > 1 && args
             get(url, queryParams(args)).
             responseBody;
 }
-
+/**
+  Call GET and lazily convert server response into InputRange of ubyte[], splitted by '\n'.
+ */
+public auto getContentByLine(A...)(string url, A args) if (args.length > 1 && args.length % 2 == 0 )
+{
+    auto rq = Request();
+    rq.useStreaming = true;
+    auto rs = rq.get(url, queryParams(args));
+    _LineReader lr = _LineReader(rq, rs);
+    return lr;
+}
 ///
 /// Call post and return response content.
 ///
@@ -525,6 +568,17 @@ public auto postContent(A...)(string url, A args) {
     auto rq = Request();
     auto rs = rq.post(url, args);
     return rs.responseBody;
+}
+/**
+  Call POST and lazily convert server response into InputRange of ubyte[], splitted by '\n'.
+ */
+public auto postContentByLine(A...)(string url, A args)
+{
+    auto rq = Request();
+    rq.useStreaming = true;
+    auto rs = rq.post(url, args);
+    _LineReader lr = _LineReader(rq, rs);
+    return lr;
 }
 
 ///
@@ -534,6 +588,17 @@ public auto putContent(A...)(string url, A args) {
     auto rq = Request();
     auto rs = rq.put(url, args);
     return rs.responseBody;
+}
+/**
+  Call PUT and lazily convert server response into InputRange of ubyte[], splitted by '\n'.
+ */
+public auto putContentByLine(A...)(string url, A args)
+{
+    auto rq = Request();
+    rq.useStreaming = true;
+    auto rs = rq.put(url, args);
+    _LineReader lr = _LineReader(rq, rs);
+    return lr;
 }
 
 ///
@@ -545,68 +610,20 @@ public auto patchContent(A...)(string url, A args) {
     return rs.responseBody;
 }
 
-///
-package unittest {
-    import std.json;
-    import std.string;
-    import std.stdio;
-    import std.range;
-    import std.process;
-
-    //globalLogLevel(LogLevel.info);
-    //// while we have no internal ftp server we can run tests in non-reloable networking environment
-    //immutable unreliable_network = environment.get("UNRELIABLENETWORK", "false") == "true";
-    //
-    ///// ftp upload from range
-    //info("Test getContent(ftp)");
-    //auto r = getContent("ftp://speedtest.tele2.net/1KB.zip");
-    //assert(unreliable_network || r.length == 1024);
-    //
-    //info("Test receiveAsRange with GET(ftp)");
-    //ubyte[] streamedContent;
-    //auto rq = Request();
-    //rq.useStreaming = true;
-    //streamedContent.length = 0;
-    //auto rs = rq.get("ftp://speedtest.tele2.net/1KB.zip");
-    //auto stream = rs.receiveAsRange;
-    //while( !stream.empty() ) {
-    //    streamedContent ~= stream.front;
-    //    stream.popFront();
-    //}
-    //assert(unreliable_network || streamedContent.length == 1024);
-    //info("Test postContent ftp");
-    //r = postContent("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
-    //assert(unreliable_network || r.length == 0);
-    //
-    ////
-    //info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
-    //rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "test, ignore please\n".representation);
-    //assert(unreliable_network || rs.code == 226);
-    //info("ftp get  ", "ftp://speedtest.tele2.net/nonexistent", ", in same session.");
-    //rs = rq.get("ftp://speedtest.tele2.net/nonexistent");
-    //assert(unreliable_network || rs.code != 226);
-    //rq.useStreaming = false;
-    //info("ftp get  ", "ftp://speedtest.tele2.net/1KB.zip", ", in same session.");
-    //rs = rq.get("ftp://speedtest.tele2.net/1KB.zip");
-    //assert(unreliable_network || rs.code == 226);
-    //assert(unreliable_network || rs.responseBody.length == 1024);
-    //info("ftp post ", "ftp://speedtest.tele2.net/upload/TEST.TXT");
-    //rs = rq.post("ftp://speedtest.tele2.net/upload/TEST.TXT", "another test, ignore please\n".representation);
-    //assert(unreliable_network || rs.code == 226);
-    //info("ftp get  ", "ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
-    //try {
-    //    rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
-    //} catch (ConnectError e)
-    //{
-    //}
-    //assert(unreliable_network || rs.code == 226);
-    //rq.authenticator = new BasicAuthentication("anonymous", "request@");
-    //try {
-    //    rs = rq.get("ftp://ftp.iij.ad.jp/pub/FreeBSD/README.TXT");
-    //} catch (ConnectError e)
-    //{
-    //}
-    //assert(unreliable_network || rs.code == 226);
-    //info("testing ftp - done.");
+unittest
+{
+    import std.algorithm;
+    info("Test ByLine interfaces");
+    auto r = getContentByLine("https://httpbin.org/stream/50");
+    assert(r.count == 50);
+    r = getContentByLine("https://httpbin.org/stream/0");
+    assert(r.count == 0);
+    r = getContentByLine("https://httpbin.org/anything", ["1":"1"]);
+    assert(r.map!"cast(string)a".filter!(a => a.canFind("data")).count == 1);
+    r = getContentByLine("https://httpbin.org/anything", queryParams("1","1"));
+    assert(r.map!"cast(string)a".filter!(a => a.canFind("data")).count == 1);
+    r = postContentByLine("https://httpbin.org/anything", "123");
+    assert(r.map!"cast(string)a".filter!(a => a.canFind("data")).count == 1);
+    r = putContentByLine("https://httpbin.org/anything", "123");
+    assert(r.map!"cast(string)a".filter!(a => a.canFind("data")).count == 1);
 }
-

@@ -68,6 +68,11 @@
 <url><loc>http://127.0.0.1/requests/base/Response.toString.html</loc></url>
 <url><loc>http://127.0.0.1/requests/base/Response.uri.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/_LineReader.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/_LineReader.empty.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/_LineReader.front.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/_LineReader.popFront.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/_LineReader.this.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/addInterceptor.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Interceptor.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Interceptor.opCall.html</loc></url>
@@ -86,6 +91,8 @@
 <url><loc>http://127.0.0.1/requests/request/Request.contentType.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.cookie.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.cookie.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/Request.deleteRequest.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/Request.deleteRequest.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.exec.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.exec.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.execute.html</loc></url>
@@ -109,6 +116,9 @@
 <url><loc>http://127.0.0.1/requests/request/Request.method.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.multipartForm.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.params.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/Request.patch.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/Request.patch.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/Request.patch.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.path.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.path.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.permanent_redirects.html</loc></url>
@@ -119,6 +129,9 @@
 <url><loc>http://127.0.0.1/requests/request/Request.postData.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.proxy.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.proxy.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/Request.put.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/Request.put.html</loc></url>
+<url><loc>http://127.0.0.1/requests/request/Request.put.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.socketFactory.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.socketFactory.html</loc></url>
 <url><loc>http://127.0.0.1/requests/request/Request.sslOptions.html</loc></url>
@@ -143,5 +156,13 @@
 <url><loc>http://127.0.0.1/requests/getContent.html</loc></url>
 <url><loc>http://127.0.0.1/requests/getContent.html</loc></url>
 <url><loc>http://127.0.0.1/requests/getContent.html</loc></url>
+<url><loc>http://127.0.0.1/requests/getContentByLine.html</loc></url>
+<url><loc>http://127.0.0.1/requests/getContentByLine.html</loc></url>
+<url><loc>http://127.0.0.1/requests/getContentByLine.html</loc></url>
+<url><loc>http://127.0.0.1/requests/getContentByLine.html</loc></url>
+<url><loc>http://127.0.0.1/requests/patchContent.html</loc></url>
 <url><loc>http://127.0.0.1/requests/postContent.html</loc></url>
+<url><loc>http://127.0.0.1/requests/postContentByLine.html</loc></url>
+<url><loc>http://127.0.0.1/requests/putContent.html</loc></url>
+<url><loc>http://127.0.0.1/requests/putContentByLine.html</loc></url>
 </urlset>

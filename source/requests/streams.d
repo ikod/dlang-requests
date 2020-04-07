@@ -371,8 +371,8 @@ public class LineSplitter : DataPipeIface!ubyte
     private
     {
         Buffer!ubyte    buff;
-        long            NL = -1;
-        long            scanned;
+        int            NL = -1;
+        int            scanned;
     }
     bool empty()
     {
@@ -388,7 +388,7 @@ public class LineSplitter : DataPipeIface!ubyte
             NL = new_NL;
             debug tracef("new nl=%d", NL);
         }
-        scanned = buff.length;
+        scanned = cast(int)buff.length;
     }
     ubyte[] get()
     {
@@ -399,7 +399,7 @@ public class LineSplitter : DataPipeIface!ubyte
             NL = buff.indexOf(cast(ubyte)'\n', 0);
             if (NL == -1)
             {
-                scanned = buff.length;
+                scanned = cast(int)buff.length;
             }
             return res;
         }
@@ -407,7 +407,7 @@ public class LineSplitter : DataPipeIface!ubyte
     }
     void flush()
     {
-        NL = buff.length - 1;
+        NL = cast(int)buff.length - 1;
     }
 }
 unittest
@@ -616,7 +616,7 @@ public struct Buffer(T) {
         }
         assert(false, "Impossible");
     }
-    long indexOf(ubyte needle, long pos)
+    int indexOf(ubyte needle, int pos)
     {
         if ( pos >= length || !__repr || !__repr.__buffer)
         {
@@ -624,7 +624,7 @@ public struct Buffer(T) {
         }
         // skip pos bytes
         debug tracef("search %d from pos %d", needle, pos);
-        long cp;
+        int cp;
         foreach (ref b; __repr.__buffer)
         {
             if ( pos >= b.length )
@@ -638,7 +638,7 @@ public struct Buffer(T) {
             if (i>=0)
             {
                 debug tracef("found at %d", i+cp);
-                return i+cp;
+                return cast(int)i+cp;
             }
             cp += b.length;
         }

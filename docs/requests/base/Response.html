@@ -51,6 +51,94 @@ $('#symbolSearchPane').show();</script>
 				</code>
 			</div>
 			
+			<section><h2>Fields</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response._code.html" class="package"><code>_code</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ushort</span></code></td><td>Server status code
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response._connectedAt.html" class="package"><code>_connectedAt</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">datetime<wbr/></span><span class="pun">.</span><span class="pln">systime<wbr/></span><span class="pun">.</span><span class="typ">SysTime</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response._contentLength.html" class="package"><code>_contentLength</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">long</span></code></td><td>Server-supplied content length (can be -1 when unknown)
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response._contentReceived.html" class="package"><code>_contentReceived</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">long</span></code></td><td>Length of received content
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response._finalURI.html" class="package"><code>_finalURI</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">requests<wbr/></span><span class="pun">.</span><span class="pln">uri<wbr/></span><span class="pun">.</span><span class="pln">URI</span></code></td><td>Final URI. Can differ from uri() if request go through redirections.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response._finishedAt.html" class="package"><code>_finishedAt</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">datetime<wbr/></span><span class="pun">.</span><span class="pln">systime<wbr/></span><span class="pun">.</span><span class="typ">SysTime</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response._receiveAsRange.html" class="package"><code>_receiveAsRange</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../requests/base/ReceiveAsRange.html"><span class="typ">ReceiveAsRange</span></a></code></td><td>stream range stored here
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response._requestSentAt.html" class="package"><code>_requestSentAt</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">datetime<wbr/></span><span class="pun">.</span><span class="pln">systime<wbr/></span><span class="pun">.</span><span class="typ">SysTime</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response._responseBody.html" class="package"><code>_responseBody</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">requests<wbr/></span><span class="pun">.</span><span class="pln">streams<wbr/></span><span class="pun">.</span><span class="typ">Buffer</span>!(ubyte)</code></td><td>Response body
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response._responseHeaders.html" class="package"><code>_responseHeaders</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[</span><span class="typ">string</span><span class="pun">]</span></code></td><td>Response headers
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response._startedAt.html" class="package"><code>_startedAt</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">datetime<wbr/></span><span class="pun">.</span><span class="pln">systime<wbr/></span><span class="pun">.</span><span class="typ">SysTime</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response._uri.html" class="package"><code>_uri</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">requests<wbr/></span><span class="pun">.</span><span class="pln">uri<wbr/></span><span class="pun">.</span><span class="pln">URI</span></code></td><td>Initial URI
+</td>
+					</tr>
+				</table>
+			</section>
 			<section><h2>Properties</h2>
 				<table>
 					<col class="caption"/>
@@ -111,6 +199,24 @@ $('#symbolSearchPane').show();</script>
 						</td>
 						<td class="typecol"><code class="prettyprint lang-d"><span class="kwd">inout</span><span class="pun">(</span><span class="pln">requests<wbr/></span><span class="pun">.</span><span class="pln">uri<wbr/></span><span class="pun">.</span><span class="pln">URI</span><span class="pun">)</span></code></td><td></td>
 					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response.code.html" class="package property"><code>code</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ushort</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response.finalURI.html" class="package property"><code>finalURI</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">requests<wbr/></span><span class="pun">.</span><span class="pln">uri<wbr/></span><span class="pun">.</span><span class="pln">URI</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response.uri.html" class="package property"><code>uri</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">requests<wbr/></span><span class="pun">.</span><span class="pln">uri<wbr/></span><span class="pun">.</span><span class="pln">URI</span></code></td><td></td>
+					</tr>
 				</table>
 			</section>
 			<section><h2>Methods</h2>
@@ -136,6 +242,22 @@ $('#symbolSearchPane').show();</script>
 						</td>
 						<td>string representation of response
 </td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Aliases</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../requests/base/Response.__xdtor.html" class="public">
+								<code>__xdtor</code>
+							</a>
+						</td>
+						<td></td>
 					</tr>
 				</table>
 			</section>

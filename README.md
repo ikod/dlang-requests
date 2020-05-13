@@ -803,6 +803,36 @@ Interceptor can change Request `r`, using Request() getters/setters before pass 
 For example, authentication methods can be added using interceptors and headers injection.
 You can implement some kind of cache and return cached response immediately.
 
+To change POST data in the interceptors you can use makeAdapter (since v1.1.2).
+Example:
+
+```
+import std.stdio;
+import std.string;
+import std.algorithm;
+import requests;
+
+class I : Interceptor
+{
+    Response opCall(Request rq, RequestHandler next)
+    {
+        rq.postData = makeAdapter(rq.postData.map!"toUpper(cast(string)a)");
+        auto rs = next.handle(rq);
+        return rs;
+    }
+}
+
+void main()
+{
+    auto f = File("text.txt", "rb");
+    Request rq;
+    rq.verbosity = 1;
+    rq.addInterceptor(new I);
+    auto rs = rq.post("https://httpbin.org/post", f.byChunk(5));
+    writeln(rs.responseBody);
+}
+```
+
 ### SocketFactory ###
 
 If configured - each time when `Request` need new connection it will call factory to create instance of NetworkStream.

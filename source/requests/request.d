@@ -301,7 +301,7 @@ public struct Request {
     mixin(Getter("uri"));
     mixin(Getter("params"));
     mixin(Getter("contentType"));
-    mixin(Getter("postData"));
+    mixin(Getter_Setter!InputRangeAdapter("postData"));
     mixin(Getter("permanent_redirects"));
     mixin(Getter("multipartForm"));
     mixin(Getter_Setter!NetStreamFactory("socketFactory"));

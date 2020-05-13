@@ -81,8 +81,12 @@ private auto ma(R)(R r) {
     return new Adapter!R(r);
 }
 
-
-package InputRangeAdapter makeAdapter(R)(R r) {
+///
+/// makeAdapter convert input range of ubytes (rank 1 or rank 2),
+/// So that it can be used in POST requests
+/// You can use it in Interceptors to modify/set POST data.
+///
+public InputRangeAdapter makeAdapter(R)(R r) {
     auto adapter = ma(r);
     InputRangeAdapter result;
     result._front = &adapter.front;

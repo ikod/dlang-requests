@@ -19,6 +19,7 @@ public import requests.uri;
 public import requests.request;
 public import requests.pool;
 public import requests.utils;
+public import requests.rangeadapter;
 
 import std.datetime;
 import std.conv;

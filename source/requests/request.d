@@ -744,14 +744,14 @@ struct _LineReader
         if (!_lineSplitter.empty)
         {
             _data = _lineSplitter.get();
-            debug tracef("data1 = <<<%s>>>", cast(string)_data);
+            debug(requests) tracef("data1 = <<<%s>>>", cast(string)_data);
             return;
         }
         if ( _stream.empty )
         {
             _lineSplitter.flush();
             _data = _lineSplitter.get();
-            debug tracef("data2 = <<<%s>>>", cast(string)_data);
+            debug(requests) tracef("data2 = <<<%s>>>", cast(string)_data);
             return;
         }
         while(_lineSplitter.empty && !_stream.empty)
@@ -761,6 +761,6 @@ struct _LineReader
             _stream.popFront();
         }
         _data = _lineSplitter.get();
-        debug tracef("data3 = <<<%s>>>", cast(string)_data);
+        debug(requests) tracef("data3 = <<<%s>>>", cast(string)_data);
     }
 }

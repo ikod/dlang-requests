@@ -380,13 +380,13 @@ public class LineSplitter : DataPipeIface!ubyte
     }
     void putNoCopy(ubyte[] s)
     {
-        debug tracef("put data: <<%s>>", cast(string)s);
+        debug(requests) tracef("put data: <<%s>>", cast(string)s);
         buff.putNoCopy(s);
         if (NL == -1)
         {
             auto new_NL = buff.indexOf(cast(ubyte)'\n', scanned);
             NL = new_NL;
-            debug tracef("new nl=%d", NL);
+            debug(requests) tracef("new nl=%d", NL);
         }
         scanned = cast(int)buff.length;
     }
@@ -623,7 +623,7 @@ public struct Buffer(T) {
             return -1;
         }
         // skip pos bytes
-        debug tracef("search %d from pos %d", needle, pos);
+        debug(requests) tracef("search %d from pos %d", needle, pos);
         int cp;
         foreach (ref b; __repr.__buffer)
         {
@@ -637,7 +637,7 @@ public struct Buffer(T) {
             pos = 0;
             if (i>=0)
             {
-                debug tracef("found at %d", i+cp);
+                debug(requests) tracef("found at %d", i+cp);
                 return cast(int)i+cp;
             }
             cp += b.length;

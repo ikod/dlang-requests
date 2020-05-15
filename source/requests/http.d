@@ -2209,9 +2209,7 @@ public struct HTTPRequest {
             case "POST","PUT","PATCH":
                 encoded = params2query(_params);
                 safeSetHeader(h, _userHeaders.ContentType, "Content-Type", "application/x-www-form-urlencoded");
-                if ( encoded.length > 0) {
-                    safeSetHeader(h, _userHeaders.ContentLength, "Content-Length", to!string(encoded.length));
-                }
+                safeSetHeader(h, _userHeaders.ContentLength, "Content-Length", to!string(encoded.length));
                 req.put(requestString());
                 break;
             default:

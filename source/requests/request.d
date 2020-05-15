@@ -582,7 +582,6 @@ public struct Request {
         auto interceptors = _static_interceptors ~ _interceptors ~ new LastInterceptor();
         auto handler = new RequestHandler(interceptors);
         return handler.handle(this);
-        
     }
     Response execute(string method, string url, MultipartForm form)
     {

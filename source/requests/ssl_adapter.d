@@ -84,8 +84,16 @@ shared static this() {
     } else
     version(Windows) {
         enum loadFunction = "LoadLibrary(lib.ptr)";
-        immutable wstring[] libsslname = ["libssl32.dll"w];
-        immutable wstring[] libcryptoname = ["libeay32.dll"w];
+        immutable wstring[] libsslname = [
+             "libssl32.dll"w,
+             "libssl-1_1"w,
+             "libssl-1_1-x64"w,
+         ];
+         immutable wstring[] libcryptoname = [
+             "libeay32.dll"w,
+             "libcrypto-1_1"w,
+             "libcrypto-1_1-x64"w,
+        ];
     } else {
         debug(requests) trace("error loading openssl: unsupported system - first access over https will fail");
         return;

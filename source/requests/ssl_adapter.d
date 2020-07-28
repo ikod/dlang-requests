@@ -82,6 +82,23 @@ shared static this() {
             "libcrypto.so",
         ];
     } else
+    version(FreeBSD) {
+        enum loadFunction = "dlopen(lib.ptr, RTLD_LAZY)";
+        immutable string[] libsslname = [
+            "libssl.so.1.1",
+            "libssl.so.1.0.2",
+            "libssl.so.1.0.1",
+            "libssl.so.1.0.0",
+            "libssl.so",
+        ];
+        immutable string[] libcryptoname = [
+            "libcrypto.so.1.1",
+            "libcrypto.so.1.0.2",
+            "libcrypto.so.1.0.1",
+            "libcrypto.so.1.0.0",
+            "libcrypto.so",
+        ];
+    } else
     version(Windows) {
         enum loadFunction = "LoadLibrary(lib.ptr)";
         immutable wstring[] libsslname = [

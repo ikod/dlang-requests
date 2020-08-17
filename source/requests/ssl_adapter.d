@@ -15,6 +15,15 @@ version(Windows) {
     alias DLSYM = dlsym;
 }
 
+version(RequestsSkipSSL)
+{
+    enum enableSSL = false;
+}
+else
+{
+    enum enableSSL = true;
+}
+
 /*
  * /usr/include/openssl/tls1.h:# define TLS_ANY_VERSION 0x10000
  */
@@ -116,7 +125,7 @@ shared static this() {
         return;
     }
 
-    static if (is(typeof(loadFunction))) {
+    static if ( enableSSL && is(typeof(loadFunction)) ) {
         foreach(lib; libsslname) {
             openssl._libssl = cast(typeof(openssl._libssl))mixin(loadFunction);
             if ( openssl._libssl !is null ) {

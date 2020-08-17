@@ -83,7 +83,7 @@ If you only need content of some webpage, you can use `getContent()`:
 auto content = getContent("http://httpbin.org/");
 ```
 
-`getContent()` will fetch complete document to buffer and return this buffer to the caller. `content` can be converted to string, or can be used as range. For example, if you need to count lines in `content`, you can directly apply `splitter()` and `count`:
+`getContent()` will fetch complete document to buffer and return this buffer to the caller(see Straming for lazy content loading). `content` can be converted to string, or can be used as range. For example, if you need to count lines in `content`, you can directly apply `splitter()` and `count`:
 
 ```d
 writeln(content.splitter('\n').count);

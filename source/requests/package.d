@@ -401,7 +401,7 @@ package unittest {
     rq.addHeaders(["content-length": to!string(s.length)]);
     rs = rq.post(httpbinUrl ~ "post", s.representation.chunks(10), "application/octet-stream");
     auto flat_content = parseJSON(cast(string)rs.responseBody().data).object["data"];
-    if ( flat_content.type == JSON_TYPE.STRING ) {
+    if ( flat_content.type == JSONType.string ) {
         // httpbin.org returns string in "data"
         assert(s == flat_content.str);
     } else {

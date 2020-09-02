@@ -17,7 +17,7 @@
             "name": "vibed",
             "versions": ["vibeD"],
             "dependencies": {
-                "vibe-d": "~>0.8"
+                "vibe-d": ">=0.8.0"
             }
         }
     ],

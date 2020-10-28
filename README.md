@@ -33,7 +33,14 @@ API docs: [Wiki](https://ikod.github.io/dlang-requests/)
 
 ### Library configurations ###
 
-This library can either use standard `std.socket` library or [`vibe.d`](http://vibed.org) for network IO. By default this library uses the standard `std.socket` configuration called `std`. To build `vibed` variant, use the `vibed` configuration:
+This library doesn't use vibe-d but it can work with vibe-d sockets for network IO, so you can use requests in your vibe-d applications. To build `vibe-d` variant, **with `requests` ver 2.x** use 
+
+```json
+    "dependencies": {
+        "requests:vibed": "~>2"
+    }
+```
+For requests 1.x use subConfiguration:
 
 ```json
 "dependencies": {

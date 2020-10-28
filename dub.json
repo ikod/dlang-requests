@@ -12,14 +12,10 @@
     "configurations": [
         {
             "name": "std"
-        },
-        {
-            "name": "vibed",
-            "versions": ["vibeD"],
-            "dependencies": {
-                "vibe-d": "~>0.8"
-            }
         }
+    ],
+    "subPackages": [
+        "./vibed/"
     ],
     "buildTypes": {
         "debug": {

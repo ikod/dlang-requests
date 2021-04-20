@@ -2,7 +2,7 @@ module httpbin;
 
 version(vibeD) {
 } else
-version (httpbin) 
+version (httpbin)
 {
 	import requests.server.httpd;
 	import requests.utils;
@@ -25,12 +25,12 @@ version (httpbin)
 		auto files   = JSONValue(rq.files);
 		auto reply   = JSONValue([
 				"method": method,
-				"headers": headers, 
+				"headers": headers,
 				"args":args,
-				"json": json, 
-				"url": url, 
-				"data": data, 
-				"form": form, 
+				"json": json,
+				"url": url,
+				"data": data,
+				"form": form,
 				"files": files
 			]);
 		return reply.toString();
@@ -41,9 +41,9 @@ version (httpbin)
 		debug(requests) trace("start httpbin app");
 		HTTPD server = new HTTPD();
 		App httpbin = App("httpbin");
-		
+
 		httpbin.port = 8081;
-		httpbin.host = "127.0.0.1"; 
+		httpbin.host = "127.0.0.1";
 		httpbin.timeout = 10.seconds;
 		httpbin.rqLimit = 5;
 		server.app(httpbin);

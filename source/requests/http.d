@@ -394,7 +394,7 @@ public struct HTTPRequest {
     private @property string requestString(QueryParam[] params = null) {
         auto query = _uri.query.dup;
         if ( params ) {
-            query ~= "&" ~ params2query(params);
+            query ~= params2query(params);
             if ( query[0] != '?' ) {
                 query = "?" ~ query;
             }
@@ -405,6 +405,16 @@ public struct HTTPRequest {
         }
         return "%s %s%s HTTP/1.1\r\n".format(_method, _uri.path, query);
     }
+
+    unittest {
+        HTTPRequest request;
+        request._uri = URI("https://www.blub.de/");
+        import std.stdio;
+        auto expected = "GET /?a=b&c=d HTTP/1.1\r\n";
+        auto actual = request.requestString([QueryParam("a", "b"), QueryParam("c", "d")]);
+        assert(expected == actual, "Expected\n  '%s' but got\n  '%s'".format(expected, actual));
+    }
+
     ///
     /// encode parameters and build query part of the url
     ///

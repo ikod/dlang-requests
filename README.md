@@ -437,7 +437,7 @@ void main()
     auto rs = rq.get("http://httpbin.org/image/jpeg");
     auto stream = rs.receiveAsRange();
     while(!stream.empty) {
-        writefln("Received %d bytes, total received %d from document legth %d", stream.front.length, rs.contentReceived, rs.contentLength);
+        writefln("Received %d bytes, total received %d from document length %d", stream.front.length, rs.contentReceived, rs.contentLength);
         stream.popFront;
     }
 }
@@ -462,21 +462,21 @@ Output:
 < access-control-allow-credentials: true
 < 1232 bytes of body received
 < 1448 bytes of body received
-Received 2680 bytes, total received 2680 from document legth 35588
-Received 2896 bytes, total received 5576 from document legth 35588
-Received 2896 bytes, total received 8472 from document legth 35588
-Received 2896 bytes, total received 11368 from document legth 35588
-Received 1448 bytes, total received 12816 from document legth 35588
-Received 1448 bytes, total received 14264 from document legth 35588
-Received 1448 bytes, total received 15712 from document legth 35588
-Received 2896 bytes, total received 18608 from document legth 35588
-Received 2896 bytes, total received 21504 from document legth 35588
-Received 2896 bytes, total received 24400 from document legth 35588
-Received 1448 bytes, total received 25848 from document legth 35588
-Received 2896 bytes, total received 28744 from document legth 35588
-Received 2896 bytes, total received 31640 from document legth 35588
-Received 2896 bytes, total received 34536 from document legth 35588
-Received 1052 bytes, total received 35588 from document legth 35588
+Received 2680 bytes, total received 2680 from document length 35588
+Received 2896 bytes, total received 5576 from document length 35588
+Received 2896 bytes, total received 8472 from document length 35588
+Received 2896 bytes, total received 11368 from document length 35588
+Received 1448 bytes, total received 12816 from document length 35588
+Received 1448 bytes, total received 14264 from document length 35588
+Received 1448 bytes, total received 15712 from document length 35588
+Received 2896 bytes, total received 18608 from document length 35588
+Received 2896 bytes, total received 21504 from document length 35588
+Received 2896 bytes, total received 24400 from document length 35588
+Received 1448 bytes, total received 25848 from document length 35588
+Received 2896 bytes, total received 28744 from document length 35588
+Received 2896 bytes, total received 31640 from document length 35588
+Received 2896 bytes, total received 34536 from document length 35588
+Received 1052 bytes, total received 35588 from document length 35588
 ```
 
 With `verbosity >= 3`, you will also receive a dump of each data portion received from server:

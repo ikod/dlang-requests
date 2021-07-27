@@ -1075,7 +1075,7 @@ public abstract class SocketStream : NetworkStream {
         return s && __isOpen && __isConnected;
     }
     void close() @trusted {
-        debug(requests) tracef("Close socket");
+        // can be callsed from dtor in GC, no gc calls here
         if ( isOpen ) {
             s.close();
             __isOpen = false;

@@ -3,6 +3,7 @@
 import requests.streams;
 import requests.utils;
 import requests.uri;
+import requests.connmanager;
 
 import std.format;
 import std.datetime;
@@ -13,6 +14,7 @@ import std.string;
 import std.exception;
 import std.bitmanip;
 import std.conv;
+import std.typecons;
 
 /++ 
     Interface to provide user info and http headers requred for server auth.

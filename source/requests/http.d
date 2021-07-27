@@ -846,6 +846,7 @@ public struct HTTPRequest {
                 _response._contentLength = _contentLength;
                 _response.receiveAsRange.activated = true;
                 _response.receiveAsRange.data = _response._responseBody.data;
+                _response.receiveAsRange.cm = _cm;
                 _response.receiveAsRange.read = delegate ubyte[] () {
 
                     while(true) {

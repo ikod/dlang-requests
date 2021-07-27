@@ -231,10 +231,11 @@ public struct ReceiveAsRange {
         }
     }
     package {
-        bool            activated;
-        ubyte[]         data;
+        bool                    activated;
+        ubyte[]                 data;
         /// HTTP or FTP module set up delegate read() for reading next portion of data.
-        ubyte[]         delegate() read;
+        ubyte[]                 delegate() read;
+        RefCounted!ConnManager  cm;
     }
 }
 

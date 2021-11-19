@@ -1,7 +1,6 @@
 # dlang-requests
 
 [![Build Status](https://travis-ci.org/ikod/dlang-requests.svg?branch=master)](https://travis-ci.org/ikod/dlang-requests)
-[![](https://img.shields.io/static/v1?style=social&label=Donate&message=%E2%9D%A4&logo=Paypal&color&link=%3Curl%3E)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=Z578ETBNPUS9W&source=url)
 
 
 HTTP client library, inspired by python-requests with goals:

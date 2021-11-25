@@ -7,6 +7,7 @@ import std.typecons;
 import core.stdc.stdlib;
 import core.sys.posix.dlfcn;
 import std.experimental.logger;
+import core.stdc.config;
 
 version(Windows) {
     import core.sys.windows.windows;
@@ -171,7 +172,7 @@ shared static this() {
     mixin(SSL_Function_set_i!("SSL_CTX_use_PrivateKey_file", int, SSL_CTX*, const char*, int));
     mixin(SSL_Function_set_i!("SSL_CTX_use_certificate_file", int, SSL_CTX*, const char*, int));
     mixin(SSL_Function_set_i!("SSL_CTX_set_cipher_list", int, SSL_CTX*, const char*));
-    mixin(SSL_Function_set_i!("SSL_CTX_ctrl", long, SSL_CTX*, int, long, void*));
+    mixin(SSL_Function_set_i!("SSL_CTX_ctrl", c_long, SSL_CTX*, int, c_long, void*));
     mixin(SSL_Function_set_i!("SSL_new", SSL*, SSL_CTX*));
     mixin(SSL_Function_set_i!("SSL_set_fd", int, SSL*, int));
     mixin(SSL_Function_set_i!("SSL_connect", int, SSL*));
@@ -180,9 +181,9 @@ shared static this() {
     mixin(SSL_Function_set_i!("SSL_free", void, SSL*));
     mixin(SSL_Function_set_i!("SSL_CTX_free", void, SSL_CTX*));
     mixin(SSL_Function_set_i!("SSL_get_error", int, SSL*, int));
-    mixin(SSL_Function_set_i!("SSL_ctrl", long, SSL*, int, long, void*));
-    mixin(CRYPTO_Function_set_i!("ERR_reason_error_string", char*, ulong));
-    mixin(CRYPTO_Function_set_i!("ERR_get_error", ulong));
+    mixin(SSL_Function_set_i!("SSL_ctrl", c_long, SSL*, int, c_long, void*));
+    mixin(CRYPTO_Function_set_i!("ERR_reason_error_string", char*, c_ulong));
+    mixin(CRYPTO_Function_set_i!("ERR_get_error", c_ulong));
 
     void delegate()[Version] init_matrix;
     init_matrix[Version(1,0)] = &openssl.init1_0;
@@ -209,8 +210,8 @@ struct OpenSSL {
         mixin(SSL_Function_decl!("SSL_load_error_strings", void));
 
         // openssl 1.1.x init functions
-        mixin(SSL_Function_decl!("OPENSSL_init_ssl", int, ulong, void*));
-        mixin(SSL_Function_decl!("OPENSSL_init_crypto", int, ulong, void*));
+        mixin(SSL_Function_decl!("OPENSSL_init_ssl", int, ulong, void*)); // fixed width 64 bit arg
+        mixin(SSL_Function_decl!("OPENSSL_init_crypto", int, ulong, void*)); // fixed width 64 bit arg
 
         // all other functions
         mixin(SSL_Function_decl!("TLSv1_client_method", SSL_METHOD*));
@@ -224,7 +225,7 @@ struct OpenSSL {
         mixin(SSL_Function_decl!("SSL_CTX_use_PrivateKey_file", int, SSL_CTX*, const char*, int));
         mixin(SSL_Function_decl!("SSL_CTX_use_certificate_file", int, SSL_CTX*, const char*, int));
         mixin(SSL_Function_decl!("SSL_CTX_set_cipher_list", int, SSL_CTX*, const char*));
-        mixin(SSL_Function_decl!("SSL_CTX_ctrl", long, SSL_CTX*, int, long, void*));
+        mixin(SSL_Function_decl!("SSL_CTX_ctrl", c_long, SSL_CTX*, int, c_long, void*));
         mixin(SSL_Function_decl!("SSL_new", SSL*, SSL_CTX*));
         mixin(SSL_Function_decl!("SSL_set_fd", int, SSL*, int));
         mixin(SSL_Function_decl!("SSL_connect", int, SSL*));
@@ -233,9 +234,9 @@ struct OpenSSL {
         mixin(SSL_Function_decl!("SSL_free", void, SSL*));
         mixin(SSL_Function_decl!("SSL_CTX_free", void, SSL_CTX*));
         mixin(SSL_Function_decl!("SSL_get_error", int, SSL*, int));
-        mixin(SSL_Function_decl!("SSL_ctrl", long, SSL*, int, long, void*));
-        mixin(SSL_Function_decl!("ERR_reason_error_string", char*, ulong));
-        mixin(SSL_Function_decl!("ERR_get_error", ulong));
+        mixin(SSL_Function_decl!("SSL_ctrl", c_long, SSL*, int, c_long, void*));
+        mixin(SSL_Function_decl!("ERR_reason_error_string", char*, c_ulong));
+        mixin(SSL_Function_decl!("ERR_get_error", c_ulong));
     }
 
     Version reportVersion() const @nogc nothrow pure {
@@ -243,7 +244,7 @@ struct OpenSSL {
     };
 
     private Version OpenSSL_version_detect() const {
-        ulong function() OpenSSL_version_num = cast(ulong function())DLSYM(cast(void*)_libcrypto, "OpenSSL_version_num".ptr);
+        c_ulong function() OpenSSL_version_num = cast(c_ulong function())DLSYM(cast(void*)_libcrypto, "OpenSSL_version_num".ptr);
         if ( OpenSSL_version_num ) {
             auto v = OpenSSL_version_num() & 0xffffffff;
             return Version((v>>>20) & 0xff, (v>>>28) & 0xff);
@@ -334,11 +335,11 @@ struct OpenSSL {
     enum int SSL_CTRL_SET_MIN_PROTO_VERSION = 123;
     enum int SSL_CTRL_SET_MAX_PROTO_VERSION = 124;
     int SSL_CTX_set_min_proto_version(SSL_CTX* ctx, int v) const @nogc nothrow {
-        int r = cast(int)adapter_SSL_CTX_ctrl(ctx, SSL_CTRL_SET_MIN_PROTO_VERSION, cast(long)v, null);
+        int r = cast(int)adapter_SSL_CTX_ctrl(ctx, SSL_CTRL_SET_MIN_PROTO_VERSION, cast(c_long)v, null);
         return r;
     }
     int SSL_CTX_set_max_proto_version(SSL_CTX* ctx, int v) const @nogc nothrow {
-        int r = cast(int)adapter_SSL_CTX_ctrl(ctx, SSL_CTRL_SET_MAX_PROTO_VERSION, cast(long)v, null);
+        int r = cast(int)adapter_SSL_CTX_ctrl(ctx, SSL_CTRL_SET_MAX_PROTO_VERSION, cast(c_long)v, null);
         return r;
     }
     SSL* SSL_new(SSL_CTX* ctx) const @nogc nothrow {
@@ -365,15 +366,15 @@ struct OpenSSL {
     int SSL_get_error(SSL* ssl, int err) const @nogc nothrow {
         return adapter_SSL_get_error(ssl, err);
     }
-    long SSL_set_tlsext_host_name(SSL* ssl, const char* host) const @nogc nothrow {
-        enum int SSL_CTRL_SET_TLSEXT_HOSTNAME = 55;
-        enum long TLSEXT_NAMETYPE_host_name = 0;
+    c_long SSL_set_tlsext_host_name(SSL* ssl, const char* host) const @nogc nothrow {
+        enum SSL_CTRL_SET_TLSEXT_HOSTNAME = 55;
+        enum TLSEXT_NAMETYPE_host_name = 0;
         return adapter_SSL_ctrl(ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME,TLSEXT_NAMETYPE_host_name, cast(void*)host);
     }
-    char* ERR_reason_error_string(ulong code) const @nogc nothrow {
+    char* ERR_reason_error_string(c_ulong code) const @nogc nothrow {
         return adapter_ERR_reason_error_string(code);
     }
-    ulong ERR_get_error() const @nogc nothrow {
+    c_ulong ERR_get_error() const @nogc nothrow {
         return adapter_ERR_get_error();
     }
 }

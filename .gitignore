@@ -4,3 +4,4 @@ __dummy.html
 *.o
 *.obj
 request.dproj
+dub.selections.json

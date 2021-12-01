@@ -145,7 +145,7 @@ auto content = getContent("http://httpbin.org/get", ["name": "any name", "age": 
 Which gives you the same response.
 
 
-### If `getContent()` fails###
+### If `getContent()` fails ###
 
  `getContent()` (and any other API call) can throw the following exceptions:
 

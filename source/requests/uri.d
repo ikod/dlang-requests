@@ -38,18 +38,46 @@ struct URI {
     
     bool uri_parse(string uri) @safe pure {
         auto i = uri.findSplit("://");
-        string   rest;
+        string   rest, authority, path_and_query;
         if ( i[1].length ) {
             _scheme = i[0].toLower;
             rest = i[2];
         } else {
             return false;
         }
+        if ( _scheme !in standard_ports ) {
+            return false;
+        }
         // separate Authority from path and query
-        i = rest.findSplit("/");
-        auto authority = i[0];
-        auto path_and_query = i[2];
-        
+        auto query = rest.indexOf("?");
+        auto path = rest.indexOf("/");
+        // auth/p?q p>0 q>p
+        // auth/p   p>0 q=-1
+        // auth?q/p p>0 q<p
+        // auth?q   p=-1 q>0
+        // auth     p=-1 q=-1
+        if ( path >= 0 ) {
+            if ( query > path || query == -1 ) {
+                // a/p?q or a/p
+                authority = rest[0..path];
+                path_and_query = rest[path+1..$];
+            } else if ( query < path ) {
+                // a?q/p
+                authority = rest[0..query];
+                path_and_query = rest[query..$];
+            }
+        } else {
+            if ( query >= 0) {
+                // auth?q   p=-1 q>0
+                authority = rest[0..query];
+                path_and_query = rest[query..$];
+            } else {
+                // auth     p=-1 q=-1
+                authority = rest;
+                path_and_query = "";
+            }
+        }
+
         // find user/password/host:port in authority
         i = authority.findSplit("@");
         string up;
@@ -150,11 +178,21 @@ unittest {
     assert(a.scheme == "http");
     assert(a.host == "example.com");
     assert(a.path == "/");
-    a = URI("svn+ssh://igor@example.com:1234");
-    assert(a.scheme == "svn+ssh");
+    a = URI("https://igor@example.com:1234");
+    assert(a.scheme == "https");
     assert(a.host == "example.com");
     assert(a.username == "igor");
     assert(a.path == "/");
+    a = URI("https://example.com?a");
+    assert(a.scheme == "https");
+    assert(a.host == "example.com");
+    assert(a.path == "/");
+    assert(a.query == "?a");
+    a = URI("https://example.com?a=/test");
+    assert(a.scheme == "https");
+    assert(a.host == "example.com");
+    assert(a.path == "/");
+    assert(a.query == "?a=/test");
     a = URI("http://igor:pass;word@example.com:1234/abc?q=x");
     assert(a.password == "pass;word");
     assert(a.port == 1234);
@@ -171,5 +209,6 @@ unittest {
     a = URI("http://registrera-domän.se");
     a.idn_encode();
     assert(a.host == "xn--registrera-domn-elb.se");
+    assertThrown!UriException(URI("cnn://deeplink?section=livetv&subsection=sliver&stream=CNN1"));
 }
 

@@ -68,7 +68,13 @@ test('drequests_test', test_exe, workdir : meson.current_source_dir())
 
 # to allow others to easily use this as a subproject
 dlang_requests_dep = declare_dependency(
-    link_with: [dlang_requests_lib],
+    link_with: [dlang_requests_lib.get_shared_lib()],
+    include_directories: [src_dir],
+    dependencies: [requests_dep]
+)
+
+dlang_requests_static_dep = declare_dependency(
+    link_with: [dlang_requests_lib.get_static_lib()],
     include_directories: [src_dir],
     dependencies: [requests_dep]
 )

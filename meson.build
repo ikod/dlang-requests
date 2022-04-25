@@ -34,21 +34,21 @@ requests_src = [
 ]
 
 src_dir = include_directories('source/')
-cachetools_dir = include_directories('cachetools-0.0.3/cachetools/source')
 #
 # Targets
 #
 
-dlang_requests_lib = library('dlang-requests',
+dlang_requests_lib = both_libraries('dlang-requests',
         [requests_src],
-        include_directories: [src_dir, cachetools_dir],
+        include_directories: src_dir,
         install: true,
         version: meson.project_version(),
         soversion: project_soversion,
-        d_module_versions: ['std']
+        d_module_versions: ['std'],
+        dependencies: [requests_dep]
 )
-pkgc.generate(name: 'dlang-requests',
-              libraries: dlang_requests_lib,
+pkgc.generate(dlang_requests_lib, 
+              name: 'dlang-requests',
               subdirs: 'd/requests',
               version: meson.project_version(),
               description: 'D HTTP client library inspired by python-requests.',
@@ -61,14 +61,16 @@ test_exe = executable('drequests_test',
      'tests/app.d'],
     include_directories: [src_dir, include_directories('tests/')],
     d_unittest: true,
-    d_module_versions: ['std', 'httpbin', 'unittest_fakemain']
+    d_module_versions: ['std', 'httpbin', 'unittest_fakemain'],
+    dependencies: [requests_dep]
 )
-test('drequests_test', test_exe)
+test('drequests_test', test_exe, workdir : meson.current_source_dir())
 
 # to allow others to easily use this as a subproject
 dlang_requests_dep = declare_dependency(
     link_with: [dlang_requests_lib],
-    include_directories: [src_dir]
+    include_directories: [src_dir],
+    dependencies: [requests_dep]
 )
 
 #

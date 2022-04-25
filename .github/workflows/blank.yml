@@ -12,6 +12,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.x'
+    - run: pip install meson ninja
 
     - name: D Compiler Installation
       uses: mihails-strasuns/setup-dlang@v1.1.1
@@ -19,4 +23,8 @@ jobs:
         compiler: ${{ matrix.dc }}
       
     - name: Test
-      run: dub test --config=std
+      run: |
+       dub test --config=std
+       dub fetch cachetools && dub build cachetools
+       meson build && ninja -j6 -C build
+       ninja -j8 -C build test

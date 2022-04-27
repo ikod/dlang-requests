@@ -905,7 +905,7 @@ else {
             return send(buf, SocketFlags.NONE);
         }
         @trusted
-        override ptrdiff_t receive(void[] buf, SocketFlags flags) scope {
+        override ptrdiff_t receive(scope void[] buf, SocketFlags flags) scope {
             return openssl.SSL_read(ssl, buf.ptr, cast(int)buf.length);
         }
         override ptrdiff_t receive(scope void[] buf) scope {

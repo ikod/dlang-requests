@@ -78,6 +78,7 @@ shared static this() {
     version(linux) {
         enum loadFunction = "dlopen(lib.ptr, RTLD_LAZY)";
         immutable string[] libsslname = [
+            "libssl.so.3",
             "libssl.so.1.1",
             "libssl.so.1.0.2",
             "libssl.so.1.0.1",
@@ -85,6 +86,7 @@ shared static this() {
             "libssl.so",
         ];
         immutable string[] libcryptoname = [
+            "libcrypto.so.3",
             "libcrypto.so.1.1",
             "libcrypto.so.1.0.2",
             "libcrypto.so.1.0.1",

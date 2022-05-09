@@ -78,6 +78,7 @@ shared static this() {
     version(linux) {
         enum loadFunction = "dlopen(lib.ptr, RTLD_LAZY)";
         immutable string[] libsslname = [
+            "libssl.so.3",
             "libssl.so.1.1",
             "libssl.so.1.0.2",
             "libssl.so.1.0.1",
@@ -85,6 +86,7 @@ shared static this() {
             "libssl.so",
         ];
         immutable string[] libcryptoname = [
+            "libcrypto.so.3",
             "libcrypto.so.1.1",
             "libcrypto.so.1.0.2",
             "libcrypto.so.1.0.1",
@@ -189,6 +191,7 @@ shared static this() {
     init_matrix[Version(1,0)] = &openssl.init1_0;
     init_matrix[Version(1,1)] = &openssl.init1_1;
     init_matrix[Version(0,2)] = &openssl.init1_1; // libressl >= 2.7.1
+    init_matrix[Version(0,3)] = &openssl.init1_1; // libressl >= 3.0.0
     auto init = init_matrix.get(openssl._ver, null);
     if ( init is null ) {
         throw new Exception("loading openssl: unknown version for init");

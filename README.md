@@ -722,6 +722,34 @@ Second argument for FTP posts can be anything that can be casted to `ubyte[]` or
 If the path in the post request doesn't exist, it will try to create all the required directories.
 As with HTTP, you can call several FTP requests using the same `Request` structure - it will reuse established connection (and authorization as well).
 
+### FTP LIST command ###
+
+To retrieve single file properties or directory listing use `rq.execute` method:
+```d
+import std.stdio;
+import requests;
+
+void main()
+{
+    auto rq = Request();
+    auto rs = rq.execute("LIST", "ftp://ftp.iij.ad.jp/pub/FreeBSD/");
+    writeln(rs.responseBody);
+
+}
+
+output:
+
+-rw-rw-r--    1 ftp      ftp            35 May 12 09:00 TIMESTAMP
+drwxrwxr-x    9 ftp      ftp           169 Oct 05  2015 development
+-rw-r--r--    1 ftp      ftp          2871 May 11 10:00 dir.sizes
+drwxrwxr-x   22 ftp      ftp          8192 May 09 23:00 doc
+drwxrwxr-x    6 ftp      ftp            92 Jan 10 21:38 ports
+drwxrwxr-x   12 ftp      ftp           237 Feb 06  2021 releases
+drwxrwxr-x   12 ftp      ftp           237 May 05 18:00 snapshots
+
+``` 
+
+
 ### Interceptors ###
 
 Interceptors provide a way to modify, or log, or cache request. They can form a chain attached to Request structure so that

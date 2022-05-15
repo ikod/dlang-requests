@@ -659,7 +659,254 @@ public struct FTPRequest {
         _response.code = code;
         return _response;
     }
+    FTPResponse list(string uri = null) {
+        enforce( uri || _uri.host, "FTP URL undefined");
+        string response;
+        ushort code;
 
+        _response = new FTPResponse;
+        _contentReceived = 0;
+        _method = "GET";
+
+        _response._startedAt = Clock.currTime;
+        scope(exit) {
+            _response._finishedAt = Clock.currTime;
+        }
+
+        if ( uri ) {
+            handleChangeURI(uri);
+        }
+
+        _response.uri = _uri;
+        _response.finalURI = _uri;
+
+        _controlChannel = _cm.get(_uri.scheme, _uri.host, _uri.port);
+
+        if ( !_controlChannel ) {
+            _controlChannel = new TCPStream();
+            _controlChannel.bind(_bind);
+            _controlChannel.connect(_uri.host, _uri.port, _timeout);
+            if ( auto purged_connection = _cm.put(_uri.scheme, _uri.host, _uri.port, _controlChannel) )
+            {
+                debug(requests) tracef("closing purged connection %s", purged_connection);
+                purged_connection.close();
+            }
+            _response._connectedAt = Clock.currTime;
+            response = serverResponse(_controlChannel);
+            _responseHistory ~= response;
+
+            code = responseToCode(response);
+            debug(requests) tracef("Server initial response: %s", response);
+            if ( code/100 > 2 ) {
+                _response.code = code;
+                return _response;
+            }
+            // Log in
+            string user, pass;
+            if ( _authenticator ) {
+                user = _authenticator.userName();
+                pass = _authenticator.password();
+            }
+            else{
+                user = _uri.username.length ? _uri.username : "anonymous";
+                pass = _uri.password.length ? _uri.password : "requests@";
+            }
+            debug(requests) tracef("Use %s:%s%s as username:password", user, pass[0], replicate("-", pass.length-1));
+
+            code = sendCmdGetResponse("USER " ~ user ~ "\r\n", _controlChannel);
+            if ( code/100 > 3 ) {
+                _response.code = code;
+                return _response;
+            } else if ( code/100 == 3) {
+                code = sendCmdGetResponse("PASS " ~ pass ~ "\r\n", _controlChannel);
+                if ( code/100 > 2 ) {
+                    _response.code = code;
+                    return _response;
+                }
+            }
+        }
+        else {
+            _response._connectedAt = Clock.currTime;
+        }
+
+        code = sendCmdGetResponse("PWD\r\n", _controlChannel);
+        string pwd;
+        if ( code/100 == 2 ) {
+            // like '257 "/home/testuser"'
+            auto a = _responseHistory[$-1].split();
+            if ( a.length > 1 ) {
+                pwd = a[1].chompPrefix(`"`).chomp(`"`);
+            }
+        }
+        scope (exit) {
+            if ( pwd && _controlChannel && !_useStreaming ) {
+                sendCmdGetResponse("CWD " ~ pwd ~ "\r\n", _controlChannel);
+            }
+        }
+
+        auto path = dirName(_uri.path);
+        if ( path != "/") {
+            path = path.chompPrefix("/");
+        }
+        code = sendCmdGetResponse("CWD " ~ path ~ "\r\n", _controlChannel);
+        if ( code/100 > 2 ) {
+            _response.code = code;
+            return _response;
+        }
+
+        code = sendCmdGetResponse("TYPE I\r\n", _controlChannel);
+        if ( code/100 > 2 ) {
+            _response.code = code;
+            return _response;
+        }
+
+        code = sendCmdGetResponse("SIZE " ~ baseName(_uri.path) ~ "\r\n", _controlChannel);
+        if ( code/100 == 2 ) {
+            // something like
+            // 213 229355520
+            auto s = _responseHistory[$-1].findSplitAfter(" ");
+            if ( s.length ) {
+                try {
+                    _contentLength = to!long(s[1]);
+                } catch (ConvException) {
+                    debug(requests) trace("Failed to convert string %s to file size".format(s[1]));
+                }
+            }
+        }
+
+        if ( _maxContentLength > 0 && _contentLength > _maxContentLength ) {
+            throw new RequestException("maxContentLength exceeded for ftp data");
+        }
+
+        code = sendCmdGetResponse("PASV\r\n", _controlChannel);
+        if ( code/100 > 2 ) {
+            _response.code = code;
+            return _response;
+        }
+        // something like  "227 Entering Passive Mode (132,180,15,2,210,187)" expected
+        // in last response.
+        // Cut anything between ( and )
+        auto v = _responseHistory[$-1].findSplitBefore(")")[0].findSplitAfter("(")[1];
+
+        TCPStream dataStream;
+        try{
+            dataStream = connectData(v);
+        } catch (FormatException e) {
+            error("Failed to parse ", v);
+            _response.code = 500;
+            return _response;
+        }
+        scope (exit ) {
+            if ( dataStream !is null && !_response._receiveAsRange.activated ) {
+                dataStream.close();
+            }
+        }
+
+        _response._requestSentAt = Clock.currTime;
+
+        code = sendCmdGetResponse("LIST " ~ baseName(_uri.path) ~ "\r\n", _controlChannel);
+        if ( code/100 > 1 && code/100 < 5) {
+            _response.code = code;
+            return _response;
+        }
+        if ( code/100 == 5) {
+            dataStream.close();
+            code = sendCmdGetResponse("PASV\r\n", _controlChannel);
+            if ( code/100 > 2 ) {
+                _response.code = code;
+                return _response;
+            }
+            v = _responseHistory[$-1].findSplitBefore(")")[0].findSplitAfter("(")[1];
+            dataStream = connectData(v);
+            code = sendCmdGetResponse("NLST " ~ _uri.path ~ "\r\n", _controlChannel);
+            if ( code/100 > 1 ) {
+                _response.code = code;
+                return _response;
+            }
+        }
+
+        dataStream.readTimeout = _timeout;
+        while ( true ) {
+            auto b = new ubyte[_bufferSize];
+            auto rc = dataStream.receive(b);
+            if ( rc <= 0 ) {
+                debug(requests) trace("done");
+                break;
+            }
+            debug(requests) tracef("got %d bytes from data channel", rc);
+
+            _contentReceived += rc;
+            _response._responseBody.putNoCopy(b[0..rc]);
+
+            if ( _maxContentLength && _response._responseBody.length >= _maxContentLength ) {
+                throw new RequestException("maxContentLength exceeded for ftp data");
+            }
+            if ( _useStreaming ) {
+                debug(requests) trace("ftp uses streaming");
+
+                auto __maxContentLength = _maxContentLength;
+                auto __contentLength = _contentLength;
+                auto __contentReceived = _contentReceived;
+                auto __bufferSize = _bufferSize;
+                auto __dataStream = dataStream;
+                auto __controlChannel = _controlChannel;
+
+                _response._contentLength = _contentLength;
+                _response.receiveAsRange.activated = true;
+                _response.receiveAsRange.data.length = 0;
+                _response.receiveAsRange.data = _response._responseBody.data;
+                _response.receiveAsRange.read = delegate ubyte[] () {
+                    Buffer!ubyte result;
+                    while(true) {
+                        // check if we received everything we need
+                        if ( __maxContentLength > 0 && __contentReceived >= __maxContentLength ) 
+                        {
+                            throw new RequestException("ContentLength > maxContentLength (%d>%d)".
+                                format(__contentLength, __maxContentLength));
+                        }
+                        // have to continue
+                        auto b = new ubyte[__bufferSize];
+                        ptrdiff_t read;
+                        try {
+                            read = __dataStream.receive(b);
+                        }
+                        catch (Exception e) {
+                            throw new RequestException("streaming_in error reading from socket", __FILE__, __LINE__, e);
+                        }
+
+                        if ( read > 0 ) {
+                            _response._contentReceived += read;
+                            __contentReceived += read;
+                            result.putNoCopy(b[0..read]);
+                            return result.data;
+                        }
+                        if ( read == 0 ) {
+                            debug(requests) tracef("streaming_in: server closed connection");
+                            __dataStream.close();
+                            code = responseToCode(serverResponse(__controlChannel));
+                            if ( code/100 == 2 ) {
+                                debug(requests) tracef("Successfully received %d bytes", _response._responseBody.length);
+                            }
+                            _response.code = code;
+                            sendCmdGetResponse("CWD " ~ pwd ~ "\r\n", __controlChannel);
+                            break;
+                        }
+                    }
+                    return result.data;
+                };
+                debug(requests) tracef("leave streaming get");
+                return _response;
+            }
+        }
+        dataStream.close();
+        response = serverResponse(_controlChannel);
+        code = responseToCode(response);
+        if ( code/100 == 2 ) {
+            debug(requests) tracef("Successfully received %d bytes", _response._responseBody.length);
+        }
+        _response.code = code;
+        return _response;
+    }
     FTPResponse execute(Request r)
     {
         string method = r.method;
@@ -682,6 +929,9 @@ public struct FTPRequest {
         if ( method == "POST" )
         {
             return post();
+        }
+        if ( method == "LIST" ) {
+            return list();
         }
         assert(0, "Can't handle method %s for ftp request".format(method));
     }

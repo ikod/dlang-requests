@@ -810,7 +810,13 @@ public struct HTTPRequest {
         _response._responseBody.putNoCopy(v);
 
         // https://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.4
-        if ( (_method == "HEAD") || responseMustNotIncludeBody(_response.code) || (_contentLength < 0 && _unChunker is null) )
+        if  (
+                // document must not have body:
+                (_method == "HEAD") || responseMustNotIncludeBody(_response.code) || 
+                // we can't receive doc's without content length and chunking only in streaming mode
+                // see https://github.com/ikod/dlang-requests/issues/146
+                ((_contentLength < 0 && _unChunker is null) && !_useStreaming)
+            )
         {
             debug(requests) tracef("response without body");
             return;

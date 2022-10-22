@@ -813,7 +813,7 @@ public struct HTTPRequest {
         if  (
                 // document must not have body:
                 (_method == "HEAD") || responseMustNotIncludeBody(_response.code) || 
-                // we can't receive doc's without content length and chunking only in streaming mode
+                // we can receive doc without content length and without chunking only in streaming mode
                 // see https://github.com/ikod/dlang-requests/issues/146
                 ((_contentLength < 0 && _unChunker is null) && !_useStreaming)
             )

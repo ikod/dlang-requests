@@ -339,7 +339,7 @@ public:
             } else
             if ( !idle.isNull ) {
                 debug(requests) tracef("use just released idle (prev job %s) for %s", _m._idle[t], route);
-                t = idle;
+                t = idle.get;
                 idle.nullify();
                 fromIdleToBusy(t, route);
             } else {
@@ -369,7 +369,7 @@ public:
     }
     do {
         if ( !_m._result.isNull ) {
-            return _m._result;
+            return _m._result.get;
         }
         Tid w;
         sendWhilePossible();
@@ -395,7 +395,7 @@ public:
             fromIdleToBusy(w, route);
             _m._sent++;
         }
-        return _m._result;
+        return _m._result.get;
     }
     /**
         helpers

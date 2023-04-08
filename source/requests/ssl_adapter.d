@@ -1,5 +1,9 @@
 module requests.ssl_adapter;
 
+version(staticssl) {
+    public import requests.ssl_adapter_static;
+} else:
+
 import std.stdio;
 import std.string;
 import std.format;

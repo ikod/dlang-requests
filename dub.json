@@ -12,6 +12,13 @@
     "configurations": [
         {
             "name": "std"
+        },
+        {
+            "name": "staticssl",
+            "versions": ["staticssl"],
+            "dflags" : ["-static"],
+            "libs": ["ssl", "crypto"],
+            "platforms": ["linux"]
         }
     ],
     "subPackages": [

@@ -30,6 +30,7 @@ API docs: [Wiki](https://ikod.github.io/dlang-requests/)
 - [SSL](#ssl-settings)
 - [FTP](#ftp-requests)
 - [Request pool](#requests-pool)
+- [Static build](#static-build)
 
 
 ### Library configurations ###
@@ -1060,3 +1061,9 @@ Exception: 2 redirects reached maxRedirects 2.
 
 dlang-requests supports IDNA through `idna` package.
 It provide correct conversion between unicode domain names and punycode, but have limited ability to check names for standard compliance.
+
+### Static Build ###
+
+By default dlang-requests links to the openssl and crypto libraries dynamically. There is a `staticssl` dub configuration (linux only!) in order to link statically to these libraries.
+
+This is often used to generate a "distro-less" binaries, typically done on `alpine` using musl's libc.

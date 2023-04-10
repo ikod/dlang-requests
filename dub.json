@@ -16,8 +16,7 @@
         {
             "name": "staticssl",
             "versions": ["staticssl"],
-            "dflags" : ["-static"],
-            "libs": ["ssl", "crypto"],
+            "libs": [":libssl.a", ":libcrypto.a"],
             "platforms": ["linux"]
         }
     ],

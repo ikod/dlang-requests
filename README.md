@@ -1,6 +1,7 @@
 # dlang-requests
+![Alt](ua.png?raw=true)
 
-[![Build Status](https://travis-ci.org/ikod/dlang-requests.svg?branch=master)](https://travis-ci.org/ikod/dlang-requests)
+<!-- [![Build Status](https://travis-ci.org/ikod/dlang-requests.svg?branch=master)](https://travis-ci.org/ikod/dlang-requests) -->
 
 
 HTTP client library, inspired by python-requests with goals:

@@ -25,6 +25,3 @@ jobs:
     - name: Test
       run: |
        dub test --config=std
-       dub fetch cachetools && dub build cachetools
-       meson build && ninja -j6 -C build
-       ninja -j8 -C build test

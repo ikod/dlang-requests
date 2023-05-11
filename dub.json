@@ -37,8 +37,7 @@
         "unittest": {
             "buildOptions": ["unittests", "debugMode", "debugInfo"],
             "versions": ["httpbin"],
-            "debugVersions": ["requests", "httpd"],
-            "sourcePaths": ["tests"]
+            "debugVersions": ["requests", "httpd"]
         },
         "localtest": {
             "buildOptions": ["unittests", "debugMode", "debugInfo"],

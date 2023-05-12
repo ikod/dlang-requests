@@ -442,6 +442,21 @@ package unittest {
     rq.timeout = 1.seconds;
     assertThrown!TimeoutException(rq.get(httpbinUrl ~ "delay/3"));
 
+    info("Test ByLine interfaces");
+    auto rsp = getContentByLine(httpbinUrl ~ "stream/50");
+    assert(rsp.count == 50);
+    rsp = getContentByLine(httpbinUrl ~ "stream/0");
+    assert(rsp.count == 0);
+    rsp = getContentByLine(httpbinUrl ~ "anything", ["1":"1"]);
+    assert(rsp.map!"cast(string)a".filter!(a => a.canFind("data")).count == 1);
+    rsp = getContentByLine(httpbinUrl ~ "anything", queryParams("1","1"));
+    assert(rsp.map!"cast(string)a".filter!(a => a.canFind("data")).count == 1);
+    rsp = postContentByLine(httpbinUrl ~ "anything", "123");
+    assert(rsp.map!"cast(string)a".filter!(a => a.canFind("data")).count == 1);
+    rsp = putContentByLine(httpbinUrl ~ "anything", "123");
+    assert(rsp.map!"cast(string)a".filter!(a => a.canFind("data")).count == 1);
+
+
     info("Test get in parallel");
     {
         import std.stdio;
@@ -609,22 +624,4 @@ public auto patchContent(A...)(string url, A args) {
     auto rq = Request();
     auto rs = rq.patch(url, args);
     return rs.responseBody;
-}
-
-unittest
-{
-    import std.algorithm;
-    info("Test ByLine interfaces");
-    auto r = getContentByLine("https://httpbin.org/stream/50");
-    assert(r.count == 50);
-    r = getContentByLine("https://httpbin.org/stream/0");
-    assert(r.count == 0);
-    r = getContentByLine("https://httpbin.org/anything", ["1":"1"]);
-    assert(r.map!"cast(string)a".filter!(a => a.canFind("data")).count == 1);
-    r = getContentByLine("https://httpbin.org/anything", queryParams("1","1"));
-    assert(r.map!"cast(string)a".filter!(a => a.canFind("data")).count == 1);
-    r = postContentByLine("https://httpbin.org/anything", "123");
-    assert(r.map!"cast(string)a".filter!(a => a.canFind("data")).count == 1);
-    r = putContentByLine("https://httpbin.org/anything", "123");
-    assert(r.map!"cast(string)a".filter!(a => a.canFind("data")).count == 1);
 }

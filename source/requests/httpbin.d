@@ -11,6 +11,7 @@ version (httpbin)
 	import std.conv;
 	import std.range;
 	import std.string;
+	import std.stdio;
 	import core.thread;
 	import std.experimental.logger;
 
@@ -53,6 +54,10 @@ version (httpbin)
 			auto rs = response(rq, buildReply(rq));
 			rs.headers["Content-Type"] = "application/json";
 			return rs;
+		}
+		auto anything(in App app, ref HTTPD_Request rq, RequestArgs args) {
+				auto rs = response(rq, buildReply(rq));
+				return rs;
 		}
 		auto get(in App app, ref HTTPD_Request rq, RequestArgs args) {
 			debug (httpd) trace("handler /get called");
@@ -187,6 +192,7 @@ version (httpbin)
 			return rs;
 		}
 		server.addRoute(exactRoute(r"/",             &root)).
+				addRoute(regexRoute(r"/anything",   &anything)).
 				addRoute(exactRoute(r"/get",         &get)).
 				addRoute(exactRoute(r"/post",        &post)).
 				addRoute(exactRoute(r"/delete",      &del)).

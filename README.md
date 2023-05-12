@@ -1,7 +1,8 @@
 # dlang-requests
-![Alt](ua.png?raw=true)
+[![Build Status](https://github.com/ikod/dlang-requests/actions/workflows/blank.yml/badge.svg)](https://github.com/ikod/dlang-requests/actions/workflows/blank.yml/badge.svg)
+![DUB](https://img.shields.io/dub/dm/requests?color=blue)
 
-<!-- [![Build Status](https://travis-ci.org/ikod/dlang-requests.svg?branch=master)](https://travis-ci.org/ikod/dlang-requests) -->
+![Alt](ua.png?raw=true)
 
 
 HTTP client library, inspired by python-requests with goals:

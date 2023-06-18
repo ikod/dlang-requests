@@ -194,9 +194,10 @@ shared static this() {
     void delegate()[Version] init_matrix;
     init_matrix[Version(1,0)] = &openssl.init1_0;
     init_matrix[Version(1,1)] = &openssl.init1_1;
-    init_matrix[Version(1,3)] = &openssl.init1_1;
     init_matrix[Version(0,2)] = &openssl.init1_1; // libressl >= 2.7.1
     init_matrix[Version(0,3)] = &openssl.init1_1; // libressl >= 3.0.0
+    init_matrix[Version(3,0)] = &openssl.init1_1; // 3.0.0
+    init_matrix[Version(3,1)] = &openssl.init1_1; // 3.1
     auto init = init_matrix.get(openssl._ver, null);
     if ( init is null ) {
         throw new Exception("loading openssl: unknown version for init");
@@ -255,7 +256,7 @@ struct OpenSSL {
         c_ulong function() OpenSSL_version_num = cast(c_ulong function())DLSYM(cast(void*)_libcrypto, "OpenSSL_version_num".ptr);
         if ( OpenSSL_version_num ) {
             auto v = OpenSSL_version_num() & 0xffffffff;
-            return Version((v>>>20) & 0xff, (v>>>28) & 0xff);
+            return Version((v>>>28) & 0xff, (v>>>20) & 0xff);
         }
         return Version(1, 0);
     }

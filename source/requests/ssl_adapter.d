@@ -194,6 +194,7 @@ shared static this() {
     void delegate()[Version] init_matrix;
     init_matrix[Version(1,0)] = &openssl.init1_0;
     init_matrix[Version(1,1)] = &openssl.init1_1;
+    init_matrix[Version(2,0)] = &openssl.init1_1;
     init_matrix[Version(0,2)] = &openssl.init1_1; // libressl >= 2.7.1
     init_matrix[Version(0,3)] = &openssl.init1_1; // libressl >= 3.0.0
     init_matrix[Version(3,0)] = &openssl.init1_1; // 3.0.0

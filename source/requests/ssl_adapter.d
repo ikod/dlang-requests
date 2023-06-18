@@ -200,7 +200,7 @@ shared static this() {
     init_matrix[Version(3,1)] = &openssl.init1_1; // 3.1
     auto init = init_matrix.get(openssl._ver, null);
     if ( init is null ) {
-        throw new Exception("loading openssl: unknown version for init");
+        throw new Exception("loading openssl: unknown version %s for init".format(openssl._ver));
     }
     init();
 }

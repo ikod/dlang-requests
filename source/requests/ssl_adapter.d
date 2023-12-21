@@ -197,9 +197,14 @@ shared static this() {
     init_matrix[Version(2,0)] = &openssl.init1_1;
     init_matrix[Version(0,2)] = &openssl.init1_1; // libressl >= 2.7.1
     init_matrix[Version(0,3)] = &openssl.init1_1; // libressl >= 3.0.0
-    init_matrix[Version(3,0)] = &openssl.init1_1; // 3.0.0
-    init_matrix[Version(3,1)] = &openssl.init1_1; // 3.1
-    auto init = init_matrix.get(openssl._ver, null);
+    init_matrix[Version(3,0)] = &openssl.init1_1; // >=3.0
+    auto initVer = (ver) {
+        if (ver.major == 3 && ver.minor >= 1) // set 3.x to 3.0 for the init matrix
+            return Version(3, 0);
+        else
+            return ver;
+    }(openssl._ver);
+    auto init = init_matrix.get(initVer, null);
     if ( init is null ) {
         throw new Exception("loading openssl: unknown version %s for init".format(openssl._ver));
     }

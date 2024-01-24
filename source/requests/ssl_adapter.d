@@ -121,11 +121,15 @@ shared static this() {
              "libssl32.dll"w,
              "libssl-1_1"w,
              "libssl-1_1-x64"w,
+             "libssl-3"w,
+             "libssl-3-x64"w,
          ];
          immutable wstring[] libcryptoname = [
              "libeay32.dll"w,
              "libcrypto-1_1"w,
              "libcrypto-1_1-x64"w,
+             "libcrypto-3"w,
+             "libcrypto-3-x64"w,
         ];
     } else {
         debug(requests) trace("error loading openssl: unsupported system - first access over https will fail");

@@ -202,6 +202,7 @@ shared static this() {
     init_matrix[Version(0,2)] = &openssl.init1_1; // libressl >= 2.7.1
     init_matrix[Version(0,3)] = &openssl.init1_1; // libressl >= 3.0.0
     init_matrix[Version(3,0)] = &openssl.init1_1; // >=3.0
+    init_matrix[Version(3,2)] = &openssl.init1_1; // >=3.2
     auto initVer = (ver) {
         if (ver.major == 3 && ver.minor >= 1) // set 3.x to 3.0 for the init matrix
             return Version(3, 0);

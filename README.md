@@ -1,5 +1,5 @@
 # dlang-requests
-[![Build Status](https://github.com/ikod/dlang-requests/actions/workflows/blank.yml/badge.svg)](https://github.com/ikod/dlang-requests/actions/workflows/blank.yml/badge.svg)
+[![Run all D Tests](https://github.com/ikod/dlang-requests/actions/workflows/blank.yml/badge.svg)](https://github.com/ikod/dlang-requests/actions/workflows/blank.yml)
 ![DUB](https://img.shields.io/dub/dm/requests?color=blue)
 
 ![Alt](ua.png?raw=true)

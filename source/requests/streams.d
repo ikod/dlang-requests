@@ -1131,9 +1131,14 @@ public abstract class SocketStream : NetworkStream {
     in {assert(isConnected);}
     do {
         auto rc = s.send(buff);
-        if (rc < 0) {
-            close();
-            throw new NetworkException("sending data: %s".format(to!string(strerror(errno))));
+        if (rc <= 0) {
+            rc = 0;
+            const code = openssl.ERR_get_error();
+            if(code != 0) {
+                const msg = openssl.ERR_reason_error_string(code);
+                close();
+                throw new NetworkException("sending data: "~msg.to!string);
+            }
         }
         return rc;
     }
@@ -1141,24 +1146,13 @@ public abstract class SocketStream : NetworkStream {
     ptrdiff_t receive(void[] buff) {
         while (true) {
             auto r = s.receive(buff);
-            if (r < 0) {
-                auto e = errno;
-                version(Windows) {
+            if (r <= 0) {
+                r = 0;
+                const code = openssl.ERR_get_error();
+                if(code != 0) {
+                    const msg = openssl.ERR_reason_error_string(code);
                     close();
-                    if ( e == 0 ) {
-                        throw new TimeoutException("Timeout receiving data");
-                    }
-                    throw new NetworkException("Unexpected error %s while receiving data".format(to!string(strerror(errno))));
-                }
-                version(Posix) {
-                    if ( e == EINTR ) {
-                        continue;
-                    }
-                    close();
-                    if ( e == EAGAIN ) {
-                        throw new TimeoutException("Timeout receiving data");
-                    }
-                    throw new NetworkException("Unexpected error %s while receiving data".format(to!string(strerror(errno))));
+                    throw new NetworkException("Unexpected error %s while receiving data".format(msg.to!string));
                 }
             }
             else {

@@ -2055,7 +2055,7 @@ public struct HTTPRequest {
             _response._finishedAt = Clock.currTime;
         }
         catch (NetworkException e) {
-            errorf("Error sending request: ", e.msg);
+            errorf("Error sending request: %s", e.msg);
             _stream.close();
             return _response;
         }

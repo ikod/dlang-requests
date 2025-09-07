@@ -1147,6 +1147,10 @@ public abstract class SocketStream : NetworkStream {
         while (true) {
             auto r = s.receive(buff);
             if (r <= 0) {
+                version(Posix) {
+                    if (errno == EINTR)
+                        continue;
+                }
                 r = 0;
                 const code = openssl.ERR_get_error();
                 if(code != 0) {

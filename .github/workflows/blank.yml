@@ -8,8 +8,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macOS-latest]
-        dc: [dmd-2.085, ldc]
-        
+        dc: [dmd, ldc]
+        exclude:
+          - { os: macOS-latest, dc: dmd }        
         # You have to exclude gdc configurations from non-linux OSes
 
     runs-on: ${{ matrix.os }}

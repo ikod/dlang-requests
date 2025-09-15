@@ -353,6 +353,13 @@ public struct Request {
         _sslOptions.setCertFile(p, t);
     }
     /**
+        should we use ssl keyLogFile?
+        set file name in env variable SSLKEYLOGFILE
+    */
+    @property void sslUseKeyLogFile(bool use) pure @safe nothrow @nogc {
+        _sslOptions.useKeyLogFile(use);
+    }
+    /**
         Set path to certificate authority file.
     */
     @property void sslSetCaCert(string path) pure @safe nothrow @nogc {

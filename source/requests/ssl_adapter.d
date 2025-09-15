@@ -182,6 +182,7 @@ shared static this() {
     mixin(SSL_Function_set_i!("SSL_CTX_use_PrivateKey_file", int, SSL_CTX*, const char*, int));
     mixin(SSL_Function_set_i!("SSL_CTX_use_certificate_file", int, SSL_CTX*, const char*, int));
     mixin(SSL_Function_set_i!("SSL_CTX_set_cipher_list", int, SSL_CTX*, const char*));
+    mixin(SSL_Function_set_i!("SSL_CTX_set_keylog_callback", int, SSL_CTX*, void*));
     mixin(SSL_Function_set_i!("SSL_CTX_ctrl", c_long, SSL_CTX*, int, c_long, void*));
     mixin(SSL_Function_set_i!("SSL_new", SSL*, SSL_CTX*));
     mixin(SSL_Function_set_i!("SSL_set_fd", int, SSL*, int));
@@ -244,6 +245,7 @@ struct OpenSSL {
         mixin(SSL_Function_decl!("SSL_CTX_use_PrivateKey_file", int, SSL_CTX*, const char*, int));
         mixin(SSL_Function_decl!("SSL_CTX_use_certificate_file", int, SSL_CTX*, const char*, int));
         mixin(SSL_Function_decl!("SSL_CTX_set_cipher_list", int, SSL_CTX*, const char*));
+        mixin(SSL_Function_decl!("SSL_CTX_set_keylog_callback", int, SSL_CTX*, void*));
         mixin(SSL_Function_decl!("SSL_CTX_ctrl", c_long, SSL_CTX*, int, c_long, void*));
         mixin(SSL_Function_decl!("SSL_new", SSL*, SSL_CTX*));
         mixin(SSL_Function_decl!("SSL_set_fd", int, SSL*, int));
@@ -345,6 +347,9 @@ struct OpenSSL {
     }
     int SSL_CTX_set_cipher_list(SSL_CTX* ssl_ctx, const char* c) const @nogc nothrow {
         return adapter_SSL_CTX_set_cipher_list(ssl_ctx, c);
+    }
+    void SSL_CTX_set_keylog_callback(SSL_CTX* ssl_ctx, void* f) const @nogc nothrow {
+        adapter_SSL_CTX_set_keylog_callback(ssl_ctx, f);
     }
     /*
      *

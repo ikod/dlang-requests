@@ -756,6 +756,8 @@ public struct SSLOptions {
         string   _certFile;
         filetype _keyType = filetype.pem;
         filetype _certType = filetype.pem;
+        //
+        bool _useKeyLogFile;
     }
     ubyte haveFiles() pure nothrow @safe @nogc {
         ubyte r = 0;
@@ -810,6 +812,13 @@ public struct SSLOptions {
     void setCertType(string t) @safe pure nothrow {
         _certType = cast(filetype)sslKeyTypes[t];
     }
+    auto useKeyLogFile(bool v) @safe pure nothrow @nogc {
+        _useKeyLogFile = v;
+        return this;
+    }
+    auto useKeyLogFile() @safe pure nothrow @nogc {
+        return _useKeyLogFile;
+    }
 }
 static immutable int[string] sslKeyTypes;
 shared static this() {
@@ -818,6 +827,25 @@ shared static this() {
         "asn1":SSLOptions.filetype.asn1,
         "der":SSLOptions.filetype.der,
     ];
+}
+
+private __gshared File keyLogFile;
+
+private void init_keylog_file() {
+    import std.process;
+    import std.concurrency;
+    auto fn = environment.get("SSLKEYLOGFILE", null);
+    if ( fn ) {
+        keyLogFile = initOnce!keyLogFile(File(fn, "a+"));
+    }
+}
+
+
+extern (C) void keylog(SSL* s, const char* line) {
+    auto f = keyLogFile;
+    assert(f.isOpen(), "requested to use not opened ssl keyLogFile");
+    f.writeln(to!string(line));
+    f.flush();
 }
 
 version(vibeD) {
@@ -876,6 +904,10 @@ else {
                     break;
                 case 0b00:
                     break;
+            }
+            if ( opts.useKeyLogFile() ) {
+                init_keylog_file();
+                openssl.SSL_CTX_set_keylog_callback(ctx, &keylog);
             }
             //SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
             //SSL_CTX_ctrl(ctx, 33, SSL_MODE_RELEASE_BUFFERS, null);

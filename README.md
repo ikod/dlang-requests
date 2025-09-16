@@ -668,6 +668,7 @@ HTTP requests can be configured for SSL options: you can enable or disable remot
 * sslSetKeyFile(string) - load client key from file
 * sslSetCertFile(string) - load client cert from file
 * sslSetCaCert(string) - load server CA cert for private or self-signed server certificates
+* sslUseKeyLogFile(bool) - enable or disable SSLKEYLOGFILE (you have to set file name in env variable SSLKEYLOGFILE)
 
 ```d
 import std.stdio;

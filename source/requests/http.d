@@ -419,8 +419,9 @@ public struct HTTPRequest {
     /// encode parameters and build query part of the url
     ///
     private static string params2query(in QueryParam[] params) pure @safe {
+        import std.uri: encodeComponent;
         return params.
-                map!(a => "%s=%s".format(a.key.urlEncoded, a.value.urlEncoded)).
+                map!(a => "%s=%s".format(a.key.encodeComponent, a.value.encodeComponent)).
                 join("&");
     }
     //

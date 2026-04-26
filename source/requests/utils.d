@@ -162,7 +162,7 @@ string[] dump(in ubyte[] data) {
 static string urlEncoded(string p) pure @safe {
     import std.uri: encodeComponent;
     immutable string[dchar] translationTable = [
-        ' ':  "%20", '!': "%21", '*': "%2A", '\'': "%27", '(': "%28", ')': "%29",
+        ' ':  "%20", '!': "%21", '\'': "%27", '(': "%28", ')': "%29",
         ';':  "%3B", ':': "%3A", '@': "%40", '&':  "%26", '=': "%3D", '+': "%2B",
         '$':  "%24", ',': "%2C", '/': "%2F", '?':  "%3F", '#': "%23", '[': "%5B",
         ']':  "%5D", '~': "%7E",
@@ -170,7 +170,7 @@ static string urlEncoded(string p) pure @safe {
     return p.encodeComponent().translate(translationTable);
 }
 package unittest {
-    assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
+    assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29*%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
     assert(urlEncoded("\0.ä.ඞ") == "%00.%C3%A4.%E0%B6%9E");
     string s = "\0.ä.ඞ";
     assert(s.urlEncoded().urlDecode() == s);
@@ -209,7 +209,7 @@ string urlDecode(string p) {
 }
 
 package unittest {
-    assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
+    assert(urlEncoded(`abc !#$&'()*+,/:;=?@[]`) == "abc%20%21%23%24%26%27%28%29*%2B%2C%2F%3A%3B%3D%3F%40%5B%5D");
     assert(urlDecode("a+bc%20%21%23%24%26%27%28%29%2A%2B%2C%2F%3A%3B%3D%3F%40%5B%5D") == `a bc !#$&'()*+,/:;=?@[]`);
 }
 

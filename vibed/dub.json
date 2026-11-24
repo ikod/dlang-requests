@@ -7,15 +7,15 @@
 	"license": "BSL-1.0",
 	"targetType": "library",
 	"name": "vibed",
-        "versions": ["vibeD"],
-        "dependencies": {
-		"cachetools": "~>0",
-		"vibe-d": "~>0.8"
-        },
-        "sourcePaths": [
-            "../source"
-        ],
-        "importPaths": [
-            "../source"
+		"versions": ["vibeD"],
+		"dependencies": {
+			"cachetools": "~>0",
+			"vibe-http": "~>1.6"
+		},
+		"sourcePaths": [
+			"../source"
+		],
+		"importPaths": [
+			"../source"
 	]
 }
